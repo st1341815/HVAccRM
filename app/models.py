@@ -94,6 +94,19 @@ class Project(Base):
 # 单元只允许从固定下拉中选择：1单元 ~ 9单元（空 = 该楼栋无单元概念，如自建/独栋）
 UNIT_OPTIONS = [f"{i}单元" for i in range(1, 10)]
 
+# 意向产品：固定白名单（多选），不允许自由输入
+PRODUCT_OPTIONS = ["锅炉", "空调", "暖气片", "地暖", "明装", "改造", "水机", "新风", "净水"]
+
+
+def encode_products(values) -> str | None:
+    """多选值 → '|A|B|' 存储（两侧带分隔符，可用 LIKE '%|A|%' 精确匹配，避免子串误命中）。"""
+    clean = [v for v in dict.fromkeys(values or []) if v in PRODUCT_OPTIONS]
+    return "|" + "|".join(clean) + "|" if clean else None
+
+
+def decode_products(raw: str | None) -> list[str]:
+    return [p for p in (raw or "").split("|") if p]
+
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -124,12 +137,15 @@ class Customer(Base):
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
     type = Column(String)  # 家装 / 工程 / 经销商 …
-    industry = Column(String)
+    phone = Column(String, index=True)  # 客户手机号（客户级，与联系人电话分开）
+    wechat = Column(String)
+    products = Column(String)  # 意向产品多选，编码为 "|锅炉|地暖|" 便于精确匹配
+    industry = Column(String)  # 已不再在表单采集，保留列以兼容 FTS/历史数据
     source = Column(String)  # 渠道来源
     level = Column(String)  # A/B/C
     status = Column(String, default="active")
     room_id = Column(Integer, ForeignKey("rooms.id"))
-    decor_stage = Column(String)
+    decor_stage = Column(String)  # 同上：保留列，表单已移除
     is_showroom = Column(Integer, default=0)
     address = Column(String)
     notes = Column(Text)
@@ -149,6 +165,10 @@ class Customer(Base):
         if not self.room:
             return ""
         return f"{self.room.project.name if self.room.project else ''} {self.room.label}"
+
+    @property
+    def product_list(self) -> list[str]:
+        return decode_products(self.products)
 
     @property
     def primary_contact(self) -> "Contact | None":

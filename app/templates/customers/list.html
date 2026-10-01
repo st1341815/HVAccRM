@@ -8,7 +8,7 @@
 
 <section class="card">
   <form method="get" action="/customers" class="filterbar">
-    <input name="q" value="{{ q }}" placeholder="搜索：客户名 / 行业 / 备注 / 联系人电话（FTS5）">
+    <input name="q" value="{{ q }}" placeholder="搜索：客户名 / 手机号 / 微信 / 备注（FTS5）">
     <select name="status">
       <option value="">全部状态</option>
       {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}

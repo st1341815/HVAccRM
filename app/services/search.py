@@ -14,6 +14,8 @@ def _like_conditions(q: str):
     )
     return or_(
         Customer.name.like(like),
+        Customer.phone.like(like),
+        Customer.wechat.like(like),
         Customer.industry.like(like),
         Customer.notes.like(like),
         Customer.address.like(like),
@@ -25,7 +27,9 @@ def search_customers(db: Session, q: str, scope_cond=None, limit: int = 200) -> 
     q = (q or "").strip()
     stmt = select(Customer)
     if q:
-        ids: list[int] = []
+        cond = _like_conditions(q)
+        # FTS5 trigram 需要 ≥3 字符；手机号（11 位）能命中 FTS 但手机号未进索引，
+        # 因此 LIKE 条件始终并集进结果，避免「搜手机号搜不到客户」。
         if len(q) >= 3:
             try:
                 rows = db.execute(
@@ -35,12 +39,10 @@ def search_customers(db: Session, q: str, scope_cond=None, limit: int = 200) -> 
                     {"m": f'"{q}"', "lim": limit},
                 ).all()
                 ids = [r[0] for r in rows]
+                if ids:
+                    cond = or_(Customer.id.in_(ids), cond)
             except Exception:
-                ids = []
-        if ids:
-            cond = Customer.id.in_(ids)
-        else:
-            cond = _like_conditions(q)
+                pass
         stmt = stmt.where(cond)
     if scope_cond is not None:
         stmt = stmt.where(scope_cond)

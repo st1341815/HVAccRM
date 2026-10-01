@@ -5,7 +5,6 @@
   <h1>{{ customer.name }}
     <span class="badge">{{ customer.status }}</span>
     {% if customer.level %}<span class="badge">等级 {{ customer.level }}</span>{% endif %}
-    {% if customer.is_showroom %}<span class="badge showroom">样板间</span>{% endif %}
   </h1>
   <div class="actions">
     <a class="btn" href="/photos/album/{{ customer.id }}">相册</a>
@@ -22,7 +21,9 @@
 <div class="meta">
   <span>🏢 房号：<strong>{{ customer.room_label or '未关联' }}</strong></span>
   <span>👤 负责人：{{ customer.owner.username if customer.owner else '-' }}</span>
-  <span>📞 主联系人：{% set pc = customer.primary_contact %}{{ pc.name ~ ' ' ~ (pc.phone or '') if pc else '未填写' }}</span>
+  <span>📱 手机：<strong>{{ customer.phone or '未填写' }}</strong></span>
+  <span>💬 微信：{{ customer.wechat or '未填写' }}</span>
+  <span>🎯 意向：{% for p in customer.product_list %}<span class="badge">{{ p }}</span>{% else %}未填写{% endfor %}</span>
   <span>📈 施工进度：<strong>{{ progress }}%</strong>{% if delayed %} <span class="red">（延期 {{ delayed }} 个节点）</span>{% endif %}</span>
   <span>🗓 建档：{{ customer.created_at[:10] }}</span>
 </div>
@@ -185,10 +186,10 @@
     <h2>基本信息</h2>
     <table class="kv">
       <tr><th>客户类型</th><td>{{ customer.type or '-' }}</td></tr>
-      <tr><th>行业</th><td>{{ customer.industry or '-' }}</td></tr>
+      <tr><th>手机号</th><td>{{ customer.phone or '-' }}</td></tr>
+      <tr><th>微信</th><td>{{ customer.wechat or '-' }}</td></tr>
+      <tr><th>意向产品</th><td>{% for p in customer.product_list %}<span class="badge">{{ p }}</span>{% else %}-{% endfor %}</td></tr>
       <tr><th>渠道来源</th><td>{{ customer.source or '-' }}</td></tr>
-      <tr><th>装修阶段</th><td>{{ customer.decor_stage or '-' }}</td></tr>
-      <tr><th>地址</th><td>{{ customer.address or '-' }}</td></tr>
       <tr><th>备注</th><td class="break">{{ customer.notes or '-' }}</td></tr>
     </table>
   </section>

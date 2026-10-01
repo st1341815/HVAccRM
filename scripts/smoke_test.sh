@@ -63,16 +63,23 @@ chk "合法单元 9单元 写入" 303 "$c"
 c=$(code -b $J "$B/projects/$PID"); has "9单元" && ok "9单元已入库" || bad "9单元未入库"
 
 echo "== 3. 客户 + 自动建工序 + 联系人 =="
-c=$(code -b $J -X POST --data-urlencode "name=测试客户张三" --data-urlencode "type=家装业主" --data-urlencode "source=自然到店" --data-urlencode "level=A" --data-urlencode "room_id=$ROOMID" --data-urlencode "contact_name=张三" --data-urlencode "contact_phone=13800000000" $B/customers/new)
+c=$(code -b $J -X POST --data-urlencode "name=测试客户张三" --data-urlencode "type=家装业主" --data-urlencode "phone=13711112222" --data-urlencode "wechat=zhangsan_wx" --data-urlencode "products=地暖" --data-urlencode "products=新风" --data-urlencode "products=不存在的产品" --data-urlencode "source=自然到店" --data-urlencode "level=A" --data-urlencode "room_id=$ROOMID" --data-urlencode "contact_name=张三" --data-urlencode "contact_phone=13800000000" $B/customers/new)
 chk "新建客户" 303 "$c"; CID=$(last_id); echo "  CID=$CID"
 c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
 has "售后回访" && ok "9 节点工序自动生成" || bad "工序未生成"
+c=$(code -b $J "$B/customers/$CID"); chk "客户详情页" 200 "$c"
+has "13711112222" && ok "客户手机号已入库并展示" || bad "客户手机号未入库"
+has "zhangsan_wx" && ok "微信号已入库并展示" || bad "微信号未入库"
+has "地暖" && has "新风" && ok "意向产品多选已入库并展示" || bad "意向产品未入库"
+has "不存在的产品" && bad "白名单外的意向产品竟被写入" || ok "白名单外的意向产品被过滤"
 c=$(code -b $J -X POST --data-urlencode "name=李四" --data-urlencode "title=经理" -d "phone=13900000000&is_primary=1" $B/customers/$CID/contacts)
 chk "添加联系人" 303 "$c"
 c=$(code -b $J --get --data-urlencode "q=张三" $B/customers); chk "搜索客户(FTS5)" 200 "$c"
 has "测试客户张三" && ok "搜索结果命中" || bad "搜索结果未命中"
 c=$(code -b $J --get --data-urlencode "q=13800000000" $B/customers)
 has "测试客户张三" && ok "按联系人手机搜索命中" || bad "手机搜索未命中"
+c=$(code -b $J --get --data-urlencode "q=13711112222" $B/customers)
+has "测试客户张三" && ok "按客户本人手机号搜索命中" || bad "客户手机号搜索未命中"
 c=$(code -b $J --get --data-urlencode "q=张三" $B/ui/customer-search); chk "HTMX 客户片段" 200 "$c"
 
 echo "== 4. 合同 + 收款（三数核对 / 超额拦截 / 增项） =="

@@ -9,10 +9,20 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Contact, Customer, CustomerShare, Project, Room, User, now_iso
+from ..models import (
+    Contact,
+    Customer,
+    CustomerShare,
+    Project,
+    Room,
+    User,
+    encode_products,
+    now_iso,
+)
 from ..permissions import (
     DEFAULT_SCOPE,
     can_edit_customer,
+    can_see_amount,
     can_view_customer,
     customer_scope_conditions,
     has_perm,
@@ -61,7 +71,8 @@ def list_customers(
 
     owners = {u.id: u for u in db.scalars(select(User)).all()}
     projects = list(db.scalars(select(Project).order_by(Project.name)).all())
-    summaries = {c.id: finance_svc.customer_summary(db, c) for c in customers}
+    show_money = has_perm(user, "payment:view") and can_see_amount(user)
+    summaries = {c.id: finance_svc.customer_summary(db, c) for c in customers} if show_money else {}
     return render(
         request,
         "customers/list.html",
@@ -75,6 +86,7 @@ def list_customers(
         owners=owners,
         projects=projects,
         summaries=summaries,
+        show_money=show_money,
         sources=SOURCES,
         levels=LEVELS,
         statuses=STATUSES,
@@ -129,14 +141,13 @@ def create_customer(
     request: Request,
     name: str = Form(...),
     type: str = Form(""),
-    industry: str = Form(""),
+    phone: str = Form(""),
+    wechat: str = Form(""),
+    products: list[str] = Form([]),
     source: str = Form(""),
     level: str = Form(""),
     status: str = Form("active"),
     room_id: str = Form(""),
-    decor_stage: str = Form(""),
-    is_showroom: str = Form(""),
-    address: str = Form(""),
     notes: str = Form(""),
     owner_id: str = Form(""),
     contact_name: str = Form(""),
@@ -166,14 +177,13 @@ def create_customer(
         owner_id=owner,
         name=name.strip(),
         type=type or None,
-        industry=industry.strip() or None,
+        phone=phone.strip() or None,
+        wechat=wechat.strip() or None,
+        products=encode_products(products),
         source=source or None,
         level=level or None,
         status=status or "active",
         room_id=parse_int(room_id),
-        decor_stage=decor_stage.strip() or None,
-        is_showroom=1 if is_showroom else 0,
-        address=address.strip() or None,
         notes=notes.strip() or None,
         created_by=user.id,
         created_at=now_iso(),
@@ -275,14 +285,13 @@ def update_customer(
     customer_id: int,
     name: str = Form(...),
     type: str = Form(""),
-    industry: str = Form(""),
+    phone: str = Form(""),
+    wechat: str = Form(""),
+    products: list[str] = Form([]),
     source: str = Form(""),
     level: str = Form(""),
     status: str = Form("active"),
     room_id: str = Form(""),
-    decor_stage: str = Form(""),
-    is_showroom: str = Form(""),
-    address: str = Form(""),
     notes: str = Form(""),
     owner_id: str = Form(""),
     db: Session = Depends(get_db),
@@ -294,6 +303,9 @@ def update_customer(
     before = {
         "name": customer.name,
         "type": customer.type,
+        "phone": customer.phone,
+        "wechat": customer.wechat,
+        "products": customer.products,
         "source": customer.source,
         "level": customer.level,
         "status": customer.status,
@@ -303,14 +315,13 @@ def update_customer(
     }
     customer.name = name.strip() or customer.name
     customer.type = type or None
-    customer.industry = industry.strip() or None
+    customer.phone = phone.strip() or None
+    customer.wechat = wechat.strip() or None
+    customer.products = encode_products(products)
     customer.source = source or None
     customer.level = level or None
     customer.status = status or "active"
     customer.room_id = parse_int(room_id)
-    customer.decor_stage = decor_stage.strip() or None
-    customer.is_showroom = 1 if is_showroom else 0
-    customer.address = address.strip() or None
     customer.notes = notes.strip() or None
     if (user.data_scope or "") == "all":
         customer.owner_id = parse_int(owner_id) or customer.owner_id
