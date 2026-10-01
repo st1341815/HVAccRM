@@ -17,7 +17,7 @@ from ..utils import client_ip, get_or_404, parse_int
 
 router = APIRouter(tags=["photos"])
 
-KINDS = ["量尺", "复尺", "现场", "到货", "施工", "安装", "验收", "完工", "售后", "其他"]
+KINDS = ["量尺", "复尺", "现场", "到货", "施工", "安装", "验收", "完工", "售后", "纸质合同", "其他"]
 
 
 def _may_upload(db: Session, user: User, customer: Customer) -> bool:
@@ -119,6 +119,7 @@ async def upload_photos(
 def delete_photo(
     request: Request,
     photo_id: int,
+    back: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("photo:delete")),
 ):
@@ -127,7 +128,9 @@ def delete_photo(
     msg = photo_svc.delete_photo(db, photo)
     log_action(db, user, "delete", "photos", photo_id, old={"path": photo.path}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(f"/photos/album/{cid}", msg)
+    # 允许调用方指定返回页（如合同详情页），仅接受站内相对路径
+    target = back if back.startswith("/") and not back.startswith("//") else f"/photos/album/{cid}"
+    return redirect(target, msg)
 
 
 @router.get("/photos/{photo_id}/file")
