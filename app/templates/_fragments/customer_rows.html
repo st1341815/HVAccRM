@@ -1,0 +1,21 @@
+{% if customers %}
+<table class="tight">
+  <thead><tr><th>客户</th><th>房号</th><th>状态</th>{% if show_money %}<th>合同额</th><th>已收</th><th>未收</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for c in customers %}
+    {% set s = summaries.get(c.id) %}
+    <tr>
+      <td><a href="/customers/{{ c.id }}">{{ c.name }}</a></td>
+      <td>{{ c.room_label or '-' }}</td>
+      <td>{{ c.status }}</td>
+      {% if show_money and s %}
+        <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
+        <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">没有匹配的客户。</p>
+{% endif %}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}看板{% endblock %} · {{ settings.app_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+{% if user %}
+<header class="topbar">
+  <div class="brand">🏠 家居建材 CRM</div>
+  <nav>
+    <a href="/" class="{{ 'active' if current_path == '/' else '' }}">看板</a>
+    {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}">客户</a>{% endif %}
+    <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}">楼盘/房号</a>
+    {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}">合同</a>{% endif %}
+    {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}">收款</a>{% endif %}
+    {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}">施工</a>{% endif %}
+    {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}">用户</a>{% endif %}
+    {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}">系统</a>{% endif %}
+  </nav>
+  <div class="me">
+    <span class="who">{{ user.username }} · {{ role_label }}</span>
+    <a href="/account">账户</a>
+    <a href="/logout">退出</a>
+  </div>
+</header>
+{% endif %}
+<main class="wrap">
+  {% if flash %}<div class="flash {{ flash.level }}">{{ flash.message }}</div>{% endif %}
+  {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="foot">v{{ version }} · {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
+</body>
+</html>

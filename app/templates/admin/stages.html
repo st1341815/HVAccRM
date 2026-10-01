@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}工序模板{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>标准施工工序模板</h1>
+  <nav class="tabs inline-tabs">
+    <a href="/admin">概览</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/permissions">权限矩阵</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/stages" class="active">工序模板</a>
+    <a href="/admin/backups">备份</a>
+  </nav>
+</div>
+
+<section class="card">
+  <table>
+    <thead><tr><th>序号</th><th>节点名称</th><th>默认工期(天)</th><th>需照片</th><th>产出物</th><th>启用</th><th>保存</th></tr></thead>
+    <tbody>
+    {% for s in stages %}
+      <tr>
+        <td>{{ s.sort_order }}</td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td colspan="5">
+          <form method="post" action="/admin/stages/{{ s.id }}/update" class="filterbar">
+            <input name="sort_order" value="{{ s.sort_order }}" inputmode="numeric" style="width:5rem">
+            <input name="default_days" value="{{ s.default_days }}" inputmode="numeric" style="width:5rem">
+            <label class="checkline"><input type="checkbox" name="require_photo" value="1" {{ 'checked' if s.require_photo else '' }}> 需照片</label>
+            <span class="muted small">{{ s.output_doc or '' }}</span>
+            <label class="checkline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if s.is_active else '' }}> 启用</label>
+            <button>保存</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">模板变更只影响之后新建的客户；存量客户可用客户详情页的「按模板补齐缺失节点」。</p>
+</section>
+
+<section class="card">
+  <h2>新增工序节点</h2>
+  <form method="post" action="/admin/stages/new" class="filterbar">
+    <input name="name" placeholder="节点名称" required>
+    <input name="sort_order" placeholder="顺序" inputmode="numeric">
+    <input name="default_days" placeholder="默认工期天数" inputmode="numeric">
+    <input name="output_doc" placeholder="产出物说明">
+    <label class="checkline"><input type="checkbox" name="require_photo" value="1"> 需照片</label>
+    <button type="submit">＋ 添加</button>
+  </form>
+</section>
+{% endblock %}

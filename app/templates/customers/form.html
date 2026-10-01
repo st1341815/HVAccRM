@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+{% block title %}{{ '编辑客户' if customer else '新建客户' }}{% endblock %}
+{% block content %}
+<h1>{{ '编辑客户：' + customer.name if customer else '新建客户' }}</h1>
+
+<form method="post" action="{{ '/customers/' + customer.id|string + '/edit' if customer else '/customers/new' }}" class="card stack">
+  <div class="grid3">
+    <label>客户姓名 *<input name="name" value="{{ customer.name if customer else '' }}" required></label>
+    <label>客户类型
+      <select name="type">
+        <option value="">未填写</option>
+        {% for t in types %}<option value="{{ t }}" {{ 'selected' if customer and customer.type == t else '' }}>{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>行业<input name="industry" value="{{ customer.industry or '' if customer else '' }}" placeholder="如：橱柜定制"></label>
+    <label>渠道来源
+      <select name="source">
+        <option value="">未填写</option>
+        {% for s in sources %}<option value="{{ s }}" {{ 'selected' if customer and customer.source == s else '' }}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>客户等级
+      <select name="level">
+        <option value="">未分级</option>
+        {% for l in levels %}<option value="{{ l }}" {{ 'selected' if customer and customer.level == l else '' }}>{{ l }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>状态
+      <select name="status">
+        {% for s in ['active','won','paused','lost'] %}
+        <option value="{{ s }}" {{ 'selected' if customer and customer.status == s else '' }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>负责人
+      <select name="owner_id">
+        {% for u in owners %}
+        <option value="{{ u.id }}" {{ 'selected' if customer and customer.owner_id == u.id else '' }}>{{ u.username }}（{{ role_labels.get(u.role, u.role) }}）</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>装修阶段<input name="decor_stage" value="{{ customer.decor_stage or '' if customer else '' }}" placeholder="如：水电完成"></label>
+    <label class="checkline"><input type="checkbox" name="is_showroom" value="1" {{ 'checked' if customer and customer.is_showroom else '' }}> 样板间</label>
+  </div>
+
+  <fieldset class="room-picker">
+    <legend>房号（楼盘 → 楼栋 → 房号 级联）</legend>
+    <div class="grid3">
+      <label>楼盘
+        <select name="project_sel" id="project_sel" onchange="loadBuildings(this.value)">
+          <option value="">请选择楼盘</option>
+          {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if customer and customer.room and customer.room.project_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>楼栋
+        <select id="building_sel" onchange="loadRooms(document.getElementById('project_sel').value, this.value)">
+          {% if customer and customer.room %}<option value="{{ customer.room.building }}" selected>{{ customer.room.building }}</option>{% else %}<option value="">请先选楼盘</option>{% endif %}
+        </select>
+      </label>
+      <label>房号
+        <select name="room_id" id="room_sel">
+          {% if customer and customer.room %}<option value="{{ customer.room.id }}" selected>{{ customer.room.label }}</option>{% else %}<option value="">请先选楼栋</option>{% endif %}
+        </select>
+      </label>
+    </div>
+    <p class="muted small">找不到房号？<a href="/projects/new">新建楼盘</a>，或进入楼盘页面快捷添加房号后回来重选。</p>
+    <p class="muted small">快捷搜索房号：
+      <input id="room_q" placeholder="如 1203" oninput="searchRooms()">
+      <span id="room_result"></span>
+    </p>
+  </fieldset>
+
+  <label>地址<input name="address" value="{{ customer.address or '' if customer else '' }}"></label>
+  <label>备注<textarea name="notes" rows="3">{{ customer.notes or '' if customer else '' }}</textarea></label>
+
+  {% if not customer %}
+  <fieldset>
+    <legend>首个联系人（可选）</legend>
+    <div class="grid3">
+      <label>姓名<input name="contact_name"></label>
+      <label>手机<input name="contact_phone"></label>
+      <label>微信<input name="contact_wechat"></label>
+    </div>
+    <label>工序默认执行人
+      <select name="default_assignee">
+        <option value="">与负责人一致</option>
+        {% for u in owners %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="muted small">保存后自动按标准工序模板生成 9 个施工节点任务。</p>
+  </fieldset>
+  {% endif %}
+
+  <div class="actions">
+    <button type="submit">保存</button>
+    <a class="btn ghost" href="{{ '/customers/' + customer.id|string if customer else '/customers' }}">取消</a>
+  </div>
+</form>
+
+<script>
+function loadBuildings(pid, autoSelect) {
+  const sel = document.getElementById('building_sel');
+  if (!pid) { sel.innerHTML = '<option value="">请先选楼盘</option>'; return; }
+  fetch('/projects/' + pid + '/buildings').then(r => r.text()).then(html => { sel.innerHTML = html; });
+}
+function loadRooms(pid, building) {
+  const sel = document.getElementById('room_sel');
+  if (!pid || !building) { sel.innerHTML = '<option value="">请先选楼栋</option>'; return; }
+  fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building))
+    .then(r => r.text()).then(html => { sel.innerHTML = html; });
+}
+function searchRooms() {
+  const q = document.getElementById('room_q').value.trim();
+  const pid = document.getElementById('project_sel').value;
+  if (!q) { document.getElementById('room_result').innerHTML = ''; return; }
+  fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q))
+    .then(r => r.text()).then(html => { document.getElementById('room_result').innerHTML = html; });
+}
+</script>
+{% endblock %}

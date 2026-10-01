@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+{% block title %}相册 · {{ customer.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ customer.name }} 的现场照片 <span class="muted small">共 {{ photos|length }} 张</span></h1>
+  <a class="btn ghost" href="/customers/{{ customer.id }}">← 返回客户</a>
+</div>
+
+{% if may_upload %}
+<section class="card">
+  <h2>上传照片（支持多选，手机可直接拍照）</h2>
+  <form method="post" action="/api/customers/{{ customer.id }}/photos" enctype="multipart/form-data" class="stack">
+    <div class="grid3">
+      <label>照片类型
+        <select name="kind">
+          {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if kind == k else '' }}>{{ k }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>关联工序节点
+        <select name="task_id">
+          <option value="">不关联</option>
+          {% for t in tasks %}<option value="{{ t.id }}">{{ t.sort_order }}. {{ t.stage }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>选择文件（可多选）<input type="file" name="files" accept="image/*" multiple required></label>
+    </div>
+    <button type="submit">上传</button>
+  </form>
+  <p class="muted small">原图保存于 data/media/{{ customer.id }}/&lt;类型&gt;/，另生成 WebP 缩略图；按文件 Hash 去重，相同文件只存一份。文件名不含客户名或房号。</p>
+</section>
+{% endif %}
+
+<section class="card">
+  <form method="get" action="/photos/album/{{ customer.id }}" class="filterbar">
+    <select name="kind">
+      <option value="">全部类型</option>
+      {% for k in kinds %}<option value="{{ k }}" {{ 'selected' if kind == k else '' }}>{{ k }}</option>{% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/photos/album/{{ customer.id }}">重置</a>
+  </form>
+
+  {% if photos %}
+  <div class="gallery">
+    {% for p in photos %}
+      <figure>
+        <a href="/photos/{{ p.id }}/file" target="_blank">
+          <img src="/photos/{{ p.id }}/thumb" alt="{{ p.kind }}" loading="lazy">
+        </a>
+        <figcaption>
+          <span class="badge">{{ p.kind }}</span>
+          <span class="muted small">{{ p.width }}×{{ p.height }}</span>
+          <span class="muted small">{{ p.taken_at or p.created_at }}</span>
+          {% if p.uploaded_by and users.get(p.uploaded_by) %}<span class="muted small">by {{ users[p.uploaded_by] }}</span>{% endif %}
+          {% if can_delete %}
+          <form method="post" action="/photos/{{ p.id }}/delete" class="inline" onsubmit="return confirm('删除这张照片？');">
+            <button class="ghost danger tiny">删除</button>
+          </form>
+          {% endif %}
+        </figcaption>
+      </figure>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">还没有照片。</p>
+  {% endif %}
+</section>
+{% endblock %}

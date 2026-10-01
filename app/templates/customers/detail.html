@@ -1,0 +1,211 @@
+{% extends "layout.html" %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ customer.name }}
+    <span class="badge">{{ customer.status }}</span>
+    {% if customer.level %}<span class="badge">等级 {{ customer.level }}</span>{% endif %}
+    {% if customer.is_showroom %}<span class="badge showroom">样板间</span>{% endif %}
+  </h1>
+  <div class="actions">
+    <a class="btn" href="/photos/album/{{ customer.id }}">相册</a>
+    {% if can_edit %}<a class="btn ghost" href="/customers/{{ customer.id }}/edit">编辑</a>{% endif %}
+    {% if can('contract:edit') %}<a class="btn" href="/contracts/new?customer_id={{ customer.id }}">＋ 新建合同</a>{% endif %}
+    {% if can_delete %}
+    <form method="post" action="/customers/{{ customer.id }}/delete" onsubmit="return confirm('确认删除客户及其合同、任务、照片记录？此操作不可恢复。');">
+      <button class="danger" type="submit">删除客户</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="meta">
+  <span>🏢 房号：<strong>{{ customer.room_label or '未关联' }}</strong></span>
+  <span>👤 负责人：{{ customer.owner.username if customer.owner else '-' }}</span>
+  <span>📞 主联系人：{% set pc = customer.primary_contact %}{{ pc.name ~ ' ' ~ (pc.phone or '') if pc else '未填写' }}</span>
+  <span>📈 施工进度：<strong>{{ progress }}%</strong>{% if delayed %} <span class="red">（延期 {{ delayed }} 个节点）</span>{% endif %}</span>
+  <span>🗓 建档：{{ customer.created_at[:10] }}</span>
+</div>
+
+{% if summary %}
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ summary.total|money }}</span><span class="kpi-label">合同总额（含增项）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.received|money }}</span><span class="kpi-label">已收合计</span></div>
+  <div class="kpi {{ 'alert' if summary.outstanding > 0 else '' }}"><span class="kpi-num">{{ summary.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
+  <div class="kpi {{ 'alert' if summary.overdue > 0 else '' }}"><span class="kpi-num">{{ summary.overdue|money }}</span><span class="kpi-label">逾期金额</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.recovery_rate }}%</span><span class="kpi-label">回款率</span></div>
+</div>
+{% endif %}
+
+<nav class="tabs">
+  <a href="?tab=overview" class="{{ 'active' if tab == 'overview' else '' }}">概览</a>
+  <a href="?tab=tasks" class="{{ 'active' if tab == 'tasks' else '' }}">施工工序</a>
+  <a href="?tab=contacts" class="{{ 'active' if tab == 'contacts' else '' }}">联系人</a>
+  {% if can('contract:view') %}<a href="?tab=finance" class="{{ 'active' if tab == 'finance' else '' }}">合同与收款</a>{% endif %}
+  <a href="/photos/album/{{ customer.id }}">现场照片</a>
+  <a href="?tab=share" class="{{ 'active' if tab == 'share' else '' }}">共享设置</a>
+</nav>
+
+{% if tab == 'tasks' %}
+<section class="card">
+  <h2>施工工序（{{ tasks|length }} 个节点）</h2>
+  <table class="tight">
+    <thead><tr><th>#</th><th>工序</th><th>计划</th><th>实际</th><th>责任人</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for t in tasks %}
+      <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+        <td>{{ t.sort_order }}</td>
+        <td>{{ t.stage }}{% if t.skip_reason %}<div class="muted small">跳过原因：{{ t.skip_reason }}</div>{% endif %}</td>
+        <td>{{ t.planned_start or '-' }} ~ {{ t.planned_end or '-' }}</td>
+        <td>{{ t.actual_start or '-' }} ~ {{ t.actual_end or '-' }}</td>
+        <td>{{ t.assignee.username if t.assignee else '-' }}</td>
+        <td><span class="badge">{{ t.status }}</span></td>
+        <td>
+          {% if t.status in ['ready'] and can('task:view') %}
+          <form method="post" action="/tasks/{{ t.id }}/start" class="inline"><button>开工</button></form>
+          {% endif %}
+          {% if t.status in ['doing'] and can('task:view') %}
+          <form method="post" action="/tasks/{{ t.id }}/done" class="inline"><button>完工</button></form>
+          {% endif %}
+          {% if t.status not in ['done','skipped'] and can('task:view') %}
+          <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
+            <input name="skip_reason" placeholder="跳过原因" required>
+            <button class="ghost">跳过</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if can_edit %}
+  <form method="post" action="/customers/{{ customer.id }}/regenerate-tasks" class="inline">
+    <button class="ghost">按模板补齐缺失节点</button>
+  </form>
+  {% endif %}
+</section>
+
+{% elif tab == 'contacts' %}
+<section class="card">
+  <h2>联系人</h2>
+  <table class="tight">
+    <thead><tr><th>姓名</th><th>职务</th><th>手机</th><th>微信</th><th>邮箱</th><th>主联系人</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for c in contacts %}
+      <tr>
+        <td>{{ c.name }}</td><td>{{ c.title or '-' }}</td><td>{{ c.phone or '-' }}</td>
+        <td>{{ c.wechat or '-' }}</td><td>{{ c.email or '-' }}</td>
+        <td>{{ '是' if c.is_primary else '' }}</td>
+        <td>
+          {% if can_edit %}
+          <form method="post" action="/customers/contacts/{{ c.id }}/delete" class="inline">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if can_edit %}
+  <h3>添加联系人</h3>
+  <form method="post" action="/customers/{{ customer.id }}/contacts" class="stack">
+    <div class="grid3">
+      <label>姓名 *<input name="name" required></label>
+      <label>职务<input name="title"></label>
+      <label>手机<input name="phone"></label>
+      <label>微信<input name="wechat"></label>
+      <label>邮箱<input name="email" type="email"></label>
+      <label>生日<input name="birthday" placeholder="YYYY-MM-DD"></label>
+    </div>
+    <label class="checkline"><input type="checkbox" name="is_primary" value="1"> 设为主联系人</label>
+    <button type="submit">添加联系人</button>
+  </form>
+  {% endif %}
+</section>
+
+{% elif tab == 'share' %}
+<section class="card">
+  <h2>数据共享</h2>
+  <p class="muted small">被共享用户将在此客户上获得「shared」数据范围的可见性（是否能修改取决于其角色权限点）。</p>
+  <table class="tight">
+    <thead><tr><th>用户</th><th>授予时间</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for s in shares %}
+      <tr>
+        <td>{{ share_users[s.user_id].username if share_users.get(s.user_id) else s.user_id }}</td>
+        <td>{{ s.granted_at }}</td>
+        <td>
+          <form method="post" action="/customers/{{ customer.id }}/unshare" class="inline">
+            <input type="hidden" name="user_id" value="{{ s.user_id }}">
+            <button class="ghost danger">取消共享</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if can_edit %}
+  <form method="post" action="/customers/{{ customer.id }}/share" class="inline">
+    <select name="user_id">
+      {% for u in assignees %}<option value="{{ u.id }}">{{ u.username }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
+    </select>
+    <button type="submit">添加共享</button>
+  </form>
+  {% endif %}
+</section>
+
+{% elif tab == 'finance' %}
+<section class="card">
+  <h2>合同与收款</h2>
+  {% if plan_rows %}
+  <table class="tight">
+    <thead><tr><th>合同号</th><th>签订日</th><th>总额</th><th>已收</th><th>未收</th><th>逾期</th><th>回款率</th><th>状态</th><th></th></tr></thead>
+    <tbody>
+    {% for c, s in plan_rows %}
+      <tr>
+        <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
+        <td>{{ c.sign_date }}</td>
+        <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
+        <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
+        <td class="{{ 'red' if s.overdue > 0 else '' }}">{{ s.overdue|money }}</td>
+        <td>{{ s.recovery_rate }}%</td>
+        <td>{{ s.status }}</td>
+        <td>{{ s.plans|length }} 期</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">还没有合同。</p>{% endif %}
+</section>
+
+{% else %}
+<div class="grid2">
+  <section class="card">
+    <h2>基本信息</h2>
+    <table class="kv">
+      <tr><th>客户类型</th><td>{{ customer.type or '-' }}</td></tr>
+      <tr><th>行业</th><td>{{ customer.industry or '-' }}</td></tr>
+      <tr><th>渠道来源</th><td>{{ customer.source or '-' }}</td></tr>
+      <tr><th>装修阶段</th><td>{{ customer.decor_stage or '-' }}</td></tr>
+      <tr><th>地址</th><td>{{ customer.address or '-' }}</td></tr>
+      <tr><th>备注</th><td class="break">{{ customer.notes or '-' }}</td></tr>
+    </table>
+  </section>
+  <section class="card">
+    <h2>工序进度</h2>
+    <div class="progress"><span style="width: {{ progress }}%"></span></div>
+    <table class="tight">
+      <thead><tr><th>工序</th><th>状态</th><th>计划完成</th></tr></thead>
+      <tbody>
+      {% for t in tasks[:9] %}
+        <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+          <td>{{ t.stage }}</td><td><span class="badge">{{ t.status }}</span></td><td>{{ t.planned_end or '-' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

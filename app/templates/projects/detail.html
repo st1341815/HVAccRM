@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ project.name }}</h1>
+  <a class="btn ghost" href="/projects">← 返回楼盘列表</a>
+</div>
+
+<div class="meta">
+  <span>📍 {{ project.city or '' }} {{ project.district or '' }} {{ project.address or '' }}</span>
+  <span>🏗 开发商：{{ project.developer or '-' }}</span>
+  <span>🗓 交房：{{ project.delivery_date or '-' }}</span>
+  <span>🏠 房号数：{{ rooms|length }}</span>
+  {% if project.notes %}<span>📝 {{ project.notes }}</span>{% endif %}
+</div>
+
+{% if can('customer:edit') or can('admin:setting') %}
+<section class="card">
+  <h2>快捷添加房号</h2>
+  <form method="post" action="/projects/{{ project.id }}/rooms" class="filterbar">
+    <input name="building" placeholder="楼栋 *（如 3号楼）" required list="building-list">
+    <datalist id="building-list">{% for b in buildings %}<option value="{{ b }}">{% endfor %}</datalist>
+    <input name="unit" placeholder="单元（如 1单元）">
+    <input name="room_no" placeholder="房号 *（如 1203）" required>
+    <input name="floor" placeholder="楼层" inputmode="numeric">
+    <input name="area" placeholder="面积㎡" inputmode="decimal">
+    <input name="layout" placeholder="户型（如 3室2厅）">
+    <input name="delivery_date" placeholder="交房日期">
+    <button type="submit">＋ 添加</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>房号清单（{{ rooms|length }}）</h2>
+  {% if rooms %}
+  <table class="tight">
+    <thead><tr><th>楼栋</th><th>单元</th><th>房号</th><th>楼层</th><th>面积</th><th>户型</th><th>客户数</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rooms %}
+      <tr>
+        <td>{{ r.building }}</td>
+        <td>{{ r.unit or '-' }}</td>
+        <td><strong>{{ r.room_no }}</strong></td>
+        <td>{{ r.floor or '-' }}</td>
+        <td>{{ r.area or '-' }}</td>
+        <td>{{ r.layout or '-' }}</td>
+        <td>{{ cust_map.get(r.id, 0) }}</td>
+        <td>
+          {% if can('admin:setting') or can('customer:delete') %}
+          <form method="post" action="/projects/rooms/{{ r.id }}/delete" class="inline" onsubmit="return confirm('删除该房号？');">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">该楼盘还没有房号，请在上方添加。</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block title %}收款流水{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>收款流水 <span class="muted small">共 {{ payments|length }} 笔</span></h1>
+  <a class="btn ghost" href="/payments/overdue">逾期应收 →</a>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ total|money }}</span><span class="kpi-label">筛选结果合计</span></div>
+  <div class="kpi"><span class="kpi-num">{{ month_total|money }}</span><span class="kpi-label">本月已收</span></div>
+  <div class="kpi {{ 'alert' if refund_total > 0 else '' }}"><span class="kpi-num">{{ refund_total|money }}</span><span class="kpi-label">退款合计</span></div>
+</div>
+
+<section class="card">
+  <form method="get" action="/payments" class="filterbar">
+    <input name="contract_id" value="{{ filters.contract_id }}" placeholder="合同 ID" inputmode="numeric">
+    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <select name="method">
+      <option value="">全部方式</option>
+      {% for m in methods %}<option value="{{ m }}" {{ 'selected' if filters.method == m else '' }}>{{ m }}</option>{% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/payments">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <table>
+    <thead><tr><th>收款日期</th><th>金额</th><th>合同</th><th>客户</th><th>方式</th><th>凭证号</th><th>收款人</th><th>备注</th><th></th></tr></thead>
+    <tbody>
+    {% for p in payments %}
+      {% set c = contract_map.get(p.contract_id) %}
+      <tr class="{{ 'row-alert' if p.amount < 0 else '' }}">
+        <td>{{ p.paid_at }}</td>
+        <td class="{{ 'red' if p.amount < 0 else '' }}"><strong>{{ p.amount|money }}</strong></td>
+        <td>{{ c.no or ('#' ~ p.contract_id) if c else p.contract_id }}</td>
+        <td>{% if c and c.customer %}<a href="/customers/{{ c.customer_id }}?tab=finance">{{ c.customer.name }}</a>{% else %}-{% endif %}</td>
+        <td>{{ p.method or '-' }}</td>
+        <td>{{ p.voucher_no or '-' }}</td>
+        <td>{{ users[p.received_by].username if p.received_by and users.get(p.received_by) else '-' }}</td>
+        <td>{{ p.remark or '-' }}</td>
+        <td>
+          {% if can_delete %}
+          <form method="post" action="/payments/{{ p.id }}/delete" class="inline" onsubmit="return confirm('删除该笔收款？系统会重算应收计划。');">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not payments %}<p class="muted">没有符合条件的收款记录。</p>{% endif %}
+</section>
+{% endblock %}

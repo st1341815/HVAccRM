@@ -1,0 +1,354 @@
+"""SQLAlchemy ORM 模型 —— 严格对应开发文档第四章 Schema（含少量实现必需的补充列）。"""
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    Column,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import DeclarativeBase, relationship
+
+
+def now_iso() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def today_str() -> str:
+    return date.today().isoformat()
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# ---------------------------------------------------------------- 用户与权限
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="sales")
+    data_scope = Column(String, default="self")
+    must_change_password = Column(Integer, default=0)
+    session_version = Column(Integer, default=1)
+    totp_enabled = Column(Integer, default=0)
+    totp_secret = Column(String)
+    is_active = Column(Integer, default=1)
+    last_login_at = Column(String)
+    created_at = Column(String, nullable=False, default=now_iso)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<User {self.id} {self.username} {self.role}>"
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    username = Column(String)  # 冗余保存，用户删除后仍可追溯
+    action = Column(String, nullable=False)
+    table_name = Column(String)
+    record_id = Column(Integer)
+    old_val = Column(Text)
+    new_val = Column(Text)
+    ip = Column(String)
+    created_at = Column(String, nullable=False, default=now_iso)
+
+
+class CustomerShare(Base):
+    __tablename__ = "customer_shares"
+
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    granted_by = Column(Integer, ForeignKey("users.id"))
+    granted_at = Column(String, nullable=False, default=now_iso)
+
+
+# ------------------------------------------------------------ 楼盘与房号
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    city = Column(String)
+    district = Column(String)
+    address = Column(String)
+    developer = Column(String)
+    delivery_date = Column(String)
+    total_units = Column(Integer)
+    notes = Column(Text)
+    created_at = Column(String, default=now_iso)
+
+    rooms = relationship("Room", back_populates="project", cascade="all, delete-orphan")
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+    __table_args__ = (UniqueConstraint("project_id", "building", "unit", "room_no", name="uq_room"),)
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    building = Column(String, nullable=False)
+    unit = Column(String)
+    room_no = Column(String, nullable=False)
+    floor = Column(Integer)
+    area = Column(Float)
+    layout = Column(String)
+    delivery_date = Column(String)
+    created_at = Column(String, default=now_iso)
+
+    project = relationship("Project", back_populates="rooms")
+
+    @property
+    def label(self) -> str:
+        parts = [self.building, self.unit or "", self.room_no]
+        return "".join(p for p in parts if p)
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    type = Column(String)  # 家装 / 工程 / 经销商 …
+    industry = Column(String)
+    source = Column(String)  # 渠道来源
+    level = Column(String)  # A/B/C
+    status = Column(String, default="active")
+    room_id = Column(Integer, ForeignKey("rooms.id"))
+    decor_stage = Column(String)
+    is_showroom = Column(Integer, default=0)
+    address = Column(String)
+    notes = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(String, nullable=False, default=now_iso)
+    updated_at = Column(String, nullable=False, default=now_iso, onupdate=now_iso)
+
+    room = relationship("Room")
+    owner = relationship("User", foreign_keys=[owner_id])
+    contacts = relationship("Contact", back_populates="customer", cascade="all, delete-orphan")
+    contracts = relationship("Contract", back_populates="customer", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="customer", cascade="all, delete-orphan")
+    photos = relationship("Photo", back_populates="customer", cascade="all, delete-orphan")
+
+    @property
+    def room_label(self) -> str:
+        if not self.room:
+            return ""
+        return f"{self.room.project.name if self.room.project else ''} {self.room.label}"
+
+    @property
+    def primary_contact(self) -> "Contact | None":
+        for c in self.contacts:
+            if c.is_primary:
+                return c
+        return self.contacts[0] if self.contacts else None
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id = Column(Integer, primary_key=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    title = Column(String)
+    phone = Column(String)
+    wechat = Column(String)
+    email = Column(String)
+    is_primary = Column(Integer, default=0)
+    birthday = Column(String)
+    created_at = Column(String, nullable=False, default=now_iso)
+
+    customer = relationship("Customer", back_populates="contacts")
+
+
+# ------------------------------------------------------------ 合同与收款
+class Contract(Base):
+    __tablename__ = "contracts"
+
+    id = Column(Integer, primary_key=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    no = Column(String, unique=True)
+    sign_date = Column(String, nullable=False)
+    total_amount = Column(Float, nullable=False, default=0)
+    discount = Column(Float, default=0)
+    status = Column(String, default="active")
+    notes = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(String, default=now_iso)
+
+    customer = relationship("Customer", back_populates="contracts")
+    items = relationship("ContractItem", back_populates="contract", cascade="all, delete-orphan")
+    plans = relationship("PaymentPlan", back_populates="contract", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="contract", cascade="all, delete-orphan")
+    change_orders = relationship("ChangeOrder", back_populates="contract", cascade="all, delete-orphan")
+
+
+class ContractItem(Base):
+    __tablename__ = "contract_items"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"))
+    product_name = Column(String, nullable=False)
+    spec = Column(String)
+    qty = Column(Float, default=0)
+    unit = Column(String)
+    unit_price = Column(Float, default=0)
+    amount = Column(Float, default=0)
+    notes = Column(Text)
+
+    contract = relationship("Contract", back_populates="items")
+
+
+class PaymentPlan(Base):
+    __tablename__ = "payment_plans"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"))
+    label = Column(String, nullable=False)
+    amount = Column(Float, nullable=False)
+    due_date = Column(String)
+    sort_order = Column(Integer, default=0)
+    status = Column(String, default="pending")
+    paid_amount = Column(Float, default=0)  # 由收款分摊计算结果写入，便于列表展示
+    remark = Column(String)
+
+    contract = relationship("Contract", back_populates="plans")
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"))
+    amount = Column(Float, nullable=False)
+    paid_at = Column(String, nullable=False)
+    method = Column(String)
+    voucher_no = Column(String)
+    received_by = Column(Integer, ForeignKey("users.id"))
+    remark = Column(Text)
+    created_at = Column(String, default=now_iso)
+
+    contract = relationship("Contract", back_populates="payments")
+
+
+class ChangeOrder(Base):
+    __tablename__ = "change_orders"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"))
+    reason = Column(String)
+    amount = Column(Float, default=0)
+    approved_at = Column(String)
+    approved_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(String, default=now_iso)
+
+    contract = relationship("Contract", back_populates="change_orders")
+
+
+# ------------------------------------------------------------ 施工管理
+class StageTemplate(Base):
+    __tablename__ = "stage_templates"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    sort_order = Column(Integer, nullable=False)
+    default_days = Column(Integer)
+    require_photo = Column(Integer, default=0)
+    is_active = Column(Integer, default=1)
+    output_doc = Column(String)  # 产出物说明
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    __table_args__ = (UniqueConstraint("customer_id", "stage", name="uq_task_customer_stage"),)
+
+    id = Column(Integer, primary_key=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    stage = Column(String, nullable=False)
+    sort_order = Column(Integer, nullable=False)
+    planned_start = Column(String)
+    planned_end = Column(String)
+    actual_start = Column(String)
+    actual_end = Column(String)
+    assignee_id = Column(Integer, ForeignKey("users.id"))
+    status = Column(String, default="pending")  # pending/ready/doing/done/skipped
+    delay_reason = Column(Text)
+    skip_reason = Column(Text)
+    notes = Column(Text)
+    created_at = Column(String, default=now_iso)
+    updated_at = Column(String, default=now_iso, onupdate=now_iso)
+
+    customer = relationship("Customer", back_populates="tasks")
+    assignee = relationship("User")
+
+
+# ------------------------------------------------------------ 照片
+class Photo(Base):
+    __tablename__ = "photos"
+
+    id = Column(Integer, primary_key=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id"))
+    kind = Column(String, nullable=False)
+    path = Column(String, nullable=False)  # 相对 data/media 的路径
+    thumb_path = Column(String)
+    width = Column(Integer)
+    height = Column(Integer)
+    taken_at = Column(String)
+    uploaded_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(String, nullable=False, default=now_iso)
+    sha256 = Column(String)
+    orig_name = Column(String)
+    size_bytes = Column(Integer)
+
+    customer = relationship("Customer", back_populates="photos")
+
+
+Index("ix_photos_customer", Photo.customer_id)
+Index("ix_photos_sha", Photo.sha256)
+Index("ix_tasks_assignee", Task.assignee_id)
+Index("ix_customers_owner", Customer.owner_id)
+Index("ix_payments_contract", Payment.contract_id)
+
+
+# ------------------------------------------------------------ 全文索引
+FTS_DDL = [
+    """CREATE VIRTUAL TABLE IF NOT EXISTS customers_fts USING fts5(
+           name, industry, notes,
+           content='customers', content_rowid='id', tokenize='trigram')""",
+    """CREATE TRIGGER IF NOT EXISTS customers_fts_ai AFTER INSERT ON customers BEGIN
+           INSERT INTO customers_fts(rowid, name, industry, notes)
+           VALUES (new.id, new.name, new.industry, new.notes); END""",
+    """CREATE TRIGGER IF NOT EXISTS customers_fts_ad AFTER DELETE ON customers BEGIN
+           INSERT INTO customers_fts(customers_fts, rowid, name, industry, notes)
+           VALUES ('delete', old.id, old.name, old.industry, old.notes); END""",
+    """CREATE TRIGGER IF NOT EXISTS customers_fts_au AFTER UPDATE ON customers BEGIN
+           INSERT INTO customers_fts(customers_fts, rowid, name, industry, notes)
+           VALUES ('delete', old.id, old.name, old.industry, old.notes);
+           INSERT INTO customers_fts(rowid, name, industry, notes)
+           VALUES (new.id, new.name, new.industry, new.notes); END""",
+]
+
+# 标准 9 个施工工序（文档 6.5）
+DEFAULT_STAGES = [
+    ("初次量尺", 1, 1, 1, "量尺图 + 现场照"),
+    ("方案/报价确认", 2, 3, 1, "合同"),
+    ("复尺", 3, 1, 1, "复尺图"),
+    ("下单生产", 4, 14, 0, "订单号"),
+    ("到货验收", 5, 1, 1, "到货照"),
+    ("基层/拆旧/配合", 6, 2, 1, "施工照"),
+    ("安装/铺贴", 7, 3, 1, "过程照"),
+    ("竣工验收", 8, 1, 1, "验收单 + 完工照"),
+    ("售后回访", 9, 30, 0, "回访记录"),
+]

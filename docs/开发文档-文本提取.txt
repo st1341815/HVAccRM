@@ -1,0 +1,238 @@
+237
+[Heading1] 家居建材客户管理系统（CRM）开发规格说明书
+[Heading2] 一、项目概述
+[Heading3] 1.1 基本信息
+[Compact] 项目名称：家居建材客户管理系统（CRM）
+[Compact] 运行环境：用户自有 NAS 平台（x86 架构，Debian 操作系统）
+[Compact] 用户规模：个人使用起步，未来扩展至 20 人以内
+[Heading3] 1.2 使用场景
+[FirstParagraph] 面向家居建材行业（定制类，如橱柜、衣柜、门窗等），专注于已成交客户的全生命周期管理。覆盖从合同签订、收款、施工安装到完工留档照片的全流程。
+[Heading3] 1.3 核心定位
+[FirstParagraph] 本系统并非通用 CRM，而是针对家居建材行业的垂直管理工具，具备以下三大核心特征： 1. 房号为核心索引：采用“楼盘-房号”结构组织数据。 2. 款项分期管理：严格区分“应收计划”与“实际收款”。 3. 工序化交付：内置标准施工流程（量尺 → 复尺 → 下单 → 到货 → 安装 → 验收 → 回访）。
+ [IMAGE]
+[Heading2] 二、技术选型规范
+[BlockText] ⚠️ 注意：以下技术栈已确定，开发过程中不得更改。
+[Compact] 层级
+[Compact] 技术选型
+[Compact] 选型理由
+[Compact] 后端框架
+[Compact] Python 3.12 + FastAPI
+[Compact] 生态完善，SQLAlchemy/Alembic 成熟，NAS 调试便捷
+[Compact] 数据库
+[Compact] SQLite (WAL 模式)
+[Compact] 单文件数据库，备份即复制；20人读多写少场景下 WAL 模式性能充足
+[Compact] 前端方案
+[Compact] HTMX + Jinja2
+[Compact] 业务以表单/列表/时间线为主，无需 SPA；HTMX 实现前后端同构，免构建工具链
+[Compact] 认证体系
+[Compact] Session/Cookie + TOTP
+[Compact] 内网自用，不接入 OAuth；支持可选二步验证
+[Compact] 部署方式
+[Compact] Docker + docker compose
+[Compact] 容器化隔离依赖，卸载干净，环境一致
+[Compact] 定时任务
+[Compact] APScheduler
+[Compact] 内置调度，处理提醒、续费预警、定期备份
+[Compact] 全文搜索
+[Compact] SQLite FTS5
+[Compact] 满足客户名、公司、备注的模糊检索需求
+[Compact] 文件存储
+[Compact] 本地文件系统
+[Compact] 照片按规则存储于 NAS 挂载目录，数据库仅存相对路径
+ [IMAGE]
+[Heading2] 三、项目目录结构
+[SourceCode] crm/├── docker-compose.yml          # 声明端口、卷、环境变量├── Dockerfile                  # 多阶段构建，最终镜像 python:3.12-slim├── pyproject.toml              # uv/pip-tools 锁依赖├── alembic.ini                 # 数据库迁移配置├── app/│   ├── main.py                 # FastAPI 入口 + 中间件│   ├── config.py               # pydantic-settings，读取环境变量│   ├── db.py                   # 引擎、会话管理、WAL 开启│   ├── models.py               # SQLAlchemy ORM 模型│   ├── auth.py                 # Session 管理、密码哈希、依赖注入│   ├── permissions.py          # get_current_user + require_owner 装饰器│   ├── routers/│   │   ├── customers.py        # 客户管理│   │   ├── projects.py         # 楼盘/房号管理│   │   ├── contracts.py        # 合同管理│   │   ├── payments.py         # 收款管理│   │   ├── tasks.py            # 施工任务│   │   ├── photos.py           # 照片上传与管理│   │   ├── admin.py            # 后台管理（用户/角色/权限/审计）│   │   └── ui.py               # HTMX 片段渲染│   ├── templates/              # Jinja2 模板（layout + 页面 + _fragments）│   ├── static/                 # 静态资源（CSS/JS/图片）│   └── scheduler.py            # 提醒扫描、每日备份打包├── migrations/                 # Alembic 迁移脚本├── data/                       # .gitignore 忽略，挂载卷，存放 DB 和媒体│   ├── crm.db│   └── media/                  # 照片存储目录└── .gitignore
+[FirstParagraph] .gitignore 配置：
+[SourceCode] data/.env*.db*.log__pycache__/.env.*
+ [IMAGE]
+[Heading2] 四、数据库设计 (Schema)
+[Heading3] 4.1 用户与权限
+[SourceCode] CREATE TABLE users (    id INTEGER PRIMARY KEY,    username TEXT UNIQUE NOT NULL,    password_hash TEXT NOT NULL,    role TEXT NOT NULL DEFAULT &#39;sales&#39;,    data_scope TEXT DEFAULT &#39;self&#39;,    must_change_password INTEGER DEFAULT 0,    session_version INTEGER DEFAULT 1,    is_active INTEGER DEFAULT 1,    last_login_at TEXT,    created_at TEXT NOT NULL);CREATE TABLE audit_log (    id INTEGER PRIMARY KEY,    user_id INTEGER REFERENCES users(id),    action TEXT NOT NULL,    table_name TEXT,    record_id INTEGER,    old_val TEXT,    new_val TEXT,    ip TEXT,    created_at TEXT NOT NULL);CREATE TABLE customer_shares (    customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,    granted_by INTEGER REFERENCES users(id),    granted_at TEXT NOT NULL,    PRIMARY KEY(customer_id, user_id));
+[Heading3] 4.2 楼盘与房号（核心索引）
+[SourceCode] CREATE TABLE projects (    id INTEGER PRIMARY KEY,    name TEXT NOT NULL,    city TEXT,    district TEXT,    address TEXT,    developer TEXT,    delivery_date TEXT,    total_units INTEGER,    notes TEXT);CREATE TABLE rooms (    id INTEGER PRIMARY KEY,    project_id INTEGER REFERENCES projects(id),    building TEXT NOT NULL,    unit TEXT,    room_no TEXT NOT NULL,    floor INTEGER,    area REAL,    layout TEXT,    delivery_date TEXT,    UNIQUE(project_id, building, unit, room_no));
+[Heading3] 4.3 客户管理
+[SourceCode] CREATE TABLE customers (    id INTEGER PRIMARY KEY,    owner_id INTEGER NOT NULL REFERENCES users(id),    name TEXT NOT NULL,    type TEXT,    industry TEXT,    source TEXT,    level TEXT,    status TEXT DEFAULT &#39;active&#39;,    room_id INTEGER REFERENCES rooms(id),    decor_stage TEXT,    is_showroom INTEGER DEFAULT 0,    address TEXT,    notes TEXT,    created_by INTEGER REFERENCES users(id),    created_at TEXT NOT NULL,    updated_at TEXT NOT NULL);CREATE TABLE contacts (    id INTEGER PRIMARY KEY,    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,    name TEXT NOT NULL,    title TEXT,    phone TEXT,    wechat TEXT,    email TEXT,    is_primary INTEGER DEFAULT 0,    birthday TEXT,    created_at TEXT NOT NULL);
+[Heading3] 4.4 合同与收款
+[SourceCode] CREATE TABLE contracts (    id INTEGER PRIMARY KEY,    customer_id INTEGER NOT NULL REFERENCES customers(id),    no TEXT UNIQUE,    sign_date TEXT NOT NULL,    total_amount REAL NOT NULL,    discount REAL DEFAULT 0,    status TEXT DEFAULT &#39;active&#39;,    notes TEXT);CREATE TABLE contract_items (    id INTEGER PRIMARY KEY,    contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,    product_name TEXT NOT NULL,    spec TEXT,    qty REAL,    unit TEXT,    unit_price REAL,    amount REAL,    notes TEXT);CREATE TABLE payment_plans (    id INTEGER PRIMARY KEY,    contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,    label TEXT NOT NULL,    amount REAL NOT NULL,    due_date TEXT,    sort_order INTEGER DEFAULT 0,    status TEXT DEFAULT &#39;pending&#39;);CREATE TABLE payments (    id INTEGER PRIMARY KEY,    contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,    amount REAL NOT NULL,    paid_at TEXT NOT NULL,    method TEXT,    voucher_no TEXT,    received_by INTEGER REFERENCES users(id),    remark TEXT);CREATE TABLE change_orders (    id INTEGER PRIMARY KEY,    contract_id INTEGER REFERENCES contracts(id),    reason TEXT,    amount REAL,    approved_at TEXT,    approved_by INTEGER REFERENCES users(id));
+[Heading3] 4.5 施工管理
+[SourceCode] CREATE TABLE stage_templates (    id INTEGER PRIMARY KEY,    name TEXT NOT NULL,    sort_order INTEGER NOT NULL,    default_days INTEGER,    require_photo INTEGER DEFAULT 0,    is_active INTEGER DEFAULT 1);CREATE TABLE tasks (    id INTEGER PRIMARY KEY,    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,    stage TEXT NOT NULL,    sort_order INTEGER NOT NULL,    planned_start TEXT,    planned_end TEXT,    actual_start TEXT,    actual_end TEXT,    assignee_id INTEGER REFERENCES users(id),    status TEXT DEFAULT &#39;pending&#39;,    delay_reason TEXT,    notes TEXT,    UNIQUE(customer_id, stage));
+[Heading3] 4.6 照片管理
+[SourceCode] CREATE TABLE photos (    id INTEGER PRIMARY KEY,    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,    task_id INTEGER REFERENCES tasks(id),    kind TEXT NOT NULL,    path TEXT NOT NULL,    thumb_path TEXT,    width INTEGER,    height INTEGER,    taken_at TEXT,    uploaded_by INTEGER REFERENCES users(id),    created_at TEXT NOT NULL);
+[Heading3] 4.7 全文索引
+[SourceCode] CREATE VIRTUAL TABLE customers_fts USING fts5(name, industry, notes, content=&#39;customers&#39;, content_rowid=&#39;id&#39;);
+ [IMAGE]
+[Heading2] 五、角色与权限设计
+[Heading3] 5.1 权限点定义
+[Compact] customer:view / customer:edit / customer:delete
+[Compact] contract:view / contract:edit
+[Compact] payment:view / payment:edit / payment:refund
+[Compact] task:view / task:assign
+[Compact] photo:upload / photo:delete
+[Compact] report:view
+[Compact] admin:user / admin:setting
+[Heading3] 5.2 角色预设
+[Compact] 角色
+[Compact] 权限范围
+[Compact] admin
+[Compact] 全部权限（店长/管理员）
+[Compact] sales
+[Compact] 客户 CRUD、查看合同、查看任务、上传照片
+[Compact] designer
+[Compact] 查看客户、查看任务、上传照片（不可见金额）
+[Compact] installer
+[Compact] 查看任务、上传照片（不可见合同金额，不可见客户列表）
+[Compact] finance
+[Compact] 查看客户、查看合同、收款管理、查看报表（可选）
+[Heading3] 5.3 数据范围 (Data Scope)
+[Compact] all：全部数据（admin）
+[Compact] self：仅本人负责的数据（sales 默认）
+[Compact] shared：本人数据 + 被显式共享的数据
+[Heading3] 5.4 权限校验规则
+[Compact] 双重校验：路由层必须同时校验“权限点”与“数据范围”。
+[Compact] 金额隔离：拥有 contract:view 不代表可查看毛利等敏感字段。
+[Compact] 白名单机制：installer 接口必须显式列出，禁止默认放行。
+[Compact] 会话失效：users 表增加 session_version，修改权限或禁用用户时版本号 +1，强制重新登录。
+ [IMAGE]
+[Heading2] 六、核心业务规则
+[Heading3] 6.1 房号录入流程
+[Compact] 级联选择：先选楼盘 → 再选楼栋 → 最后输入房号。
+[Compact] 快捷创建：支持在录入现场直接新建楼盘或房号。
+[Compact] 模糊搜索：同一楼盘下，输入“1203”应列出所有楼栋的 1203 房号。
+[Heading3] 6.2 收款管理规则
+[Compact] 三数核对：合同总额 ≠ 已收 ≠ 应收，系统需实时计算差值。
+[Compact] 逾期重算：定时任务每日扫描 payment_plans，若 due_date < 今日 且未付清，状态更新为 overdue。
+[Compact] 增项处理：增项必须走 change_orders，并同步追加 payment_plans。
+[Compact] 超额拦截：入库前校验 sum(payments) + 本次金额 ≤ total_amount + 增项总额。
+[Compact] 视图计算：前端展示应收合计、已收合计、未收金额及回款率（已收/应收）。
+[Heading3] 6.3 施工任务规则
+[Compact] 自动建单：客户建单时按模板自动生成 9 个标准节点任务。
+[Compact] 前置依赖：按 sort_order 控制，上一节点未完成，下一节点仅显示 ready，禁止开工。
+[Compact] 跳过机制：跳过节点必须填写原因。
+[Compact] 延期预警：若 planned_end < 今日 且 status != done，自动标记延期，首页红字提示。
+[Heading3] 6.4 照片管理规范
+[Compact] 存储路径：data/media/{customer_id}/{kind}/{uuid}.jpg，数据库仅存相对路径。
+[Compact] 命名规则：严禁使用客户名或房号作为文件名/目录名。
+[Compact] 图片处理：保留原图 + 生成 WebP 缩略图（长边 1280px，质量 80）。
+[Compact] 上传接口：POST /api/customers/{id}/photos (multipart)，支持多张上传。
+[Compact] 元数据：服务端读取 EXIF DateTimeOriginal 和 GPS（可选）。
+[Compact] 去重：按文件 Hash 判重，重复文件仅存储一份物理文件。
+[Compact] 安装工限制：仅允许 POST photos 及查看自己负责的客户，无删除权。
+[Heading3] 6.5 标准施工工序节点
+[Compact] 序号
+[Compact] 节点名称
+[Compact] 说明
+[Compact] 默认工期
+[Compact] 产出物
+[Compact] 1
+[Compact] 初次量尺
+[Compact] 上门测量
+[Compact] 1天
+[Compact] 量尺图 + 现场照
+[Compact] 2
+[Compact] 方案/报价确认
+[Compact] 出图、签合同
+[Compact] —
+[Compact] 合同
+[Compact] 3
+[Compact] 复尺
+[Compact] 硬装完成后精确尺寸
+[Compact] 1天
+[Compact] 复尺图
+[Compact] 4
+[Compact] 下单生产
+[Compact] 工厂排产
+[Compact] 7-20天
+[Compact] 订单号
+[Compact] 5
+[Compact] 到货验收
+[Compact] 核对型号/数量/破损
+[Compact] 1天
+[Compact] 到货照
+[Compact] 6
+[Compact] 基层/拆旧/配合
+[Compact] 与水电木工衔接
+[Compact] 按需
+[Compact] 施工照
+[Compact] 7
+[Compact] 安装/铺贴
+[Compact] 主工序
+[Compact] 1-5天
+[Compact] 过程照
+[Compact] 8
+[Compact] 竣工验收
+[Compact] 客户签字
+[Compact] 1天
+[Compact] 验收单 + 完工照
+[Compact] 9
+[Compact] 售后回访
+[Compact] 30天/90天回访
+[Compact] —
+[Compact] 回访记录
+ [IMAGE]
+[Heading2] 七、首页看板指标
+[Compact] 工序预警：今日/本周到期工序数量（延期标红）。
+[Compact] 财务预警：逾期应收总额 + Top5 欠款客户。
+[Compact] 本月业绩：签约额 / 已收款 / 回款率。
+[Compact] 施工概况：在施工地数量。
+[Compact] 客户增长：近 30 天新增客户数 & 来源渠道分布。
+[Compact] 进阶指标：楼盘渗透率排行。
+ [IMAGE]
+[Heading2] 八、Docker 部署配置
+[Heading3] 8.1 docker-compose.yml 关键配置
+[SourceCode] services:  crm:    build: .    restart: unless-stopped    user: "1000:1000"    ports:      - "8090:8000"    environment:      - TZ=Asia/Shanghai      - APP_SECRET_KEY=${APP_SECRET_KEY}      - DB_PATH=/data/crm.db      - DATA_DIR=/data    volumes:      - ./data:/data      - ./config:/config:ro    mem_limit: 512m    healthcheck:      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]      interval: 60s      retries: 3
+[Heading3] 8.2 Dockerfile 要求
+[Compact] 多阶段构建：构建阶段与运行阶段分离。
+[Compact] 基础镜像：最终镜像基于 python:3.12-slim。
+[Compact] 安全运行：非 root 用户运行。
+[Compact] 缓存优化：pip 缓存层单独处理。
+[Compact] 依赖内置：sqlite3 已包含在官方 slim 镜像中。
+ [IMAGE]
+[Heading2] 九、开发里程碑（8轮交付计划）
+[Compact] 轮次
+[Compact] 核心内容
+[Compact] 交付物标准
+[Compact] 第1轮
+[Compact] 脚手架跑通
+[Compact] Docker + FastAPI + 首页，浏览器显示“CRM已启动”
+[Compact] 第2轮
+[Compact] 数据库层
+[Compact] SQLAlchemy + SQLite WAL + Alembic，库文件生成且可连接
+[Compact] 第3轮
+[Compact] 认证体系
+[Compact] 登录/登出 + 用户管理（含 admin 账号）
+[Compact] 第4轮
+[Compact] 核心业务
+[Compact] 楼盘 + 房号 + 客户 CRUD，能录入第一个带房号的客户
+[Compact] 第5轮
+[Compact] 财务模块
+[Compact] 合同 + 收款计划 + 实收流水，可见应收/已收/逾期
+[Compact] 第6轮
+[Compact] 施工模块
+[Compact] 工序模板 + 任务 + 延期预警，施工看板可用
+[Compact] 第7轮
+[Compact] 文件模块
+[Compact] 照片上传 + 缩略图 + 相册页，手机拍照上传成功
+[Compact] 第8轮
+[Compact] 运维/权限
+[Compact] 权限拦截 + 审计日志 + 备份脚本，支持多账号协作
+ [IMAGE]
+[Heading2] 十、NAS 特有注意事项
+[Compact] 权限模型：容器内禁止 root 运行，固定 UID/GID（如 1000），通过环境变量映射。
+[Compact] 路径分离：配置、数据、缓存、日志四个目录物理分离，全部通过卷挂载。
+[Compact] 远程挂载：若数据在 NFS/SMB 挂载点，需特别注意文件锁和 inode 行为。
+[Compact] 磁盘休眠：日志级别设为 INFO 以上，避免频繁写日志或轮询扫描阻止硬盘休眠。
+[Compact] 多架构构建：使用 docker buildx 一次构建 linux/amd64 和 linux/arm64。
+[Compact] 内存限制：compose 中必须配置 mem_limit。
+[Compact] HTTPS 策略：容器仅监听 HTTP，HTTPS 由 NAS 反代（Let’s Encrypt）处理。
+[Compact] 备份策略：每天凌晨执行 VACUUM INTO 或 .backup 至 data/backups/，保留最近 30 份。
+[Compact] 并发写处理：SQLite 20人并发写会有短暂锁等待，写操作需封装重试机制（database is locked 时退避重试 3 次）。
+[Compact] 首次启动：自动建库建表 + 创建 admin，通过环境变量 ADMIN_USER / ADMIN_PASS 传入一次。
+ [IMAGE]
+[Heading2] 十一、开发协作规则
+[Compact] 单轮单模块：每轮只做一个模块，跑通并经用户确认后方可继续。
+[Compact] 交付完整性：每次交付必须包含：文件清单 + 完整代码 + 运行命令 + 验证方法。
+[Compact] 报错规范：报错信息必须贴全文，禁止概括。
+[Compact] 数据安全：动数据前必须先备份。
+[Compact] 版本控制：每次交付后执行 git commit。
+[Compact] 诚实原则：遇到不懂的代码直接询问，禁止假装懂或猜测。
+[Compact] 需求变更：需求变动随时提出，“简化版”指令可砍掉花哨功能。

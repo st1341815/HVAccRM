@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}权限矩阵{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>角色权限矩阵</h1>
+  <nav class="tabs inline-tabs">
+    <a href="/admin">概览</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/permissions" class="active">权限矩阵</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/stages">工序模板</a>
+    <a href="/admin/backups">备份</a>
+  </nav>
+</div>
+
+<section class="card">
+  <table class="tight">
+    <thead>
+      <tr><th>权限点</th>{% for key, label in roles.items() %}<th>{{ label }}<div class="muted small">{{ key }}</div></th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for perm in all_perms %}
+      <tr>
+        <td><code>{{ perm }}</code></td>
+        {% for key in roles.keys() %}
+          <td class="center">{{ '✅' if perm in role_perms[key] else '—' }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>数据范围</h2>
+  <table class="tight">
+    <thead><tr><th>范围</th><th>含义</th></tr></thead>
+    <tbody>
+    {% for key, label in scopes.items() %}<tr><td><code>{{ key }}</code></td><td>{{ label }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">金额隔离：设计师与安装工即使能看客户，也看不到合同金额（模板层与视图层双重屏蔽）。安装工采用显式白名单——只能看到自己被指派任务的客户。</p>
+</section>
+{% endblock %}

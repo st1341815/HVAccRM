@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+{% block title %}看板{% endblock %}
+{% block content %}
+<h1>首页看板 <span class="muted small">{{ today }}</span></h1>
+
+<div class="kpis">
+  {% if show_task_widgets %}
+  <div class="kpi {{ 'alert' if delayed|length else '' }}">
+    <span class="kpi-num">{{ delayed|length }}</span>
+    <span class="kpi-label">延期工序（红字预警）</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-num">{{ due_today|length }}</span>
+    <span class="kpi-label">今日到期工序</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-num">{{ due_week|length }}</span>
+    <span class="kpi-label">本周到期工序</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-num">{{ in_progress }}</span>
+    <span class="kpi-label">在施工地</span>
+  </div>
+  {% endif %}
+  {% if can('customer:view') %}
+  <div class="kpi">
+    <span class="kpi-num">{{ customer_total }}</span>
+    <span class="kpi-label">可见客户总数</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-num">{{ new_customers }}</span>
+    <span class="kpi-label">近 30 天新增客户</span>
+  </div>
+  {% endif %}
+  {% if finance %}
+  <div class="kpi {{ 'alert' if finance.overdue_total > 0 else '' }}">
+    <span class="kpi-num">{{ finance.overdue_total|money }}</span>
+    <span class="kpi-label">逾期应收总额</span>
+  </div>
+  {% endif %}
+</div>
+
+{% if show_task_widgets %}
+<div class="grid2">
+  <section class="card">
+    <h2>⚠️ 延期工序</h2>
+    {% if delayed %}
+    <table class="tight">
+      <thead><tr><th>客户</th><th>工序</th><th>计划完成</th><th>状态</th></tr></thead>
+      <tbody>
+      {% for t in delayed[:10] %}
+        <tr class="row-alert">
+          <td>{% if customers_map.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers_map[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
+          <td>{{ t.stage }}</td>
+          <td class="red">{{ t.planned_end }}</td>
+          <td>{{ t.status }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="/tasks?scope=open">查看全部施工任务 →</a></p>
+    {% else %}<p class="muted">暂无延期工序。</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>本周到期工序</h2>
+    {% if due_week %}
+      <ul class="list">
+      {% for t in due_week[:10] %}
+        <li><strong>{{ t.planned_end }}</strong> · {{ t.stage }} · {% if customers_map.get(t.customer_id) %}{{ customers_map[t.customer_id].name }}{% endif %}</li>
+      {% endfor %}
+      </ul>
+    {% else %}<p class="muted">本周没有到期工序。</p>{% endif %}
+  </section>
+</div>
+{% endif %}
+
+{% if finance %}
+<section class="card">
+  <h2>本月业绩（{{ today[:7] }}）</h2>
+  <div class="kpis">
+    <div class="kpi"><span class="kpi-num">{{ finance.signed_month|money }}</span><span class="kpi-label">签约额</span></div>
+    <div class="kpi"><span class="kpi-num">{{ finance.received_month|money }}</span><span class="kpi-label">已收款</span></div>
+    <div class="kpi"><span class="kpi-num">{{ finance.rate }}%</span><span class="kpi-label">回款率（已收/签约）</span></div>
+  </div>
+  <h3>Top5 欠款客户</h3>
+  {% if finance.debtors %}
+  <table class="tight">
+    <thead><tr><th>客户</th><th>逾期金额</th></tr></thead>
+    <tbody>
+    {% for c, amount in finance.debtors %}
+      <tr><td><a href="/customers/{{ c.id }}?tab=finance">{{ c.name }}</a></td><td class="red">{{ amount|money }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">没有逾期欠款。</p>{% endif %}
+  <p><a href="/payments/overdue">查看逾期明细 →</a></p>
+</section>
+{% endif %}
+
+{% if can('customer:view') %}
+<div class="grid2">
+  <section class="card">
+    <h2>客户来源分布（近 30 天）</h2>
+    {% if source_dist %}
+      <ul class="list">{% for name, cnt in source_dist %}<li>{{ name }} <span class="badge">{{ cnt }}</span></li>{% endfor %}</ul>
+    {% else %}<p class="muted">近 30 天没有新增客户。</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>楼盘渗透率排行</h2>
+    {% if project_rows %}
+    <table class="tight">
+      <thead><tr><th>楼盘</th><th>已成交客户</th><th>总房号</th><th>渗透率</th></tr></thead>
+      <tbody>
+      {% for row in project_rows %}
+        <tr><td>{{ row.name }}</td><td>{{ row.customers }}</td><td>{{ row.units }}</td><td>{{ row.rate }}%</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">暂无楼盘数据。</p>{% endif %}
+  </section>
+</div>
+{% endif %}
+
+{% if recent_photos %}
+<section class="card">
+  <h2>最新现场照片</h2>
+  <div class="gallery">
+    {% for p in recent_photos %}
+      <a href="/photos/{{ p.id }}/file" target="_blank" title="{{ p.kind }} · {{ p.created_at }}">
+        <img src="/photos/{{ p.id }}/thumb" alt="{{ p.kind }}" loading="lazy">
+        <span>{{ p.kind }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

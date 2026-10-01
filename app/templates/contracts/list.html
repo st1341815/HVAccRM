@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block title %}合同列表{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>合同台账 <span class="muted small">共 {{ rows|length }} 份</span></h1>
+  {% if can('contract:edit') %}<a class="btn" href="/contracts/new">＋ 新建合同</a>{% endif %}
+</div>
+
+{% if can_amount %}
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ totals.total|money }}</span><span class="kpi-label">合同总额</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.received|money }}</span><span class="kpi-label">已收合计</span></div>
+  <div class="kpi {{ 'alert' if totals.outstanding > 0 else '' }}"><span class="kpi-num">{{ totals.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
+  <div class="kpi {{ 'alert' if totals.overdue > 0 else '' }}"><span class="kpi-num">{{ totals.overdue|money }}</span><span class="kpi-label">逾期金额</span></div>
+</div>
+{% endif %}
+
+<section class="card">
+  <form method="get" action="/contracts" class="filterbar">
+    <input name="customer_id" value="{{ customer_id }}" placeholder="客户 ID 过滤" inputmode="numeric">
+    <select name="status">
+      <option value="">全部状态</option>
+      {% for s in ['active','done','void'] %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/contracts">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <table>
+    <thead><tr><th>合同号</th><th>客户</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>逾期</th><th>回款率</th>{% endif %}<th>收款期数</th><th>状态</th><th></th></tr></thead>
+    <tbody>
+    {% for c, s in rows %}
+      <tr>
+        <td>{{ c.no or ('#' ~ c.id) }}</td>
+        <td><a href="/customers/{{ c.customer_id }}?tab=finance">{{ c.customer.name if c.customer else c.customer_id }}</a></td>
+        <td>{{ c.sign_date }}</td>
+        {% if can_amount %}
+        <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
+        <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
+        <td class="{{ 'red' if s.overdue > 0 else '' }}">{{ s.overdue|money }}</td>
+        <td>{{ s.recovery_rate }}%</td>
+        {% endif %}
+        <td>{{ s.plans|length }}</td>
+        <td>{{ c.status }}</td>
+        <td><a href="/contracts/{{ c.id }}">详情 →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not rows %}<p class="muted">没有符合条件的合同。</p>{% endif %}
+</section>
+{% endblock %}

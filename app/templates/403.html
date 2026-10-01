@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}无权限{% endblock %}
+{% block content %}
+<div class="card center">
+  <h1>403 · 无权限访问</h1>
+  <p class="muted">{{ detail or '当前账号缺少该操作的权限，或数据不在你的数据范围内。' }}</p>
+  <p><a href="/">返回看板</a></p>
+</div>
+{% endblock %}

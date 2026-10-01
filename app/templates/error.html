@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}出错了{% endblock %}
+{% block content %}
+<div class="card center">
+  <h1>出错了</h1>
+  <p class="muted break">{{ detail or '服务器内部错误，请查看容器日志。' }}</p>
+  <p><a href="/">返回看板</a></p>
+</div>
+{% endblock %}
