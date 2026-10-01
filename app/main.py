@@ -17,7 +17,17 @@ from .auth import NotAuthenticated, load_user, router as auth_router
 from .bootstrap import configure_logging, ensure_fts, run_migrations, seed_admin, seed_stages
 from .config import get_settings, set_timezone
 from .db import healthcheck, session_scope
-from .routers import admin, contracts, customers, payments, photos, projects, tasks, ui
+from .routers import (
+    admin,
+    contracts,
+    costs,
+    customers,
+    payments,
+    photos,
+    projects,
+    tasks,
+    ui,
+)
 from .scheduler import start_scheduler, stop_scheduler
 from .templating import flash_cookie_name, render
 
@@ -93,6 +103,7 @@ app.include_router(projects.router)
 app.include_router(customers.router)
 app.include_router(contracts.router)
 app.include_router(payments.router)
+app.include_router(costs.router)
 app.include_router(tasks.router)
 app.include_router(photos.router)
 app.include_router(admin.router)

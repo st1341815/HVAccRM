@@ -161,18 +161,21 @@
   <h2>合同与收款</h2>
   {% if plan_rows %}
   <table class="tight">
-    <thead><tr><th>合同号</th><th>签订日</th><th>总额</th><th>已收</th><th>未收</th><th>回款率</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>合同号</th><th>签订日</th><th>总额</th><th>已收</th><th>未收</th>{% if show_cost %}<th>成本</th><th>毛利</th>{% endif %}<th>回款率</th><th>状态</th><th></th></tr></thead>
     <tbody>
-    {% for c, s in plan_rows %}
+    {% for c, s, p in plan_rows %}
       <tr>
         <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
         <td>{{ c.sign_date }}</td>
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
-        <td class="{{ 'red' if s.overdue > 0 else '' }}">{{ s.overdue|money }}</td>
+        {% if show_cost and p %}
+          <td>{{ p.cost|money }}</td>
+          <td class="{{ 'red' if p.is_loss else '' }}">{{ p.gross_profit|money }}</td>
+        {% endif %}
         <td>{{ s.recovery_rate }}%</td>
         <td>{{ s.status }}</td>
-        <td>{{ s.plans|length }} 期</td>
+        <td>{% if show_cost %}<a href="/contracts/{{ c.id }}#costs">录成本 →</a>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

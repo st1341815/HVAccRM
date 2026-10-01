@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% block title %}成本明细{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>成本明细 <span class="muted small">共 {{ rows|length }} 条</span></h1>
+  <nav class="tabs inline-tabs">
+    <a href="/costs">利润核算</a>
+    <a href="/costs/entries" class="active">成本明细</a>
+    <a href="/costs/suppliers">供应商</a>
+  </nav>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ total|money }}</span><span class="kpi-label">筛选结果合计</span></div>
+</div>
+
+<section class="card">
+  <form method="get" action="/costs/entries" class="filterbar">
+    <select name="category">
+      <option value="">全部费用项目</option>
+      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if filters.category == c else '' }}>{{ c }}</option>{% endfor %}
+    </select>
+    <input name="supplier_id" value="{{ filters.supplier_id }}" placeholder="供应商 ID" inputmode="numeric">
+    <input name="installer_id" value="{{ filters.installer_id }}" placeholder="安装师傅 ID" inputmode="numeric">
+    <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <input name="keyword" value="{{ filters.keyword }}" placeholder="备注关键词">
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/costs/entries">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <table class="tight">
+    <thead><tr><th>日期</th><th>合同号</th><th>客户</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>录入人</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      {% set c = contract_map.get(r.contract_id) %}
+      <tr>
+        <td>{{ r.spent_at or '-' }}</td>
+        <td>{% if c %}<a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a>{% else %}#{{ r.contract_id }}{% endif %}</td>
+        <td>{% if c and c.customer %}{{ c.customer.name }}{% else %}-{% endif %}</td>
+        <td>{{ r.category }}</td>
+        <td><strong>{{ r.amount|money }}</strong></td>
+        <td>{{ suppliers[r.supplier_id].name if r.supplier_id and suppliers.get(r.supplier_id) else '-' }}</td>
+        <td>{{ users[r.installer_id].display_name if r.installer_id and users.get(r.installer_id) else '-' }}</td>
+        <td class="break">{{ r.remark or '-' }}</td>
+        <td>{{ users[r.created_by].display_name if r.created_by and users.get(r.created_by) else '-' }}</td>
+        <td>
+          {% if can_edit %}
+          <form method="post" action="/costs/{{ r.id }}/delete" class="inline" onsubmit="return confirm('删除这条成本记录？');">
+            <input type="hidden" name="back" value="/costs/entries">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not rows %}<p class="muted">没有符合条件的成本记录。</p>{% endif %}
+</section>
+{% endblock %}

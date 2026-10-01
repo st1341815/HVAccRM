@@ -314,6 +314,51 @@ c=$(code -b $J -c $J -X POST --data-urlencode "full_name=" $B/account/profile); 
 c=$(code -b $J "$B/account"); has "admin" && ok "姓名清空后回落显示登录账号" || bad "清空后未回落账号"
 c=$(code -b $J -X POST --data-urlencode "full_name=超长姓名$(printf 'x%.0s' {1..40})" $B/account/profile); chk "超长姓名被拒" 303 "$c"
 
+echo "== 7c. 成本与利润核算 =="
+c=$(code -b $J -X POST --data-urlencode "name=测试供应商$RUN" --data-urlencode "contact=王经理" --data-urlencode "phone=13900001111" $B/costs/suppliers/new)
+chk "新建供应商" 303 "$c"
+c=$(code -b $J "$B/costs/suppliers"); has "测试供应商$RUN" && ok "供应商列表可见" || bad "供应商未出现"
+SPID=$(curl -s -b $J "$B/costs/suppliers" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "测试供应商$RUN" | grep -o 'suppliers/[0-9]*/update' | head -1 | grep -o '[0-9]*')
+echo "  供应商 id=$SPID"
+c=$(code -b $J -X POST --data-urlencode "name=测试供应商$RUN" $B/costs/suppliers/new)
+chk "重名供应商被拒（重定向）" 303 "$c"
+n=$(curl -s -b $J "$B/costs/suppliers" | grep -c "测试供应商$RUN")
+[ "$n" -eq 1 ] && ok "重名供应商未写入（仍 1 条）" || bad "重名供应商重复写入（$n 条）"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=材料成本" -F "amount=8000" -F "remark=缺供应商测试" $B/costs/new)
+chk "材料成本缺供应商被拒（重定向）" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID"); has "缺供应商测试" && bad "缺供应商的材料成本竟入库" || ok "缺供应商的材料成本未入库"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=材料成本" -F "amount=8000" -F "supplier_id=$SPID" -F "spent_at=2026-02-10" -F "remark=锅炉主机及管材" $B/costs/new)
+chk "登记材料成本（关联供应商）" 303 "$c"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=施工费用" -F "amount=3000" -F "remark=缺师傅测试" $B/costs/new)
+chk "施工费用缺安装师傅被拒（重定向）" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID"); has "缺师傅测试" && bad "缺师傅的施工费用竟入库" || ok "缺安装师傅的施工费用未入库"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=施工费用" -F "amount=3000" -F "installer_id=$IID" -F "spent_at=2026-02-12" -F "remark=安装工费两工两日" $B/costs/new)
+chk "登记施工费用（关联安装师傅）" 303 "$c"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=乱写项目" -F "amount=100" $B/costs/new)
+chk "非法费用项目被拒（重定向）" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID"); chk "合同详情（含成本模块）" 200 "$c"
+has "登记成本" && ok "合同页有成本登记模块" || bad "合同页缺成本模块"
+has "11,000.00" && ok "成本合计 11000 已汇总" || bad "成本合计不对"
+has "27,000.00" && ok "毛利 27000 已计算（收入 38000 − 成本 11000）" || bad "毛利不对"
+has 'label="安装工"' && ok "安装师傅下拉含「安装工」分组" || bad "安装师傅下拉缺安装工分组"
+c=$(code -b $J "$B/costs"); chk "利润核算页" 200 "$c"
+has "11,000.00" && ok "利润页成本合计一致" || bad "利润页成本合计不一致"
+c=$(code -b $J "$B/costs/entries"); chk "成本明细页" 200 "$c"
+has "锅炉主机及管材" && ok "明细展示备注" || bad "明细缺备注"
+c=$(code -b $J --get --data-urlencode "keyword=两工两日" "$B/costs/entries")
+has "两工两日" && ok "备注关键词可检索" || bad "备注检索失效"
+c=$(code -b $J --get --data-urlencode "category=材料成本" "$B/costs/entries")
+has "材料成本" && ok "按费用项目筛选" || bad "按费用项目筛选失效"
+c=$(code -b $J --get --data-urlencode "supplier_id=$SPID" "$B/costs/entries")
+has "锅炉主机及管材" && ok "按供应商筛选" || bad "按供应商筛选失效"
+DELC=$(curl -s -b $J "$B/contracts/$CTID" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '锅炉主机及管材' | grep -o 'costs/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J -X POST "$B/costs/$DELC/delete"); chk "删除成本记录" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID"); has "35,000.00" && ok "删除成本后毛利重算为 35000" || bad "删除成本后毛利未重算"
+DX=/tmp/crmtest/designer_cost_jar.txt
+login_user $DU designer12345 $DX designer12345  # 第 7 节已把 designer 密码改成 designer12345 > /dev/null
+c=$(code -b $DX "$B/costs"); chk "designer 访问成本页被拒" 403 "$c"
+c=$(code -b $D "$B/costs"); chk "sales 访问成本页（有 cost:view）" 200 "$c"
+
 echo "== 8. 会话失效 / 备份 / 审计 =="
 login_user $SU sales12345 $D sales12345x && ok "sales 重新登录" || bad "sales 重新登录失败"
 c=$(code -b $D $B/customers); chk "sales 会话有效" 200 "$c"

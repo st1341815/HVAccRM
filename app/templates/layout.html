@@ -17,6 +17,7 @@
     <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}">楼盘/房号</a>
     {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}">合同</a>{% endif %}
     {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}">收款</a>{% endif %}
+    {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}">成本</a>{% endif %}
     {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}">施工</a>{% endif %}
     {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}">用户</a>{% endif %}
     {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}">系统</a>{% endif %}

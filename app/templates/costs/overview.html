@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block title %}利润核算{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>成本与利润 <span class="muted small">以合同为单个项目核算</span></h1>
+  <nav class="tabs inline-tabs">
+    <a href="/costs" class="active">利润核算</a>
+    <a href="/costs/entries">成本明细</a>
+    <a href="/costs/suppliers">供应商</a>
+  </nav>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ totals.income|money }}</span><span class="kpi-label">收入（合同额+增项）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.cost|money }}</span><span class="kpi-label">成本合计</span></div>
+  <div class="kpi {{ 'alert' if totals.gross_profit < 0 else '' }}"><span class="kpi-num">{{ totals.gross_profit|money }}</span><span class="kpi-label">毛利</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.gross_margin }}%</span><span class="kpi-label">毛利率</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.received|money }}</span><span class="kpi-label">已收合计</span></div>
+</div>
+
+<section class="card">
+  <h2>成本构成</h2>
+  <table class="tight">
+    <thead><tr><th>费用项目</th>{% for c in categories %}<th>{{ c }}</th>{% endfor %}<th>合计</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>金额</td>
+        {% for c in categories %}<td>{{ category_totals.get(c, 0)|money }}</td>{% endfor %}
+        <td><strong>{{ totals.cost|money }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <form method="get" action="/costs" class="filterbar">
+    <label class="inline-label">签订日从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <label class="checkline"><input type="checkbox" name="only_cost" value="1" {{ 'checked' if filters.only_cost else '' }}> 只看已录成本</label>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/costs">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <h2>按合同核算（{{ rows|length }} 份，按毛利升序）</h2>
+  <table class="tight">
+    <thead>
+      <tr><th>合同号</th><th>客户</th><th>产品类型</th><th>签订日</th><th>收入</th><th>成本</th><th>毛利</th><th>毛利率</th><th>已收</th><th>未收</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for c, fin, p in rows %}
+      <tr class="{{ 'row-alert' if p.is_loss else '' }}">
+        <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
+        <td>{% if c.customer %}<a href="/customers/{{ c.customer_id }}">{{ c.customer.name }}</a>{% else %}#{{ c.customer_id }}{% endif %}</td>
+        <td>{{ c.product_type or '-' }}</td>
+        <td>{{ c.sign_date }}</td>
+        <td>{{ p.income|money }}</td>
+        <td>{{ p.cost|money }}{% if p.cost <= 0 %}<span class="muted small">（未录）</span>{% endif %}</td>
+        <td class="{{ 'red' if p.is_loss else '' }}"><strong>{{ p.gross_profit|money }}</strong></td>
+        <td>{{ p.gross_margin }}%</td>
+        <td>{{ p.received|money }}</td>
+        <td class="{{ 'red' if fin.outstanding > 0 else '' }}">{{ fin.outstanding|money }}</td>
+        <td>{% if can_edit %}<a href="/contracts/{{ c.id }}">录成本 →</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not rows %}<p class="muted">没有符合条件的合同。</p>{% endif %}
+  <p class="muted small">口径：收入 = 合同额（减优惠）+ 增项；成本 = 该合同下全部成本费用；毛利 = 收入 − 成本。</p>
+</section>
+{% endblock %}

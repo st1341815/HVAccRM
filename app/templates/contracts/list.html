@@ -38,7 +38,6 @@
         {% if can_amount %}
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
-        <td class="{{ 'red' if s.overdue > 0 else '' }}">{{ s.overdue|money }}</td>
         <td>{{ s.recovery_rate }}%</td>
         {% endif %}
         <td>{{ s.plans|length }}</td>

@@ -9,6 +9,7 @@ from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
 from ..models import (
+    COST_CATEGORIES,
     PRODUCT_OPTIONS,
     ChangeOrder,
     Contract,
@@ -27,6 +28,7 @@ from ..permissions import (
     require,
 )
 from ..services import finance as finance_svc
+from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
 from ..templating import redirect, render
@@ -241,6 +243,11 @@ def contract_detail(
         ).all()
     )
     payment_photos = photo_svc.photos_by_payment(db, [p.id for p in payments])
+    # 成本与利润：需 cost:view 且不属金额隔离角色
+    can_cost = has_perm(user, "cost:view") and can_see_amount(user)
+    costs = list(contract.costs) if can_cost else []
+    profit = cost_svc.profit_summary(db, contract) if can_cost else None
+    installers, other_users = cost_svc.contract_installers(db) if can_cost else ([], [])
     return render(
         request,
         "contracts/detail.html",
@@ -253,6 +260,14 @@ def contract_detail(
         contract_photos=contract_photos,
         payment_photos=payment_photos,
         product_types=PRODUCT_OPTIONS,
+        costs=costs,
+        profit=profit,
+        cost_categories=COST_CATEGORIES,
+        suppliers=cost_svc.active_suppliers(db) if can_cost else [],
+        installers=installers,
+        other_users=other_users,
+        cost_users={u.id: u for u in users.values()},
+        can_cost=can_cost,
         can_amount=can_see_amount(user),
         can_edit=has_perm(user, "contract:edit"),
         can_pay=has_perm(user, "payment:edit"),
