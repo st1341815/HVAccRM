@@ -11,6 +11,7 @@ from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
 from ..models import Customer, Project, Room, UNIT_OPTIONS, User
 from ..permissions import require_any
+from ..regions import validate_region
 from ..templating import redirect, render
 from ..utils import client_ip, parse_date, parse_float, parse_int
 
@@ -73,6 +74,9 @@ def create_project(
 ):
     if not name.strip():
         return render(request, "projects/form.html", project=None, error="楼盘名称必填")
+    region_error = validate_region(city, district)
+    if region_error:
+        return render(request, "projects/form.html", project=None, error=region_error)
     project = Project(
         name=name.strip(),
         city=city.strip() or None,
