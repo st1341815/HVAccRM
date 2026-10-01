@@ -3,7 +3,15 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ project.name }}</h1>
-  <a class="btn ghost" href="/projects">← 返回楼盘列表</a>
+  <div class="actions">
+    <a class="btn ghost" href="/projects">← 返回楼盘列表</a>
+    {% if can('admin:setting') or can('customer:delete') %}
+    <form method="post" action="/projects/{{ project.id }}/delete" class="inline"
+          onsubmit="return confirm('删除楼盘「{{ project.name }}」{% if rooms %}及其 {{ rooms|length }} 个房号{% endif %}？此操作不可恢复。');">
+      <button class="danger">删除楼盘</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 
 <div class="meta">
