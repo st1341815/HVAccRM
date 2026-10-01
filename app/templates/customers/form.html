@@ -6,13 +6,14 @@
 <form method="post" action="{{ '/customers/' + customer.id|string + '/edit' if customer else '/customers/new' }}" class="card stack">
   <div class="grid3">
     <label>客户姓名 *<input name="name" value="{{ customer.name if customer else '' }}" required></label>
+    <label>客户手机号<input name="phone" type="tel" inputmode="numeric" value="{{ customer.phone or '' if customer else '' }}" placeholder="如 13800000000"></label>
+    <label>微信<input name="wechat" value="{{ customer.wechat or '' if customer else '' }}" placeholder="微信号 / 手机号"></label>
     <label>客户类型
       <select name="type">
         <option value="">未填写</option>
         {% for t in types %}<option value="{{ t }}" {{ 'selected' if customer and customer.type == t else '' }}>{{ t }}</option>{% endfor %}
       </select>
     </label>
-    <label>行业<input name="industry" value="{{ customer.industry or '' if customer else '' }}" placeholder="如：橱柜定制"></label>
     <label>渠道来源
       <select name="source">
         <option value="">未填写</option>
@@ -39,9 +40,17 @@
         {% endfor %}
       </select>
     </label>
-    <label>装修阶段<input name="decor_stage" value="{{ customer.decor_stage or '' if customer else '' }}" placeholder="如：水电完成"></label>
-    <label class="checkline"><input type="checkbox" name="is_showroom" value="1" {{ 'checked' if customer and customer.is_showroom else '' }}> 样板间</label>
   </div>
+
+  <fieldset class="product-picker">
+    <legend>意向产品（可多选）</legend>
+    <div class="grid3 checkgrid">
+      {% set chosen = customer.product_list if customer else [] %}
+      {% for p in product_options %}
+      <label class="checkline"><input type="checkbox" name="products" value="{{ p }}" {{ 'checked' if p in chosen else '' }}> {{ p }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
 
   <fieldset class="room-picker">
     <legend>房号（楼盘 → 楼栋 → 房号 级联）</legend>
@@ -70,12 +79,11 @@
     </p>
   </fieldset>
 
-  <label>地址<input name="address" value="{{ customer.address or '' if customer else '' }}"></label>
   <label>备注<textarea name="notes" rows="3">{{ customer.notes or '' if customer else '' }}</textarea></label>
 
   {% if not customer %}
   <fieldset>
-    <legend>首个联系人（可选）</legend>
+    <legend>补充联系人（可选，客户本人以外的其他联系人）</legend>
     <div class="grid3">
       <label>姓名<input name="contact_name"></label>
       <label>手机<input name="contact_phone"></label>

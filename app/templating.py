@@ -42,6 +42,7 @@ templates.env.globals["role_labels"] = permissions.ROLE_LABELS
 templates.env.globals["all_permissions"] = permissions.ALL_PERMISSIONS
 templates.env.globals["role_perms"] = permissions.ROLE_PERMS
 templates.env.globals["unit_options"] = models.UNIT_OPTIONS
+templates.env.globals["product_options"] = models.PRODUCT_OPTIONS
 
 
 def flash_cookie_name() -> str:
