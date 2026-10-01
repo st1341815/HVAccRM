@@ -1,7 +1,7 @@
 {% if tasks %}
 <table class="tight">
   <thead>
-    <tr><th>客户 / 房号</th><th>工序</th><th>计划</th><th>责任人</th><th>状态</th><th>操作</th></tr>
+    <tr><th>客户 / 房号</th><th>工序</th><th>计划</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr>
   </thead>
   <tbody>
   {% for t in tasks %}
@@ -25,6 +25,7 @@
         </form>
         {% else %}{{ users_map[t.assignee_id].username if t.assignee_id and users_map.get(t.assignee_id) else '未指派' }}{% endif %}
       </td>
+      <td>{% include "_fragments/task_photos.html" with context %}</td>
       <td><span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>
       <td class="actions-cell">
         {% if t.status == 'ready' %}

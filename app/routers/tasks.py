@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Task, User, now_iso, today_str
+from ..models import Customer, Photo, StageTemplate, Task, User, now_iso, today_str
 from ..permissions import has_perm, require, task_scope_conditions, visible_customer_ids
+from ..services import photos as photo_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int
+from ..utils import client_ip, get_or_404, parse_int, return_path
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -34,6 +35,17 @@ def _can_touch(db: Session, user: User, task: Task) -> bool:
         return True
     allowed = visible_customer_ids(db, user)
     return allowed is None or task.customer_id in allowed
+
+
+def _photo_ctx(db: Session, tasks: list[Task], user: User, request: Request) -> dict:
+    """施工页照片上下文：每个节点的已有照片 + 是否需照片 + 上传权限 + 返回路径。"""
+    return {
+        "task_photos": photo_svc.photos_by_task(db, [t.id for t in tasks]),
+        "stage_requires_photo": task_svc.stage_photo_requirements(db),
+        "stage_kind": task_svc.STAGE_PHOTO_KIND,
+        "can_upload_photo": has_perm(user, "photo:upload"),
+        "back_path": str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
+    }
 
 
 @router.get("")
@@ -85,6 +97,7 @@ def task_board(
         filters={"assignee": assignee, "stage": stage, "status": status, "customer_id": customer_id, "scope": scope},
         can_assign=has_perm(user, "task:assign"),
         today=today_str(),
+        **_photo_ctx(db, tasks, user, request),
     )
     if partial:
         return render(request, "_fragments/task_rows.html", **ctx)
@@ -110,7 +123,7 @@ def start(
     ok, msg = task_svc.start_task(db, task)
     log_action(db, user, "task_start" if ok else "task_start_denied", "tasks", task.id, new={"status": task.status, "msg": msg}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(request.headers.get("referer") or "/tasks", msg, "ok" if ok else "err")
+    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/done")
@@ -127,9 +140,13 @@ def done(
     if notes.strip():
         task.notes = notes.strip()
     ok, msg = task_svc.finish_task(db, task)
+    if ok and task_svc.stage_photo_requirements(db).get(task.stage):
+        have = db.scalar(select(func.count(Photo.id)).where(Photo.task_id == task.id)) or 0
+        if not have:
+            msg += "（提示：该节点模板标记为「需照片」，建议先上传现场照片）"
     log_action(db, user, "task_done" if ok else "task_done_denied", "tasks", task.id, new={"status": task.status, "msg": msg}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(request.headers.get("referer") or "/tasks", msg, "ok" if ok else "err")
+    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/skip")
@@ -146,7 +163,7 @@ def skip(
     ok, msg = task_svc.skip_task(db, task, skip_reason)
     log_action(db, user, "task_skip" if ok else "task_skip_denied", "tasks", task.id, new={"status": task.status, "reason": skip_reason}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(request.headers.get("referer") or "/tasks", msg, "ok" if ok else "err")
+    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/assign")
@@ -163,7 +180,7 @@ def assign(
     task.updated_at = now_iso()
     log_action(db, user, "task_assign", "tasks", task.id, old=before, new={"assignee_id": task.assignee_id}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(request.headers.get("referer") or "/tasks", "已指派")
+    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), "已指派")
 
 
 @router.post("/{task_id}/plan")
@@ -186,4 +203,4 @@ def plan(
     task.updated_at = now_iso()
     log_action(db, user, "task_plan", "tasks", task.id, old=before, new={"planned_start": task.planned_start, "planned_end": task.planned_end}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(request.headers.get("referer") or "/tasks", "工期已更新")
+    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), "工期已更新")

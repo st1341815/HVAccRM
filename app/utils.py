@@ -46,3 +46,28 @@ def client_ip(request: Request) -> str:
 
 def is_htmx(request: Request) -> bool:
     return request.headers.get("hx-request", "").lower() == "true"
+
+
+def _to_local_path(value: str | None) -> str | None:
+    """把可能是绝对 URL 的值裁成站内相对路径；非站内路径返回 None。"""
+    if not value:
+        return None
+    v = value.strip()
+    if v.startswith(("http://", "https://")):
+        from urllib.parse import urlparse
+
+        parsed = urlparse(v)
+        v = parsed.path or ""
+        if parsed.query:
+            v = f"{v}?{parsed.query}"
+    if v.startswith("/") and not v.startswith("//"):
+        return v
+    return None
+
+
+def return_path(back: str | None, referer: str | None, default: str) -> str:
+    """决定操作后跳回哪里：显式 back 优先，其次 Referer，都不可信时用 default。
+
+    只接受站内相对路径，避免被构造成外部跳转（开放重定向）。
+    """
+    return _to_local_path(back) or _to_local_path(referer) or default

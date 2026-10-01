@@ -78,6 +78,20 @@ def find_by_hash(db: Session, sha: str) -> Photo | None:
     return db.scalars(select(Photo).where(Photo.sha256 == sha).limit(1)).first()
 
 
+def photos_by_task(db: Session, task_ids: list[int]) -> dict[int, list[Photo]]:
+    """按工序任务分组照片（施工看板/客户工序页展示用）。"""
+    ids = [i for i in task_ids if i]
+    if not ids:
+        return {}
+    rows = db.scalars(
+        select(Photo).where(Photo.task_id.in_(ids)).order_by(Photo.created_at.desc(), Photo.id.desc())
+    ).all()
+    grouped: dict[int, list[Photo]] = {}
+    for ph in rows:
+        grouped.setdefault(ph.task_id, []).append(ph)
+    return grouped
+
+
 def save_photo(
     db: Session,
     customer_id: int,

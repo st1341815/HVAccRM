@@ -31,6 +31,7 @@ from ..permissions import (
     visible_customer_ids,
 )
 from ..services import finance as finance_svc
+from ..services import photos as photo_svc
 from ..services import search as search_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
@@ -251,6 +252,11 @@ def customer_detail(
         share_users=share_users,
         progress=task_svc.progress(tasks),
         delayed=task_svc.delay_count(db, tasks),
+        task_photos=photo_svc.photos_by_task(db, [t.id for t in tasks]),
+        stage_requires_photo=task_svc.stage_photo_requirements(db),
+        stage_kind=task_svc.STAGE_PHOTO_KIND,
+        can_upload_photo=has_perm(user, "photo:upload"),
+        back_path=str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
         can_edit=can_edit_customer(db, user, customer),
         can_delete=has_perm(user, "customer:delete"),
         sources=SOURCES,
