@@ -61,10 +61,10 @@ def dashboard(
         contracts = [c for c in contracts if c.customer_id in ids] if c_scope is not None else contracts
         signed = round(sum(c.total_amount or 0 for c in contracts if (c.sign_date or "").startswith(month)), 2)
         received = 0.0
-        overdue = 0.0
+        outstanding = 0.0
         for c in contracts:
             s = finance_svc.contract_summary(db, c)
-            overdue += s.overdue
+            outstanding += s.outstanding
             for p in c.payments:
                 if (p.paid_at or "").startswith(month):
                     received += p.amount or 0
@@ -72,7 +72,7 @@ def dashboard(
             "signed_month": signed,
             "received_month": round(received, 2),
             "rate": round(received / signed * 100, 1) if signed else 0.0,
-            "overdue_total": round(overdue, 2),
+            "outstanding_total": round(outstanding, 2),
             "debtors": finance_svc.top_debtors(db, 5),
         }
 

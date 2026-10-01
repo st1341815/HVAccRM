@@ -23,21 +23,16 @@
   <div class="kpi"><span class="kpi-num">{{ summary.base|money }}</span><span class="kpi-label">合同额（减优惠）</span></div>
   <div class="kpi"><span class="kpi-num">{{ summary.change|money }}</span><span class="kpi-label">增项合计</span></div>
   <div class="kpi"><span class="kpi-num">{{ summary.total|money }}</span><span class="kpi-label">应收总额</span></div>
-  <div class="kpi"><span class="kpi-num">{{ summary.plans_total|money }}</span><span class="kpi-label">计划应收合计</span></div>
   <div class="kpi"><span class="kpi-num">{{ summary.received|money }}</span><span class="kpi-label">已收合计</span></div>
   <div class="kpi {{ 'alert' if summary.outstanding > 0 else '' }}"><span class="kpi-num">{{ summary.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
-  <div class="kpi {{ 'alert' if summary.overdue > 0 else '' }}"><span class="kpi-num">{{ summary.overdue|money }}</span><span class="kpi-label">逾期金额</span></div>
   <div class="kpi"><span class="kpi-num">{{ summary.recovery_rate }}%</span><span class="kpi-label">回款率</span></div>
 </div>
-{% if summary.needs_plan %}
-<div class="flash warn">提示：应收计划合计 {{ summary.plans_total|money }} 少于应收总额 {{ summary.total|money }}，请检查分期计划是否遗漏。</div>
-{% endif %}
 {% endif %}
 
 {% if can_pay %}
 <section class="card">
   <h2>登记收款 / 退款</h2>
-  <form method="post" action="/payments/record" class="filterbar">
+  <form method="post" action="/payments/record" class="filterbar" enctype="multipart/form-data">
     <input type="hidden" name="contract_id" value="{{ contract.id }}">
     <input type="hidden" name="back" value="/contracts/{{ contract.id }}">
     <input name="amount" placeholder="金额（退款填负数）" inputmode="decimal" required>
@@ -47,77 +42,42 @@
     </select>
     <input name="voucher_no" placeholder="凭证号">
     <input name="remark" placeholder="备注">
+    <label class="inline-label" title="可多张：转账截图 / 收款凭证">付款截图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
     <button type="submit">登记</button>
   </form>
-  <p class="muted small">入库前校验：已收 + 本次 ≤ 应收总额（含增项），超收会被拦截。</p>
+  <p class="muted small">入库前校验：已收 + 本次 ≤ 应收总额（含增项），超收会被拦截。付款截图会挂在对应收款流水上（重复图自动去重）。</p>
 </section>
 {% endif %}
 
-<div class="grid2">
-  <section class="card">
-    <h2>应收计划</h2>
-    <table class="tight">
-      <thead><tr><th>#</th><th>期次</th><th>金额</th><th>已分摊</th><th>约定日期</th><th>状态</th><th></th></tr></thead>
-      <tbody>
-      {% for p in summary.plans %}
-        <tr class="{{ 'row-alert' if p.status == 'overdue' else '' }}">
-          <td>{{ p.sort_order }}</td>
-          <td>{{ p.label }}</td>
-          <td>{{ p.amount|money }}</td>
-          <td>{{ p.paid_amount|money }}</td>
-          <td>{{ p.due_date or '-' }}</td>
-          <td><span class="badge">{{ p.status }}</span></td>
-          <td>
-            {% if can_edit %}
-            <form method="post" action="/contracts/plans/{{ p.id }}/delete" class="inline" onsubmit="return confirm('删除该期计划？');">
-              <button class="ghost danger">删除</button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% if can_edit %}
-    <form method="post" action="/contracts/{{ contract.id }}/plans" class="filterbar">
-      <input name="label" placeholder="期次名称" required>
-      <input name="amount" placeholder="金额" inputmode="decimal" required>
-      <input name="due_date" type="date">
-      <button type="submit">＋ 添加期次</button>
-    </form>
-    {% endif %}
-  </section>
-
-  <section class="card">
-    <h2>增项（变更单）</h2>
-    <table class="tight">
-      <thead><tr><th>原因</th><th>金额</th><th>审批时间</th><th></th></tr></thead>
-      <tbody>
-      {% for co in changes %}
-        <tr>
-          <td>{{ co.reason }}</td><td>{{ co.amount|money }}</td><td>{{ co.approved_at or '-' }}</td>
-          <td>
-            {% if can_edit %}
-            <form method="post" action="/contracts/change-orders/{{ co.id }}/delete" class="inline">
-              <button class="ghost danger">删除</button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% if can_edit %}
-    <form method="post" action="/contracts/{{ contract.id }}/change-orders" class="filterbar">
-      <input name="reason" placeholder="增项原因" required>
-      <input name="amount" placeholder="金额" inputmode="decimal" required>
-      <input name="due_date" type="date">
-      <label class="checkline"><input type="checkbox" name="sync_plan" value="1" checked> 同步追加一期应收</label>
-      <button type="submit">＋ 登记增项</button>
-    </form>
-    {% endif %}
-  </section>
-</div>
+<section class="card">
+  <h2>增项（变更单）</h2>
+  <table class="tight">
+    <thead><tr><th>原因</th><th>金额</th><th>审批时间</th><th></th></tr></thead>
+    <tbody>
+    {% for co in changes %}
+      <tr>
+        <td>{{ co.reason }}</td><td>{{ co.amount|money }}</td><td>{{ co.approved_at or '-' }}</td>
+        <td>
+          {% if can_edit %}
+          <form method="post" action="/contracts/change-orders/{{ co.id }}/delete" class="inline">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if can_edit %}
+  <form method="post" action="/contracts/{{ contract.id }}/change-orders" class="filterbar">
+    <input name="reason" placeholder="增项原因" required>
+    <input name="amount" placeholder="金额" inputmode="decimal" required>
+    <button type="submit">＋ 登记增项</button>
+  </form>
+  {% endif %}
+</section>
 
 <section class="card">
   <h2>合同明细</h2>
@@ -186,7 +146,7 @@
 <section class="card">
   <h2>收款流水</h2>
   <table class="tight">
-    <thead><tr><th>收款日期</th><th>金额</th><th>方式</th><th>凭证号</th><th>收款人</th><th>备注</th></tr></thead>
+    <thead><tr><th>收款日期</th><th>金额</th><th>方式</th><th>凭证号</th><th>收款人</th><th>付款截图</th><th>备注</th></tr></thead>
     <tbody>
     {% for p in payments %}
       <tr class="{{ 'row-alert' if p.amount < 0 else '' }}">
@@ -195,6 +155,14 @@
         <td>{{ p.method or '-' }}</td>
         <td>{{ p.voucher_no or '-' }}</td>
         <td>{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
+        <td>
+          {% set phs = payment_photos.get(p.id, []) %}
+          {% for ph in phs[:3] %}
+            <a href="/photos/{{ ph.id }}/file" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
+          {% endfor %}
+          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {% if not phs %}<span class="muted small">—</span>{% endif %}
+        </td>
         <td>{{ p.remark or '-' }}</td>
       </tr>
     {% endfor %}

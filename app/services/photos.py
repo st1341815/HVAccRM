@@ -78,6 +78,20 @@ def find_by_hash(db: Session, sha: str) -> Photo | None:
     return db.scalars(select(Photo).where(Photo.sha256 == sha).limit(1)).first()
 
 
+def photos_by_payment(db: Session, payment_ids: list[int]) -> dict[int, list[Photo]]:
+    """按收款记录分组截图（收款流水/合同详情展示用）。"""
+    ids = [i for i in payment_ids if i]
+    if not ids:
+        return {}
+    rows = db.scalars(
+        select(Photo).where(Photo.payment_id.in_(ids)).order_by(Photo.created_at.desc(), Photo.id.desc())
+    ).all()
+    grouped: dict[int, list[Photo]] = {}
+    for ph in rows:
+        grouped.setdefault(ph.payment_id, []).append(ph)
+    return grouped
+
+
 def photos_by_task(db: Session, task_ids: list[int]) -> dict[int, list[Photo]]:
     """按工序任务分组照片（施工看板/客户工序页展示用）。"""
     ids = [i for i in task_ids if i]
@@ -101,6 +115,7 @@ def save_photo(
     uploaded_by: int | None,
     task_id: int | None = None,
     contract_id: int | None = None,
+    payment_id: int | None = None,
 ) -> tuple[Photo | None, str]:
     """保存一张照片。返回 (Photo, 状态信息)。
 
@@ -129,6 +144,7 @@ def save_photo(
             customer_id=customer_id,
             task_id=task_id,
             contract_id=contract_id,
+            payment_id=payment_id,
             kind=kind,
             path=existing.path,
             thumb_path=existing.thumb_path,
@@ -165,6 +181,7 @@ def save_photo(
         customer_id=customer_id,
         task_id=task_id,
         contract_id=contract_id,
+        payment_id=payment_id,
         kind=kind,
         path=str(rel_path),
         thumb_path=str(thumb_rel) if thumb_rel else None,

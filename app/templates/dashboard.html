@@ -33,9 +33,9 @@
   </div>
   {% endif %}
   {% if finance %}
-  <div class="kpi {{ 'alert' if finance.overdue_total > 0 else '' }}">
-    <span class="kpi-num">{{ finance.overdue_total|money }}</span>
-    <span class="kpi-label">逾期应收总额</span>
+  <div class="kpi {{ 'alert' if finance.outstanding_total > 0 else '' }}">
+    <span class="kpi-num">{{ finance.outstanding_total|money }}</span>
+    <span class="kpi-label">未收总额</span>
   </div>
   {% endif %}
 </div>
@@ -86,15 +86,15 @@
   <h3>Top5 欠款客户</h3>
   {% if finance.debtors %}
   <table class="tight">
-    <thead><tr><th>客户</th><th>逾期金额</th></tr></thead>
+    <thead><tr><th>客户</th><th>未收金额</th></tr></thead>
     <tbody>
     {% for c, amount in finance.debtors %}
       <tr><td><a href="/customers/{{ c.id }}?tab=finance">{{ c.name }}</a></td><td class="red">{{ amount|money }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
-  {% else %}<p class="muted">没有逾期欠款。</p>{% endif %}
-  <p><a href="/payments/overdue">查看逾期明细 →</a></p>
+  {% else %}<p class="muted">没有未收欠款。</p>{% endif %}
+  <p><a href="/payments/overdue">查看欠款明细 →</a></p>
 </section>
 {% endif %}
 
