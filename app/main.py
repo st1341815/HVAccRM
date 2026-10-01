@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     s = get_settings()
     set_timezone(s.tz)
     s.ensure_dirs()
-    log.info("启动 %s v%s（%s）", s.app_name, __version__, s.database_url)
+    log.info("启动 %s（%s）v%s（%s）", s.app_name, s.app_name_en, __version__, s.database_url)
     backend = run_migrations()
     ensure_fts()
     seed_stages()
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="家居建材客户管理系统 CRM",
+    title="oneCRM · 暖通空调客户管理系统",
     version=__version__,
     lifespan=lifespan,
     docs_url="/api/docs",

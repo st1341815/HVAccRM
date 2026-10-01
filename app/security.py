@@ -75,7 +75,8 @@ def verify_totp(secret: str, code: str, window: int = 1, step: int = 30, digits:
 def totp_uri(secret: str, username: str) -> str:
     from urllib.parse import quote
 
-    issuer = quote(get_settings().app_name)
+    # 验证器 App 里显示的产品名用英文短名，避免中文 issuer 在不同 App 下编码差异
+    issuer = quote(get_settings().app_name_en)
     return f"otpauth://totp/{issuer}:{quote(username)}?secret={secret}&issuer={issuer}&period=30&digits=6"
 
 
