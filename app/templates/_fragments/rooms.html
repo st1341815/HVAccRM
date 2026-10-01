@@ -1,3 +1,4 @@
+{% if rooms %}<option value="">请选择房号</option>{% endif %}
 {% for room in rooms %}
 <option value="{{ room.id }}">{{ room.building }}{{ room.unit or '' }}-{{ room.room_no }}{% if room.area %}（{{ room.area }}㎡）{% endif %}</option>
 {% endfor %}

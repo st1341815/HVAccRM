@@ -1,3 +1,4 @@
+{% if buildings %}<option value="">请选择楼栋</option>{% endif %}
 {% for building, cnt in buildings %}
 <option value="{{ building }}">{{ building }}（{{ cnt }} 套）</option>
 {% endfor %}

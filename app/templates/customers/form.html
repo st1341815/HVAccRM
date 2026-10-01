@@ -98,22 +98,32 @@
 </form>
 
 <script>
-function loadBuildings(pid, autoSelect) {
+function loadBuildings(pid) {
   const sel = document.getElementById('building_sel');
+  const roomSel = document.getElementById('room_sel');
+  roomSel.innerHTML = '<option value="">请先选楼栋</option>';
   if (!pid) { sel.innerHTML = '<option value="">请先选楼盘</option>'; return; }
-  fetch('/projects/' + pid + '/buildings').then(r => r.text()).then(html => { sel.innerHTML = html; });
+  fetch('/projects/' + pid + '/buildings', {cache: 'no-store'})
+    .then(r => r.text())
+    .then(html => {
+      sel.innerHTML = html;
+      const real = Array.from(sel.options).filter(o => o.value !== '');
+      // 只有一个楼栋时自动选中并立即加载房号：
+      // 代码设置 value 不会触发 change 事件，否则用户点同一项也唤不出房号
+      if (real.length === 1) { sel.value = real[0].value; loadRooms(pid, real[0].value); }
+    });
 }
 function loadRooms(pid, building) {
   const sel = document.getElementById('room_sel');
   if (!pid || !building) { sel.innerHTML = '<option value="">请先选楼栋</option>'; return; }
-  fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building))
+  fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building), {cache: 'no-store'})
     .then(r => r.text()).then(html => { sel.innerHTML = html; });
 }
 function searchRooms() {
   const q = document.getElementById('room_q').value.trim();
   const pid = document.getElementById('project_sel').value;
   if (!q) { document.getElementById('room_result').innerHTML = ''; return; }
-  fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q))
+  fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q), {cache: 'no-store'})
     .then(r => r.text()).then(html => { document.getElementById('room_result').innerHTML = html; });
 }
 </script>

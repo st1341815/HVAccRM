@@ -46,12 +46,14 @@ c=$(code -b $J -X POST --data-urlencode "building=2号楼" --data-urlencode "roo
 chk "新增房号(2号楼同房号)" 303 "$c"
 c=$(code -b $J "$B/projects/$PID/buildings"); chk "楼栋片段" 200 "$c"
 has "1号楼" && ok "楼栋片段含数据" || bad "楼栋片段无数据"
+has "请选择楼栋" && ok "楼栋片段含占位项（否则浏览器自动选中首项且不触发 change，房号永远加载不出来）" || bad "楼栋片段缺少占位项"
 c=$(code -b $J --get --data-urlencode "building=1号楼" $B/projects/$PID/rooms); chk "房号片段" 200 "$c"
+has "请选择房号" && ok "房号片段含占位项（否则首个房号被静默选中，易存错房号）" || bad "房号片段缺少占位项"
 c=$(code -b $J "$B/projects/rooms/search?project_id=$PID&q=1203"); chk "房号模糊搜索" 200 "$c"
 has "1203" && ok "模糊搜索命中 1203" || bad "模糊搜索未命中"
 n=$(grep -c "1203" $OUT); [ "$n" -ge 2 ] && ok "跨楼栋返回 2 条 1203（实际 $n）" || bad "跨楼栋未返回多条 1203"
 c=$(code -b $J -X POST --data-urlencode "name=快捷楼盘B" $B/projects/quick); chk "快捷新建楼盘(JSON)" 200 "$c"
-ROOMID=$(curl -s -b $J --get --data-urlencode "building=1号楼" $B/projects/$PID/rooms | grep -o 'value="[0-9]*"' | head -1 | grep -o '[0-9]*')
+ROOMID=$(curl -s -b $J --get --data-urlencode "building=1号楼" $B/projects/$PID/rooms | grep -o 'value="[0-9][0-9]*"' | head -1 | grep -o '[0-9][0-9]*' | head -1)
 echo "  ROOMID=$ROOMID"
 
 echo "== 3. 客户 + 自动建工序 + 联系人 =="

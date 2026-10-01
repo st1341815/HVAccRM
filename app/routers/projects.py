@@ -219,7 +219,9 @@ def building_options(
         .group_by(Room.building)
         .order_by(Room.building)
     ).all()
-    return render(request, "_fragments/buildings.html", project_id=project_id, buildings=rows)
+    response = render(request, "_fragments/buildings.html", project_id=project_id, buildings=rows)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/{project_id}/rooms")
@@ -234,7 +236,11 @@ def room_options(
     if building.strip():
         stmt = stmt.where(Room.building == building.strip())
     rooms = list(db.scalars(stmt.order_by(Room.unit, Room.room_no)).all())
-    return render(request, "_fragments/rooms.html", project_id=project_id, building=building, rooms=rooms)
+    response = render(
+        request, "_fragments/rooms.html", project_id=project_id, building=building, rooms=rooms
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/rooms/search")
