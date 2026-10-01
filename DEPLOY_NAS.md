@@ -13,8 +13,34 @@
 | 资源限制 | `mem_limit 512m`，日志 `json-file 5m × 3` |
 | 健康检查 | 容器内 `GET /health`（60s 间隔）→ `healthy` |
 | 验证结果 | `scripts/smoke_test.sh` 92/92 通过 |
+| 部署形态 | **fnOS Docker Compose 项目**，项目名 `crm`，工作目录 `/vol1/1000/crm`，compose 文件 `docker-compose.yml` |
 
-部署变量保存在 NAS：`/vol1/1000/crm/config/deploy.env`（含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
+部署变量保存在 NAS：`/vol1/1000/crm/config/deploy.env`，并已派生一份 `/vol1/1000/crm/.env`（compose 默认读取，权限均为 `600`，含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
+
+### 1.1 在飞牛 Docker 界面里管理（推荐入口）
+
+飞牛的 Docker 应用按「Compose 项目」组织，裸容器（`docker container create` 直接创建）只出现在
+**容器**页签、不会出现在**项目**页签。因此部署已改为 compose 项目形态：
+
+- 飞牛桌面 → **Docker → 项目**：可见项目 `crm`（running 1/1），可从这里启动/停止/查看容器；
+- 飞牛桌面 → **Docker → 容器**：可见容器 `crm`，`所属项目` 列显示 `crm`；
+- 项目工作目录必须是**宿主机真实路径**。若用 `docker:cli` 之类的容器代跑 compose，挂载必须
+  写成 `/vol1/1000:/vol1/1000`（路径一致），否则 `com.docker.compose.project.working_dir`
+  会记成容器内路径（如 `/work/crm`），飞牛界面点进项目时找不到 compose 文件。
+
+在 NAS 上手动管理（等价于界面操作）：
+
+```bash
+cd /vol1/1000/crm
+docker compose up -d            # 启动/更新（自动读取同目录 .env）
+docker compose ps
+docker compose down             # 停止并删除容器（不动 data/、config/）
+docker compose up -d --build    # 改代码后重建镜像
+```
+
+> 注意：飞牛的「项目」页对项目信息有缓存。若界面显示的路径仍是改造前的 `work/crm`，
+> 刷新页面或重进 Docker 应用即可；`docker compose ls` / 容器标签里的路径是准确的
+> （`/vol1/1000/crm`）。
 
 ## 2. 常用运维命令（NAS 上执行）
 
