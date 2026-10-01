@@ -1,7 +1,7 @@
 # oneCRM · 暖通空调客户管理系统
 
 面向暖通空调（中央空调 / 地暖 / 暖气片 / 新风 / 净水 / 明装改造等）**已成交客户全生命周期**的垂直管理工具。
-房号为核心索引、款项分期管理、工序化交付。
+房号为核心索引、成本归集与利润核算、工序化交付（**只记录实际进度，不做计划排期**）。
 
 技术栈（按开发文档锁定）：Python 3.12 + FastAPI · SQLite(WAL) · HTMX + Jinja2 ·
 Session/Cookie + TOTP · APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose。
@@ -69,7 +69,7 @@ crm/
 │   ├── permissions.py          # 权限点 + 角色 + 数据范围（双重校验）
 │   ├── audit.py                # 审计日志
 │   ├── bootstrap.py            # 启动引导（迁移/FTS/工序/admin）
-│   ├── scheduler.py            # 逾期重算 / 延期扫描 / 每日备份
+│   ├── scheduler.py            # 逾期重算 / 每日备份
 │   ├── templating.py           # Jinja2 + Flash
 │   ├── services/               # finance / tasks / photos / search / backup
 │   ├── routers/                # customers / projects / contracts / payments
@@ -90,7 +90,6 @@ crm/
 | 客户建单自动生成 9 个工序任务 | `services/tasks.py::generate_tasks` |
 | 前置依赖（上节点未完成不可开工） | `services/tasks.py::start_task` |
 | 跳过节点必须填原因 | `services/tasks.py::skip_task` |
-| 延期预警（planned_end < 今日） | `services/tasks.py::is_delayed` + 首页红字 |
 | 照片路径/命名/缩略图/去重 | `services/photos.py` |
 | 房号级联 + 同楼盘模糊搜索 | `routers/projects.py` + 客户表单 JS |
 | 权限点 + 数据范围双重校验 | `permissions.py`（`require()` + `visible_customer_ids`） |

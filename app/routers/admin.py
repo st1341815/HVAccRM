@@ -266,7 +266,6 @@ def update_stage(
     request: Request,
     stage_id: int,
     sort_order: str = Form("0"),
-    default_days: str = Form("1"),
     require_photo: str = Form(""),
     is_active: str = Form(""),
     db: Session = Depends(get_db),
@@ -275,9 +274,8 @@ def update_stage(
     stage = db.get(StageTemplate, stage_id)
     if not stage:
         return redirect("/admin/stages", "工序不存在", "err")
-    before = {"sort_order": stage.sort_order, "default_days": stage.default_days, "require_photo": stage.require_photo, "is_active": stage.is_active}
+    before = {"sort_order": stage.sort_order, "require_photo": stage.require_photo, "is_active": stage.is_active}
     stage.sort_order = parse_int(sort_order) or 0
-    stage.default_days = parse_int(default_days) or 1
     stage.require_photo = 1 if require_photo else 0
     stage.is_active = 1 if is_active else 0
     log_action(db, user, "update", "stage_templates", stage.id, old=before, new=stage, ip=client_ip(request))

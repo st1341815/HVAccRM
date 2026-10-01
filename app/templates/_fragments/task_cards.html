@@ -2,28 +2,27 @@
 <div class="task-cards">
   {% for g in groups %}
     {% set c = g.customer %}
-    <section class="task-card {{ 'is-alert' if g.delayed else '' }}">
+    <section class="task-card">
       <div class="tc-head">
         {% if c %}<a href="/customers/{{ c.id }}?tab=tasks"><strong>{{ c.name }}</strong></a>
           <span class="muted small">{{ c.room_label }}</span>
         {% else %}<strong>#{{ g.tasks[0].customer_id if g.tasks else '' }}</strong>{% endif %}
         <span class="badge">{{ g.progress }}%</span>
-        {% if g.delayed %}<span class="badge s-overdue">延期 {{ g.delayed }}</span>{% endif %}
+        {% if g.open %}<span class="badge s-doing">未完成 {{ g.open }}</span>{% endif %}
       </div>
       {% if c and c.phone %}<div class="tc-meta muted small">📱 {{ c.phone }}</div>{% endif %}
       <ol class="tc-steps">
         {% for t in g.tasks %}
-          <li class="tc-step {{ 'is-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+          <li class="tc-step">
             <div class="tc-step-head">
               <span class="tc-stage">{{ t.sort_order }}. {{ t.stage }}</span>
               <span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span>
             </div>
             <div class="tc-step-meta muted small">
-              计划 {{ t.planned_start or '-' }} ~ {{ t.planned_end or '-' }}
-              {% if t.assignee_id and users_map.get(t.assignee_id) %} · {{ users_map[t.assignee_id].display_name }}{% endif %}
+              {% if t.actual_start %}开工 {{ t.actual_start }}{% endif %}{% if t.actual_end %} · 完工 {{ t.actual_end }}{% endif %}
+              {% if not t.actual_start and t.assignee_id and users_map.get(t.assignee_id) %}责任人 {{ users_map[t.assignee_id].display_name }}{% elif t.actual_start and t.assignee_id and users_map.get(t.assignee_id) %} · {{ users_map[t.assignee_id].display_name }}{% endif %}
             </div>
             {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}
-            {% if t.delay_reason %}<div class="muted small red">延期：{{ t.delay_reason }}</div>{% endif %}
             {% if t.notes %}<div class="tc-note small">{{ t.notes }}</div>{% endif %}
             {% if t.status not in ['done','skipped'] or task_photos.get(t.id) %}
               <div class="tc-step-body">

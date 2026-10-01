@@ -229,20 +229,24 @@ if [ -n "$TD" ]; then
   has "提示：该节点模板标记为" && ok "需照片节点未拍照即完工 → 给出上传提示" || bad "需照片节点完工未给出提示"
 fi
 
+c=$(code -b $J "$B/"); chk "首页看板" 200 "$c"
+has "延期工序" && bad "首页仍有延期工序部件" || ok "首页已去掉延期工序部件"
+has "未完成工序" && ok "首页改为「未完成工序」统计" || bad "首页未显示未完成工序"
+c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
+has "计划完成" && bad "客户工序页仍有计划完成列" || ok "客户工序页已去掉计划列"
+
 echo "== 5c. 施工看板增强（快捷筛选 / 分组视图 / 拍照 / 完工备注） =="
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板" 200 "$c"
 has 'capture="environment"' && ok "手机端相机直拍按钮（capture=environment）" || bad "缺相机直拍按钮"
-has "今日到期" && has "只看延期" && has "我负责的" && ok "快捷筛选 chips 齐全" || bad "快捷筛选 chips 缺失"
+has "全部未完成" && has "我负责的" && ok "快捷筛选 chips（全部未完成 / 我负责的）" || bad "快捷筛选 chips 缺失"
 has "按客户" && has "按任务" && ok "视图切换（按任务 / 按客户）" || bad "缺视图切换"
-PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/plan' | head -1 | grep -o '[0-9]*')
-if [ -z "$PTID" ]; then PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*'); fi
+# 施工不再做计划排期：计划列/到期/延期相关元素应当全部消失
+has "今日到期" && bad "施工页仍有「今日到期」筛选" || ok "已去掉到期筛选"
+has "只看延期" && bad "施工页仍有「只看延期」筛选" || ok "已去掉延期筛选"
+has "<th>计划</th>" && bad "任务表仍有「计划」列" || ok "任务表已去掉计划列"
+PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST --data-urlencode "planned_end=2000-01-01" $B/tasks/$PTID/plan)
-chk "把节点计划完成日改到过去（造延期）" 303 "$c"
-c=$(code -b $J "$B/tasks?scope=open&delayed=1"); chk "快捷筛选：只看延期" 200 "$c"
-has "2000-01-01" && ok "延期任务命中筛选" || bad "延期筛选未命中"
-has 'chip on' && ok "延期 chip 高亮" || bad "chip 未高亮"
-c=$(code -b $J "$B/tasks?scope=open&due=today"); chk "快捷筛选：今日到期" 200 "$c"
-has "今日到期" && ok "今日到期 chip 存在" || bad "今日到期 chip 缺失"
+chk "改工期接口已删除（404）" 404 "$c"
 c=$(code -b $J "$B/tasks?scope=all&view=customer"); chk "按客户分组视图" 200 "$c"
 has "task-cards" && ok "分组卡片渲染" || bad "分组卡片缺失"
 has "上门勘测" && has "调试验收" && ok "客户卡内展示该客户全部节点" || bad "客户卡节点不完整"

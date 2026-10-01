@@ -37,16 +37,11 @@ def dashboard(
             stmt = stmt.where(t_scope)
         if extra is not None:
             stmt = stmt.where(extra)
-        return list(db.scalars(stmt.order_by(Task.planned_end)).all())
+        return list(db.scalars(stmt.order_by(Task.customer_id, Task.sort_order, Task.id)).all())
 
     open_tasks = _tasks()
-    delayed = [t for t in open_tasks if task_svc.is_delayed(t, today)] if has_perm(user, "task:view") else []
-    due_today = [t for t in open_tasks if t.planned_end == today] if has_perm(user, "task:view") else []
-    due_week = (
-        [t for t in open_tasks if t.planned_end and today < t.planned_end <= week_end]
-        if has_perm(user, "task:view")
-        else []
-    )
+    # 施工计划不在系统内跟踪：只统计「进行中/未完成」的工序数量
+    open_count = len(open_tasks) if has_perm(user, "task:view") else 0
 
     cust_stmt = select(Customer)
     if c_scope is not None:
@@ -121,9 +116,8 @@ def dashboard(
         request,
         "dashboard.html",
         today=today,
-        delayed=delayed,
-        due_today=due_today,
-        due_week=due_week,
+        open_count=open_count,
+        open_tasks=open_tasks[:10],
         finance=finance,
         show_money=show_money,
         in_progress=in_progress,
@@ -165,7 +159,7 @@ def fragment_tasks(
     user: User = Depends(current_user_or_redirect),
 ):
     scope = task_scope_conditions(db, user)
-    stmt = select(Task).where(Task.status.notin_(["done", "skipped"])).order_by(Task.planned_end)
+    stmt = select(Task).where(Task.status.notin_(["done", "skipped"])).order_by(Task.customer_id, Task.sort_order)
     if scope is not None:
         stmt = stmt.where(scope)
     tasks = list(db.scalars(stmt.limit(50)).all())

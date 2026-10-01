@@ -5,17 +5,9 @@
 
 <div class="kpis">
   {% if show_task_widgets %}
-  <div class="kpi {{ 'alert' if delayed|length else '' }}">
-    <span class="kpi-num">{{ delayed|length }}</span>
-    <span class="kpi-label">延期工序（红字预警）</span>
-  </div>
   <div class="kpi">
-    <span class="kpi-num">{{ due_today|length }}</span>
-    <span class="kpi-label">今日到期工序</span>
-  </div>
-  <div class="kpi">
-    <span class="kpi-num">{{ due_week|length }}</span>
-    <span class="kpi-label">本周到期工序</span>
+    <span class="kpi-num">{{ open_count }}</span>
+    <span class="kpi-label">未完成工序</span>
   </div>
   <div class="kpi">
     <span class="kpi-num">{{ in_progress }}</span>
@@ -41,38 +33,24 @@
 </div>
 
 {% if show_task_widgets %}
-<div class="grid2">
-  <section class="card">
-    <h2>⚠️ 延期工序</h2>
-    {% if delayed %}
-    <table class="tight">
-      <thead><tr><th>客户</th><th>工序</th><th>计划完成</th><th>状态</th></tr></thead>
-      <tbody>
-      {% for t in delayed[:10] %}
-        <tr class="row-alert">
-          <td>{% if customers_map.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers_map[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
-          <td>{{ t.stage }}</td>
-          <td class="red">{{ t.planned_end }}</td>
-          <td>{{ t.status }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <p><a href="/tasks?scope=open">查看全部施工任务 →</a></p>
-    {% else %}<p class="muted">暂无延期工序。</p>{% endif %}
-  </section>
-
-  <section class="card">
-    <h2>本周到期工序</h2>
-    {% if due_week %}
-      <ul class="list">
-      {% for t in due_week[:10] %}
-        <li><strong>{{ t.planned_end }}</strong> · {{ t.stage }} · {% if customers_map.get(t.customer_id) %}{{ customers_map[t.customer_id].name }}{% endif %}</li>
-      {% endfor %}
-      </ul>
-    {% else %}<p class="muted">本周没有到期工序。</p>{% endif %}
-  </section>
-</div>
+<section class="card">
+  <h2>未完成工序（{{ open_count }}）</h2>
+  {% if open_tasks %}
+  <table class="tight">
+    <thead><tr><th>客户</th><th>工序</th><th>状态</th></tr></thead>
+    <tbody>
+    {% for t in open_tasks %}
+      <tr>
+        <td>{% if customers_map.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers_map[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
+        <td>{{ t.stage }}</td>
+        <td><span class="badge s-{{ t.status }}">{{ t.status }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="/tasks?scope=open">查看全部施工任务 →</a></p>
+  {% else %}<p class="muted">没有未完成的工序。</p>{% endif %}
+</section>
 {% endif %}
 
 {% if finance %}
