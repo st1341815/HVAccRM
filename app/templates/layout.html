@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}看板{% endblock %} · {{ settings.app_name }}</title>
+  <title>{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
 {% if user %}
 <header class="topbar">
-  <div class="brand">🏠 家居建材 CRM</div>
+  <div class="brand">🌡️ oneCRM</div>
   <nav>
     <a href="/" class="{{ 'active' if current_path == '/' else '' }}">看板</a>
     {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}">客户</a>{% endif %}
@@ -33,6 +33,6 @@
   {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
 </main>
-<footer class="foot">v{{ version }} · {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
+<footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
 </body>
 </html>

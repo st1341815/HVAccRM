@@ -11,7 +11,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "家居建材客户管理系统"
+    app_name: str = "暖通空调客户管理系统"
+    app_name_en: str = "oneCRM"
     app_secret_key: str = "dev-insecure-change-me"
 
     # 路径：配置 / 数据 / 缓存 / 日志分离（NAS 卷挂载）

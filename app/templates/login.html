@@ -2,8 +2,8 @@
 {% block title %}登录{% endblock %}
 {% block content %}
 <div class="login-card">
-  <h1>家居建材客户管理系统</h1>
-  <p class="muted">内网自用 · 请使用管理员分配的账号登录</p>
+  <h1>🌡️ oneCRM</h1>
+  <p class="muted">暖通空调客户管理系统 · 内网自用 · 请使用管理员分配的账号登录</p>
   <form method="post" action="/login" class="stack">
     <input type="hidden" name="next" value="{{ next or '/' }}">
     <label>账号<input name="username" value="{{ username or '' }}" required autofocus autocomplete="username"></label>

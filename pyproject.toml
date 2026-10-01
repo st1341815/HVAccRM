@@ -1,7 +1,7 @@
 [project]
-name = "homeliving-crm"
-version = "0.8.0"
-description = "家居建材客户管理系统（CRM）— NAS 自托管版"
+name = "onecrm"
+version = "0.9.0"
+description = "oneCRM — 暖通空调客户管理系统，NAS 自托管版"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.115.6",
