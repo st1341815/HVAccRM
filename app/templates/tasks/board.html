@@ -19,7 +19,7 @@
     </select>
     <select name="assignee">
       <option value="">全部责任人</option>
-      {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if filters.assignee == u.id|string else '' }}>{{ u.username }}</option>{% endfor %}
+      {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if filters.assignee == u.id|string else '' }}>{{ u.display_name }}</option>{% endfor %}
     </select>
     <select name="stage">
       <option value="">全部工序节点</option>

@@ -92,6 +92,7 @@ def create_user(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    full_name: str = Form(""),
     role: str = Form("sales"),
     data_scope: str = Form(""),
     db: Session = Depends(get_db),
@@ -107,6 +108,7 @@ def create_user(
         return redirect("/admin/users", "角色不正确", "err")
     new_user = User(
         username=username,
+        full_name=full_name.strip() or None,
         password_hash=hash_password(password),
         role=role,
         data_scope=data_scope or DEFAULT_SCOPE.get(role, "self"),
@@ -117,10 +119,19 @@ def create_user(
     )
     db.add(new_user)
     db.flush()
-    log_action(db, user, "create", "users", new_user.id, new={"username": username, "role": role}, ip=client_ip(request))
+    log_action(
+        db,
+        user,
+        "create",
+        "users",
+        new_user.id,
+        new={"username": username, "full_name": new_user.full_name, "role": role},
+        ip=client_ip(request),
+    )
     commit_retry(db)
     return redirect(
-        f"/admin/users#u{new_user.id}", f"用户 {username} 已创建，首次登录需修改密码"
+        f"/admin/users#u{new_user.id}",
+        f"用户 {new_user.name_with_account} 已创建，首次登录需修改密码",
     )
 
 
@@ -131,6 +142,7 @@ def update_user(
     role: str = Form(""),
     data_scope: str = Form(""),
     is_active: str = Form(""),
+    full_name: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("admin:user")),
 ):
@@ -139,8 +151,16 @@ def update_user(
         return redirect("/admin/users", "用户不存在", "err")
     if target.id == user.id and not is_active:
         return redirect("/admin/users", "不能禁用当前登录账号", "err")
-    before = {"role": target.role, "data_scope": target.data_scope, "is_active": target.is_active}
+    before = {
+        "role": target.role,
+        "data_scope": target.data_scope,
+        "is_active": target.is_active,
+        "full_name": target.full_name,
+    }
     changed = False
+    if full_name.strip() != (target.full_name or ""):
+        target.full_name = full_name.strip() or None
+        changed = True
     if role and role != target.role and role in ROLE_PERMS:
         target.role = role
         if not data_scope:

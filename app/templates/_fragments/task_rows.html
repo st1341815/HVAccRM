@@ -20,10 +20,10 @@
         <form method="post" action="/tasks/{{ t.id }}/assign" class="inline">
           <select name="assignee_id" onchange="this.form.submit()">
             <option value="">未指派</option>
-            {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if t.assignee_id == u.id else '' }}>{{ u.username }}</option>{% endfor %}
+            {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if t.assignee_id == u.id else '' }}>{{ u.display_name }}</option>{% endfor %}
           </select>
         </form>
-        {% else %}{{ users_map[t.assignee_id].username if t.assignee_id and users_map.get(t.assignee_id) else '未指派' }}{% endif %}
+        {% else %}{{ users_map[t.assignee_id].display_name if t.assignee_id and users_map.get(t.assignee_id) else '未指派' }}{% endif %}
       </td>
       <td>{% include "_fragments/task_photos.html" with context %}</td>
       <td><span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>

@@ -6,6 +6,15 @@
 
 <div class="grid2">
   <section class="card">
+    <h2>我的姓名</h2>
+    <form method="post" action="/account/profile" class="stack">
+      <label>姓名<input name="full_name" value="{{ user.full_name or '' }}" maxlength="32" placeholder="如 张三"></label>
+      <button type="submit">保存姓名</button>
+    </form>
+    <p class="muted small">登录账号仍是 <code>{{ user.username }}</code>。姓名会优先显示在负责人、责任人、收款人等表单选择框里（留空则显示账号）。</p>
+  </section>
+
+  <section class="card">
     <h2>修改密码</h2>
     <form method="post" action="/account/password" class="stack">
       {% if not user.must_change_password %}

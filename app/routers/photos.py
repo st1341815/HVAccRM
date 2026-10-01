@@ -57,7 +57,7 @@ def album(
         stmt = stmt.where(Photo.kind == kind)
     photos = list(db.scalars(stmt.order_by(Photo.created_at.desc())).all())
     tasks = sorted(customer.tasks, key=lambda t: t.sort_order)
-    users = {u.id: u.username for u in db.scalars(select(User)).all()}
+    users = {u.id: u.display_name for u in db.scalars(select(User)).all()}
     return render(
         request,
         "photos/album.html",

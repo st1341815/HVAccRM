@@ -22,7 +22,7 @@
     {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}">系统</a>{% endif %}
   </nav>
   <div class="me">
-    <span class="who">{{ user.username }} · {{ role_label }}</span>
+    <span class="who">{{ user.display_name }} · {{ role_label }}</span>
     <a href="/account">账户</a>
     <a href="/logout">退出</a>
   </div>
