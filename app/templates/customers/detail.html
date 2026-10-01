@@ -51,7 +51,7 @@
 <section class="card">
   <h2>施工工序（{{ tasks|length }} 个节点）</h2>
   <table class="tight">
-    <thead><tr><th>#</th><th>工序</th><th>计划</th><th>实际</th><th>责任人</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>#</th><th>工序</th><th>计划</th><th>实际</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
     {% for t in tasks %}
       <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
@@ -60,6 +60,7 @@
         <td>{{ t.planned_start or '-' }} ~ {{ t.planned_end or '-' }}</td>
         <td>{{ t.actual_start or '-' }} ~ {{ t.actual_end or '-' }}</td>
         <td>{{ t.assignee.username if t.assignee else '-' }}</td>
+        <td>{% include "_fragments/task_photos.html" with context %}</td>
         <td><span class="badge">{{ t.status }}</span></td>
         <td>
           {% if t.status in ['ready'] and can('task:view') %}

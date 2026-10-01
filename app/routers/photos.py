@@ -13,7 +13,7 @@ from ..models import Customer, Photo, Task, User
 from ..permissions import has_perm, require, visible_customer_ids
 from ..services import photos as photo_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int
+from ..utils import client_ip, get_or_404, parse_int, return_path
 
 router = APIRouter(tags=["photos"])
 
@@ -79,6 +79,7 @@ async def upload_photos(
     files: list[UploadFile] = File(default=[]),
     kind: str = Form("其他"),
     task_id: str = Form(""),
+    back: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
 ):
@@ -112,7 +113,9 @@ async def upload_photos(
     message = f"上传完成：新增 {saved} 张，去重 {skipped} 张"
     if errors:
         message += "；失败 " + "；".join(errors)
-    return redirect(f"/photos/album/{customer.id}", message, "err" if errors else "ok")
+    # 从施工看板/客户工序页上传时跳回原页面（只接受站内相对路径）
+    target = return_path(back, request.headers.get("referer"), f"/photos/album/{customer.id}")
+    return redirect(target, message, "err" if errors else "ok")
 
 
 @router.post("/photos/{photo_id}/delete")
@@ -128,8 +131,8 @@ def delete_photo(
     msg = photo_svc.delete_photo(db, photo)
     log_action(db, user, "delete", "photos", photo_id, old={"path": photo.path}, ip=client_ip(request))
     commit_retry(db)
-    # 允许调用方指定返回页（如合同详情页），仅接受站内相对路径
-    target = back if back.startswith("/") and not back.startswith("//") else f"/photos/album/{cid}"
+    # 允许调用方指定返回页（合同详情页/施工看板），仅接受站内相对路径
+    target = return_path(back, request.headers.get("referer"), f"/photos/album/{cid}")
     return redirect(target, msg)
 
 

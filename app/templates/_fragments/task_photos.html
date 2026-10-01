@@ -1,0 +1,24 @@
+<div class="task-photos">
+  {% set phs = task_photos.get(t.id, []) %}
+  {% for ph in phs[:3] %}
+    <a href="/photos/{{ ph.id }}/file" target="_blank" title="{{ ph.orig_name or '' }} · {{ ph.created_at[:16] }}">
+      <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="现场照">
+    </a>
+  {% endfor %}
+  {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+  {% if phs %}
+    <span class="muted small">{{ phs|length }} 张</span>
+  {% elif stage_requires_photo.get(t.stage) %}
+    <span class="badge warn">需照片</span>
+  {% endif %}
+  {% if can_upload_photo %}
+    <form method="post" action="/api/customers/{{ t.customer_id }}/photos"
+          enctype="multipart/form-data" class="inline task-upload">
+      <input type="hidden" name="task_id" value="{{ t.id }}">
+      <input type="hidden" name="kind" value="{{ stage_kind.get(t.stage, '其他') }}">
+      <input type="hidden" name="back" value="{{ back_path }}">
+      <input type="file" name="files" accept="image/*" multiple required>
+      <button class="ghost">上传</button>
+    </form>
+  {% endif %}
+</div>

@@ -77,6 +77,10 @@ form.tight-stack { gap: .3rem; }
 form.inline { display: inline-flex; gap: .3rem; align-items: center; }
 label { display: block; font-size: .85rem; color: #374151; }
 label.checkline { display: flex; align-items: center; gap: .3rem; }
+.task-photos { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.task-photos img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
+.task-upload { display: flex; align-items: center; gap: .25rem; }
+.task-upload input[type=file] { max-width: 11rem; font-size: .72rem; }
 .checkgrid { row-gap: .3rem; }
 .checkgrid label.checkline { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .3rem .5rem; cursor: pointer; }
 .checkgrid label.checkline:has(input:checked) { border-color: var(--brand); background: #eef2ff; color: var(--brand-dark); font-weight: 600; }

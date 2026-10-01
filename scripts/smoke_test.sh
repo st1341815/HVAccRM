@@ -188,6 +188,28 @@ c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=" $B/tasks/$TID3/s
 c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户硬装未完成" $B/tasks/$TID3/skip); chk "跳过(带原因)" 303 "$c"
 c=$(code -b $J "$B/ui/tasks"); chk "HTMX 任务片段" 200 "$c"
 
+echo "== 5b. 施工页照片上传 =="
+c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
+has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
+has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
+TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
+echo "  上传到任务 TID=$TT"
+LOC=$(curl -s -b $J -c $J -o /dev/null -D $HDR -F "task_id=$TT" -F "kind=现场" -F "back=/tasks?scope=all" -F "files=@/tmp/crmtest/site1.jpg" $B/api/customers/$CID/photos; loc)
+echo "  上传后 Location：$LOC"
+echo "$LOC" | grep -q "scope=all" && ok "从施工页上传后跳回施工页" || bad "上传后未跳回施工页: $LOC"
+c=$(code -b $J "$B/tasks?scope=all")
+has "/photos/" && ok "施工页显示该节点照片缩略图" || bad "施工页未显示照片"
+c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
+has 'enctype="multipart/form-data"' && ok "客户工序页也有上传控件" || bad "客户工序页缺少上传控件"
+# 需照片节点完工且未拍照 → 回执里带上传提示
+TD=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+if [ -n "$TD" ]; then
+  code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TD/start > /dev/null
+  code -b $J -c $J -X POST -H "referer: $B/tasks" "$B/tasks/$TD/done" > /dev/null
+  c=$(code -b $J "$B/tasks"); chk "完工后回到施工页" 200 "$c"
+  has "提示：该节点模板标记为" && ok "需照片节点未拍照即完工 → 给出上传提示" || bad "需照片节点完工未给出提示"
+fi
+
 echo "== 6. 照片上传 / 缩略图 / Hash 去重 =="
 PYTHONPATH= .venv/bin/python - <<'PY'
 import random

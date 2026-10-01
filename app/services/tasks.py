@@ -159,3 +159,20 @@ def default_assignee(db: Session, tasks: list[Task]) -> list[User]:
     if not ids:
         return []
     return list(db.scalars(select(User).where(User.id.in_(ids))).all())
+
+# 工序节点 → 相册分类（上传照片时自动归类）
+STAGE_PHOTO_KIND: dict[str, str] = {
+    "上门勘测": "现场",
+    "前期施工": "施工",
+    "后期施工": "施工",
+    "调试验收": "验收",
+}
+
+
+def stage_default_kind(stage: str | None) -> str:
+    return STAGE_PHOTO_KIND.get(stage or "", "其他")
+
+
+def stage_photo_requirements(db: Session) -> dict[str, bool]:
+    """节点是否需要照片（取自工序模板的 require_photo 开关）。"""
+    return {s.name: bool(s.require_photo) for s in db.scalars(select(StageTemplate)).all()}
