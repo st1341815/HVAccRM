@@ -38,7 +38,14 @@ for p in / /customers /projects /contracts /payments /tasks /admin /admin/users 
 done
 
 echo "== 2. 楼盘 / 房号 =="
-c=$(code -b $J -X POST --data-urlencode "name=测试楼盘A" --data-urlencode "city=杭州" -d "total_units=100" $B/projects/new)
+c=$(code -b $J "$B/projects/new"); chk "新建楼盘页" 200 "$c"
+has 'value="合肥" selected' && ok "城市默认为合肥" || bad "城市默认值不是合肥"
+has 'value="包河区" selected' && ok "区县默认包河区" || bad "区县默认值不是包河区"
+c=$(code -b $J -X POST --data-urlencode "name=非法城市楼盘$RUN" --data-urlencode "city=杭州" $B/projects/new); chk "非法城市被拒（回填表单 200）" 200 "$c"
+c=$(code -b $J "$B/projects"); has "非法城市楼盘$RUN" && bad "非法城市竟被写入" || ok "非法城市未写入"
+c=$(code -b $J -X POST --data-urlencode "name=错配区县楼盘$RUN" --data-urlencode "city=合肥" --data-urlencode "district=浦东新区" $B/projects/new); chk "区县与城市不匹配被拒" 200 "$c"
+c=$(code -b $J "$B/projects"); has "错配区县楼盘$RUN" && bad "错配区县竟被写入" || ok "错配区县未写入"
+c=$(code -b $J -X POST --data-urlencode "name=测试楼盘A" --data-urlencode "city=合肥" --data-urlencode "district=包河区" -d "total_units=100" $B/projects/new)
 chk "新建楼盘" 303 "$c"; PID=$(last_id); echo "  PID=$PID"
 c=$(code -b $J -X POST --data-urlencode "building=1号楼" --data-urlencode "unit=1单元" --data-urlencode "room_no=1203" --data-urlencode "floor=12" --data-urlencode "area=118" $B/projects/$PID/rooms)
 chk "新增房号(1号楼)" 303 "$c"

@@ -1,3 +1,5 @@
+{% set sel_city = project.city if project and project.city else default_city %}
+{% set sel_district = project.district if project and project.district else default_district %}
 {% extends "layout.html" %}
 {% block title %}新建楼盘{% endblock %}
 {% block content %}
@@ -5,8 +7,20 @@
 <form method="post" action="/projects/new" class="card stack">
   <div class="grid3">
     <label>楼盘名称 *<input name="name" required value="{{ project.name if project else '' }}"></label>
-    <label>城市<input name="city"></label>
-    <label>区县<input name="district"></label>
+    <label>城市
+      <select name="city" id="city_sel" onchange="syncDistricts()">
+        {% for c in city_options %}
+        <option value="{{ c }}" {{ 'selected' if c == sel_city else '' }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>区县
+      <select name="district" id="district_sel">
+        {% for d in districts_of(sel_city) %}
+        <option value="{{ d }}" {{ 'selected' if d == sel_district else '' }}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>开发商<input name="developer"></label>
     <label>交房日期<input name="delivery_date" placeholder="YYYY-MM-DD"></label>
     <label>总户数<input name="total_units" inputmode="numeric"></label>
@@ -18,4 +32,28 @@
     <a class="btn ghost" href="/projects">取消</a>
   </div>
 </form>
+
+<script>
+  const CITY_DISTRICTS = {{ city_districts | tojson }};
+  const DEFAULT_DISTRICT = {{ default_district | tojson }};
+
+  function syncDistricts() {
+    const city = document.getElementById('city_sel').value;
+    const sel = document.getElementById('district_sel');
+    const list = CITY_DISTRICTS[city] || [];
+    let chosen = false;
+    sel.innerHTML = '';
+    for (const d of list) {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      if (city === {{ default_city | tojson }} && d === DEFAULT_DISTRICT) {
+        opt.selected = true;
+        chosen = true;
+      }
+      sel.appendChild(opt);
+    }
+    if (!chosen) sel.selectedIndex = 0;  // 不是默认城市就落到第一项（不要覆盖默认区县）
+  }
+</script>
 {% endblock %}
