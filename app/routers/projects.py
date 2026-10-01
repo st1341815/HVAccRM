@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Project, Room, User
+from ..models import Customer, Project, Room, UNIT_OPTIONS, User
 from ..permissions import require_any
 from ..templating import redirect, render
 from ..utils import client_ip, parse_date, parse_float, parse_int
@@ -159,11 +159,19 @@ def add_room(
         return redirect("/projects", "楼盘不存在", "err")
     if not building.strip() or not room_no.strip():
         return redirect(f"/projects/{project_id}", "楼栋与房号必填", "err")
+    unit = unit.strip()
+    if unit and unit not in UNIT_OPTIONS:
+        # 单元只允许 1单元~9单元（下拉固定值），不接受自由输入
+        return redirect(
+            f"/projects/{project_id}",
+            "单元只能从下拉中选择：1单元 ~ 9单元",
+            "err",
+        )
     exists = db.scalars(
         select(Room)
         .where(Room.project_id == project_id)
         .where(Room.building == building.strip())
-        .where(Room.unit == (unit.strip() or None))
+        .where(Room.unit == (unit or None))
         .where(Room.room_no == room_no.strip())
     ).first()
     if exists:
@@ -171,7 +179,7 @@ def add_room(
     room = Room(
         project_id=project_id,
         building=building.strip(),
-        unit=unit.strip() or None,
+        unit=unit or None,
         room_no=room_no.strip(),
         floor=int(parse_float(floor)) if floor.strip() else None,
         area=parse_float(area) if area.strip() else None,

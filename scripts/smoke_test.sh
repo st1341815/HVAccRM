@@ -55,6 +55,12 @@ n=$(grep -c "1203" $OUT); [ "$n" -ge 2 ] && ok "跨楼栋返回 2 条 1203（实
 c=$(code -b $J -X POST --data-urlencode "name=快捷楼盘B" $B/projects/quick); chk "快捷新建楼盘(JSON)" 200 "$c"
 ROOMID=$(curl -s -b $J --get --data-urlencode "building=1号楼" $B/projects/$PID/rooms | grep -o 'value="[0-9][0-9]*"' | head -1 | grep -o '[0-9][0-9]*' | head -1)
 echo "  ROOMID=$ROOMID"
+c=$(code -b $J -X POST --data-urlencode "building=5号楼" --data-urlencode "unit=12单元" --data-urlencode "room_no=999" $B/projects/$PID/rooms)
+chk "非法单元被拒（仅允许 1~9 单元）" 303 "$c"
+c=$(code -b $J "$B/projects/$PID"); has "5号楼" && bad "非法单元竟被写入" || ok "非法单元未写入"
+c=$(code -b $J -X POST --data-urlencode "building=6号楼" --data-urlencode "unit=9单元" --data-urlencode "room_no=999" $B/projects/$PID/rooms)
+chk "合法单元 9单元 写入" 303 "$c"
+c=$(code -b $J "$B/projects/$PID"); has "9单元" && ok "9单元已入库" || bad "9单元未入库"
 
 echo "== 3. 客户 + 自动建工序 + 联系人 =="
 c=$(code -b $J -X POST --data-urlencode "name=测试客户张三" --data-urlencode "type=家装业主" --data-urlencode "source=自然到店" --data-urlencode "level=A" --data-urlencode "room_id=$ROOMID" --data-urlencode "contact_name=张三" --data-urlencode "contact_phone=13800000000" $B/customers/new)

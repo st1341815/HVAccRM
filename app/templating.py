@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import __version__, permissions
+from . import __version__, models, permissions
 from .config import get_settings
 from .models import today_str
 from .security import make_flash, loads
@@ -41,6 +41,7 @@ templates.env.filters["short_dt"] = short_dt
 templates.env.globals["role_labels"] = permissions.ROLE_LABELS
 templates.env.globals["all_permissions"] = permissions.ALL_PERMISSIONS
 templates.env.globals["role_perms"] = permissions.ROLE_PERMS
+templates.env.globals["unit_options"] = models.UNIT_OPTIONS
 
 
 def flash_cookie_name() -> str:
