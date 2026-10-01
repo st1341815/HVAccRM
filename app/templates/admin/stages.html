@@ -15,7 +15,7 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>序号</th><th>节点名称</th><th>默认工期(天)</th><th>需照片</th><th>产出物</th><th>启用</th><th>保存</th></tr></thead>
+    <thead><tr><th>序号</th><th>节点名称</th><th>默认工期(天)</th><th>需照片</th><th>产出物</th><th>启用</th><th>保存 / 删除</th></tr></thead>
     <tbody>
     {% for s in stages %}
       <tr>
@@ -29,6 +29,11 @@
             <span class="muted small">{{ s.output_doc or '' }}</span>
             <label class="checkline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if s.is_active else '' }}> 启用</label>
             <button>保存</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/admin/stages/{{ s.id }}/delete" class="inline" onsubmit="return confirm('删除工序节点「{{ s.name }}」？已使用该节点的客户任务不会被删除。');">
+            <button class="ghost danger">删除</button>
           </form>
         </td>
       </tr>

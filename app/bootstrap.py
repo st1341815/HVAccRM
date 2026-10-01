@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from .config import get_settings
 from .db import SessionLocal, engine
@@ -46,12 +46,16 @@ def ensure_fts() -> None:
 
 
 def seed_stages() -> int:
+    """仅在「库中还没有任何工序模板」时写入默认模板。
+
+    刻意不做「缺哪个补哪个」：模板属于用户可维护的数据，
+    后台删掉/改名/调整后不该在下次重启时被自动补回来。
+    """
     added = 0
     with SessionLocal() as db:
-        existing = {s.name for s in db.scalars(select(StageTemplate)).all()}
+        if db.scalar(select(func.count(StageTemplate.id))):
+            return 0
         for name, order, days, require_photo, output in DEFAULT_STAGES:
-            if name in existing:
-                continue
             db.add(
                 StageTemplate(
                     name=name,

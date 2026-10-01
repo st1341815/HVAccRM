@@ -66,7 +66,8 @@ echo "== 3. 客户 + 自动建工序 + 联系人 =="
 c=$(code -b $J -X POST --data-urlencode "name=测试客户张三" --data-urlencode "type=家装业主" --data-urlencode "phone=13711112222" --data-urlencode "wechat=zhangsan_wx" --data-urlencode "products=地暖" --data-urlencode "products=新风" --data-urlencode "products=不存在的产品" --data-urlencode "source=自然到店" --data-urlencode "level=A" --data-urlencode "room_id=$ROOMID" --data-urlencode "contact_name=张三" --data-urlencode "contact_phone=13800000000" $B/customers/new)
 chk "新建客户" 303 "$c"; CID=$(last_id); echo "  CID=$CID"
 c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
-has "售后回访" && ok "9 节点工序自动生成" || bad "工序未生成"
+has "调试验收" && ok "4 节点工序自动生成（上门勘测/前期施工/后期施工/调试验收）" || bad "工序未生成"
+has "上门勘测" && has "前期施工" && has "后期施工" && ok "4 个节点名称齐全" || bad "节点名称不全"
 c=$(code -b $J "$B/customers/$CID"); chk "客户详情页" 200 "$c"
 has "13711112222" && ok "客户手机号已入库并展示" || bad "客户手机号未入库"
 has "zhangsan_wx" && ok "微信号已入库并展示" || bad "微信号未入库"
@@ -81,6 +82,17 @@ has "测试客户张三" && ok "按联系人手机搜索命中" || bad "手机�
 c=$(code -b $J --get --data-urlencode "q=13711112222" $B/customers)
 has "测试客户张三" && ok "按客户本人手机号搜索命中" || bad "客户手机号搜索未命中"
 c=$(code -b $J --get --data-urlencode "q=张三" $B/ui/customer-search); chk "HTMX 客户片段" 200 "$c"
+
+echo "== 3b. 工序模板 CRUD =="
+c=$(code -b $J -X POST --data-urlencode "name=临时工序$RUN" --data-urlencode "sort_order=99" --data-urlencode "default_days=2" --data-urlencode "require_photo=1" $B/admin/stages/new)
+chk "新增工序模板" 303 "$c"
+c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && ok "新模板出现在列表" || bad "新模板未出现"
+SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "临时工序$RUN" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J -X POST "$B/admin/stages/$SID/delete"); chk "删除未使用的工序" 303 "$c"
+c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && bad "未使用的工序删除无效" || ok "未使用的工序已删除"
+USED_SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "调试验收" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J -X POST "$B/admin/stages/$USED_SID/delete"); chk "删除在用工序被拒（重定向）" 303 "$c"
+c=$(code -b $J "$B/admin/stages"); has "调试验收" && ok "在用工序未被误删" || bad "在用工序被删掉了"
 
 echo "== 4. 合同 + 收款（三数核对 / 超额拦截 / 增项） =="
 c=$(code -b $J -X POST --data-urlencode "customer_id=$CID" --data-urlencode "no=HT-$RUN-001" --data-urlencode "sign_date=2026-01-15" --data-urlencode "total_amount=30000" --data-urlencode "discount=0" --data-urlencode "plan_labels=定金
