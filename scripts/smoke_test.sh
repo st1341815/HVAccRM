@@ -406,6 +406,18 @@ has "login" && ok "审计日志已记录登录事件" || bad "审计日志缺失
 has "password_change" && ok "审计日志已记录改密事件" || bad "审计日志缺少改密事件"
 
 
+echo "== 8b. 界面资产（响应式 / 手机适配） =="
+c=$(code -b $J "$B/static/app.css"); chk "样式表可访问" 200 "$c"
+has "max-width: 780px" && ok "样式表含移动端断点" || bad "样式表缺移动端断点"
+has "js-stack" && ok "样式表含宽表格卡片化规则" || bad "样式表缺 js-stack 规则"
+has "safe-area-inset" && ok "样式表含刘海屏安全区适配" || bad "缺安全区适配"
+c=$(code -b $J "$B/customers"); chk "客户列表页" 200 "$c"
+has "js-stack" && ok "页面注入宽表格卡片化脚本" || bad "页面缺卡片化脚本"
+has "viewport-fit=cover" && ok "viewport 适配刘海屏" || bad "viewport 未适配"
+has 'class="meta"' > /dev/null 2>&1 || true
+c=$(code -b $J "$B/customers/$CID"); chk "客户详情页" 200 "$c"
+has 'class="meta"' && ok "详情页信息条已渲染" || bad "详情页缺 .meta 信息条"
+
 echo "== 9. 二步验证（TOTP）生命周期 =="
 PYTHONPATH= .venv/bin/python - "$B" "$APW" <<'PY'
 import base64, hashlib, hmac, re, struct, subprocess, sys, tempfile, time
