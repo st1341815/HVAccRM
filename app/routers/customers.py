@@ -30,6 +30,7 @@ from ..permissions import (
     require_any,
     visible_customer_ids,
 )
+from ..services import costs as cost_svc
 from ..services import finance as finance_svc
 from ..services import photos as photo_svc
 from ..services import search as search_svc
@@ -229,10 +230,11 @@ def customer_detail(
     contracts = list(customer.contracts)
     summary = finance_svc.customer_summary(db, customer) if has_perm(user, "contract:view") else None
     plans = []
+    show_cost = has_perm(user, "cost:view") and can_see_amount(user)
     plan_rows = []
     for c in contracts:
         s = finance_svc.contract_summary(db, c)
-        plan_rows.append((c, s))
+        plan_rows.append((c, s, cost_svc.profit_summary(db, c) if show_cost else None))
 
     assignees = list(db.scalars(select(User).where(User.is_active == 1)).all())
     shares = list(db.scalars(select(CustomerShare).where(CustomerShare.customer_id == customer.id)).all())
@@ -247,6 +249,7 @@ def customer_detail(
         contracts=contracts,
         summary=summary,
         plan_rows=plan_rows,
+        show_cost=show_cost,
         assignees=assignees,
         shares=shares,
         share_users=share_users,

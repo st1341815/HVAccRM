@@ -110,6 +110,13 @@ UNIT_OPTIONS = [f"{i}单元" for i in range(1, 10)]
 PRODUCT_OPTIONS = ["锅炉", "空调", "暖气片", "地暖", "明装", "改造", "水机", "新风", "净水"]
 
 
+# 成本费用项目（固定白名单）：材料成本需关联供应商，施工费用需关联安装师傅
+COST_CATEGORIES = ["材料成本", "施工费用", "介绍费", "物流成本", "售后成本", "其他"]
+# 需要额外关联对象的费用项目
+COST_NEEDS_SUPPLIER = "材料成本"
+COST_NEEDS_INSTALLER = "施工费用"
+
+
 def encode_products(values) -> str | None:
     """多选值 → '|A|B|' 存储（两侧带分隔符，可用 LIKE '%|A|%' 精确匹配，避免子串误命中）。"""
     clean = [v for v in dict.fromkeys(values or []) if v in PRODUCT_OPTIONS]
@@ -226,6 +233,12 @@ class Contract(Base):
     customer = relationship("Customer", back_populates="contracts")
     items = relationship("ContractItem", back_populates="contract", cascade="all, delete-orphan")
     plans = relationship("PaymentPlan", back_populates="contract", cascade="all, delete-orphan")
+    costs = relationship(
+        "ContractCost",
+        back_populates="contract",
+        cascade="all, delete-orphan",
+        order_by="ContractCost.id",
+    )
     payments = relationship("Payment", back_populates="contract", cascade="all, delete-orphan")
     change_orders = relationship("ChangeOrder", back_populates="contract", cascade="all, delete-orphan")
 
@@ -276,6 +289,41 @@ class Payment(Base):
     created_at = Column(String, default=now_iso)
 
     contract = relationship("Contract", back_populates="payments")
+
+
+class Supplier(Base):
+    """供应商：材料成本必须关联到一个供应商。"""
+
+    __tablename__ = "suppliers"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+    contact = Column(String)  # 联系人
+    phone = Column(String)
+    notes = Column(Text)
+    is_active = Column(Integer, default=1)
+    created_at = Column(String, nullable=False, default=now_iso)
+
+
+class ContractCost(Base):
+    """合同成本：以合同（单个项目）为单位归集，用于利润核算。"""
+
+    __tablename__ = "contract_costs"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False)
+    category = Column(String, nullable=False)  # COST_CATEGORIES
+    amount = Column(Float, nullable=False, default=0)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"))  # 材料成本必填
+    installer_id = Column(Integer, ForeignKey("users.id"))  # 施工费用必填
+    remark = Column(Text)  # 备注：方便后续查询
+    spent_at = Column(String)  # 费用发生日期
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(String, nullable=False, default=now_iso)
+
+    contract = relationship("Contract", back_populates="costs")
+    supplier = relationship("Supplier")
+    installer = relationship("User", foreign_keys=[installer_id])
 
 
 class ChangeOrder(Base):

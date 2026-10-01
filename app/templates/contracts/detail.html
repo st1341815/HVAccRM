@@ -26,6 +26,9 @@
   <div class="kpi"><span class="kpi-num">{{ summary.received|money }}</span><span class="kpi-label">已收合计</span></div>
   <div class="kpi {{ 'alert' if summary.outstanding > 0 else '' }}"><span class="kpi-num">{{ summary.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
   <div class="kpi"><span class="kpi-num">{{ summary.recovery_rate }}%</span><span class="kpi-label">回款率</span></div>
+  <div class="kpi"><span class="kpi-num">{{ profit.cost|money }}</span><span class="kpi-label">成本合计</span></div>
+  <div class="kpi {{ 'alert' if profit.is_loss else '' }}"><span class="kpi-num">{{ profit.gross_profit|money }}</span><span class="kpi-label">毛利</span></div>
+  <div class="kpi"><span class="kpi-num">{{ profit.gross_margin }}%</span><span class="kpi-label">毛利率</span></div>
 </div>
 {% endif %}
 
@@ -76,6 +79,64 @@
     <input name="amount" placeholder="金额" inputmode="decimal" required>
     <button type="submit">＋ 登记增项</button>
   </form>
+  {% endif %}
+</section>
+
+<section class="card" id="costs">
+  <h2>成本（{{ costs|length }} 条，合计 {{ profit.cost|money }}）
+    <span class="muted small">毛利 {{ profit.gross_profit|money }} · 毛利率 {{ profit.gross_margin }}%</span>
+  </h2>
+  <table class="tight">
+    <thead><tr><th>日期</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>录入人</th><th></th></tr></thead>
+    <tbody>
+    {% for r in costs %}
+      <tr>
+        <td>{{ r.spent_at or '-' }}</td>
+        <td>{{ r.category }}</td>
+        <td><strong>{{ r.amount|money }}</strong></td>
+        <td>{{ r.supplier.name if r.supplier else '-' }}</td>
+        <td>{{ r.installer.display_name if r.installer else '-' }}</td>
+        <td class="break">{{ r.remark or '-' }}</td>
+        <td>{{ cost_users[r.created_by].display_name if r.created_by and cost_users.get(r.created_by) else '-' }}</td>
+        <td>
+          {% if can_cost %}
+          <form method="post" action="/costs/{{ r.id }}/delete" class="inline" onsubmit="return confirm('删除这条成本记录？');">
+            <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not costs %}<p class="muted">还没有成本记录。材料成本需选供应商，施工费用需选安装师傅。</p>{% endif %}
+  {% if can_cost %}
+  <form method="post" action="/costs/new" class="filterbar">
+    <input type="hidden" name="contract_id" value="{{ contract.id }}">
+    <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
+    <select name="category" id="cost_cat" onchange="syncCostFields()">
+      {% for c in cost_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <input name="amount" placeholder="金额 *" inputmode="decimal" required>
+    <select name="supplier_id" id="cost_supplier">
+      <option value="">供应商（材料成本必选）</option>
+      {% for sp in suppliers %}<option value="{{ sp.id }}">{{ sp.name }}</option>{% endfor %}
+    </select>
+    <select name="installer_id" id="cost_installer">
+      <option value="">安装师傅（施工费用必选）</option>
+      {% if installers %}<optgroup label="安装工">
+        {% for u in installers %}<option value="{{ u.id }}">{{ u.display_name }}</option>{% endfor %}
+      </optgroup>{% endif %}
+      {% if other_users %}<optgroup label="其他账号">
+        {% for u in other_users %}<option value="{{ u.id }}">{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
+      </optgroup>{% endif %}
+    </select>
+    <input name="spent_at" type="date" value="{{ today }}">
+    <input name="remark" placeholder="备注（材料规格 / 工序 / 结算方式，便于后续查询）">
+    <button type="submit">＋ 登记成本</button>
+  </form>
+  <p class="muted small">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）；供应商在 <a href="/costs/suppliers">成本 → 供应商</a> 维护。</p>
   {% endif %}
 </section>
 
@@ -196,4 +257,19 @@
   </form>
 </section>
 {% endif %}
+<script>
+  function syncCostFields() {
+    const cat = document.getElementById('cost_cat');
+    if (!cat) return;
+    const sup = document.getElementById('cost_supplier');
+    const ins = document.getElementById('cost_installer');
+    const needSup = cat.value === '材料成本';
+    const needIns = cat.value === '施工费用';
+    sup.style.borderColor = needSup ? 'var(--brand)' : '';
+    ins.style.borderColor = needIns ? 'var(--brand)' : '';
+    sup.title = needSup ? '材料成本必须选择供应商' : '';
+    ins.title = needIns ? '施工费用必须选择安装师傅' : '';
+  }
+  syncCostFields();
+</script>
 {% endblock %}

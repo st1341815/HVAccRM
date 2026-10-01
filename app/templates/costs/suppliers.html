@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block title %}供应商{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>供应商 <span class="muted small">材料成本必须关联供应商</span></h1>
+  <nav class="tabs inline-tabs">
+    <a href="/costs">利润核算</a>
+    <a href="/costs/entries">成本明细</a>
+    <a href="/costs/suppliers" class="active">供应商</a>
+  </nav>
+</div>
+
+<section class="card">
+  <table class="tight">
+    <thead><tr><th>ID</th><th>名称</th><th>联系人</th><th>电话</th><th>累计材料成本</th><th>状态</th><th>备注 / 调整</th></tr></thead>
+    <tbody>
+    {% for s in rows %}
+      <tr class="{{ 'row-muted' if not s.is_active else '' }}">
+        <td>{{ s.id }}</td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td>{{ s.contact or '-' }}</td>
+        <td>{{ s.phone or '-' }}</td>
+        <td>{{ used.get(s.id, 0)|money }}</td>
+        <td>{{ '启用' if s.is_active else '已停用' }}</td>
+        <td>
+          {% if can_edit %}
+          <form method="post" action="/costs/suppliers/{{ s.id }}/update" class="filterbar">
+            <input name="contact" value="{{ s.contact or '' }}" placeholder="联系人">
+            <input name="phone" value="{{ s.phone or '' }}" placeholder="电话">
+            <input name="notes" value="{{ s.notes or '' }}" placeholder="备注">
+            <label class="checkline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if s.is_active else '' }}> 启用</label>
+            <button>保存</button>
+          </form>
+          {% else %}<span class="muted">{{ s.notes or '' }}</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not rows %}<p class="muted">还没有供应商，先在下边添加。</p>{% endif %}
+</section>
+
+{% if can_edit %}
+<section class="card">
+  <h2>新增供应商</h2>
+  <form method="post" action="/costs/suppliers/new" class="filterbar">
+    <input name="name" placeholder="供应商名称 *" required>
+    <input name="contact" placeholder="联系人">
+    <input name="phone" placeholder="电话">
+    <input name="notes" placeholder="备注（主营品类 / 结算方式）">
+    <button type="submit">＋ 添加</button>
+  </form>
+  <p class="muted small">停用后不再出现在「材料成本」的下拉里，但历史记录仍保留。</p>
+</section>
+{% endif %}
+{% endblock %}

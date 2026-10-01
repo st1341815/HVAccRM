@@ -30,13 +30,12 @@
     <thead><tr><th>合同号</th><th>客户</th><th>应收总额</th><th>已收</th><th>未收</th><th>回款率</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
-      <tr class="{{ 'row-alert' if s.overdue > 0 else '' }}">
+      <tr class="{{ 'row-alert' if s.outstanding > 0 else '' }}">
         <td>{{ c.no or ('#' ~ c.id) }}</td>
         <td>{{ c.customer.name if c.customer else c.customer_id }}</td>
         <td>{{ s.total|money }}</td>
         <td>{{ s.received|money }}</td>
-        <td>{{ s.outstanding|money }}</td>
-        <td class="red">{{ s.overdue|money }}</td>
+        <td class="red">{{ s.outstanding|money }}</td>
         <td>{{ s.recovery_rate }}%</td>
         <td>{{ s.status }}</td>
         <td><a href="/contracts/{{ c.id }}">收款 →</a></td>
