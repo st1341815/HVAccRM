@@ -6,13 +6,13 @@ import sys
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..config import get_settings
 from ..db import commit_retry, engine, get_db
-from ..models import AuditLog, Customer, Photo, StageTemplate, User, now_iso
+from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso
 from ..permissions import (
     DEFAULT_SCOPE,
     ROLE_LABELS,
@@ -265,10 +265,33 @@ def update_stage(
     return redirect("/admin/stages", f"工序「{stage.name}」已更新")
 
 
+@router.post("/stages/{stage_id}/delete")
+def delete_stage(
+    request: Request,
+    stage_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    """删除工序模板。已有客户任务使用该节点时拒绝，只能停用。"""
+    stage = db.get(StageTemplate, stage_id)
+    if not stage:
+        return redirect("/admin/stages", "工序不存在", "err")
+    used = db.scalar(select(func.count(Task.id)).where(Task.stage == stage.name)) or 0
+    if used:
+        return redirect(
+            "/admin/stages",
+            f"已有 {used} 个客户任务使用「{stage.name}」，不能删除；停用即可不再对新客户生效",
+            "err",
+        )
+    log_action(db, user, "delete", "stage_templates", stage.id, old=stage, ip=client_ip(request))
+    db.delete(stage)
+    commit_retry(db)
+    return redirect("/admin/stages", f"工序「{stage.name}」已删除")
+
+
 @router.get("/backups")
 def backups_page(
-    request: Request,
-    db: Session = Depends(get_db),
+    request: Request,    db: Session = Depends(get_db),
     user: User = Depends(require("admin:setting")),
 ):
     return render(
