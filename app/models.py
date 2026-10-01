@@ -91,6 +91,10 @@ class Project(Base):
     rooms = relationship("Room", back_populates="project", cascade="all, delete-orphan")
 
 
+# 单元只允许从固定下拉中选择：1单元 ~ 9单元（空 = 该楼栋无单元概念，如自建/独栋）
+UNIT_OPTIONS = [f"{i}单元" for i in range(1, 10)]
+
+
 class Room(Base):
     __tablename__ = "rooms"
     __table_args__ = (UniqueConstraint("project_id", "building", "unit", "room_no", name="uq_room"),)
@@ -110,8 +114,7 @@ class Room(Base):
 
     @property
     def label(self) -> str:
-        parts = [self.building, self.unit or "", self.room_no]
-        return "".join(p for p in parts if p)
+        return "-".join(p for p in (self.building, self.unit, self.room_no) if p)
 
 
 class Customer(Base):

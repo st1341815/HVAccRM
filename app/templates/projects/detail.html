@@ -20,7 +20,10 @@
   <form method="post" action="/projects/{{ project.id }}/rooms" class="filterbar">
     <input name="building" placeholder="楼栋 *（如 3号楼）" required list="building-list">
     <datalist id="building-list">{% for b in buildings %}<option value="{{ b }}">{% endfor %}</datalist>
-    <input name="unit" placeholder="单元（如 1单元）">
+    <select name="unit">
+      <option value="">单元（可不选）</option>
+      {% for u in unit_options %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+    </select>
     <input name="room_no" placeholder="房号 *（如 1203）" required>
     <input name="floor" placeholder="楼层" inputmode="numeric">
     <input name="area" placeholder="面积㎡" inputmode="decimal">
