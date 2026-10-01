@@ -13,6 +13,7 @@
       <td>{{ t.sort_order }}. {{ t.stage }}
         {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}
         {% if t.delay_reason %}<div class="muted small red">延期：{{ t.delay_reason }}</div>{% endif %}
+        {% if t.notes %}<div class="muted small">备注：{{ t.notes }}</div>{% endif %}
       </td>
       <td>{{ t.planned_start or '-' }}<br><span class="{{ 'red' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">{{ t.planned_end or '-' }}</span></td>
       <td>
@@ -31,7 +32,10 @@
         {% if t.status == 'ready' %}
           <form method="post" action="/tasks/{{ t.id }}/start" class="inline"><button>开工</button></form>
         {% elif t.status == 'doing' %}
-          <form method="post" action="/tasks/{{ t.id }}/done" class="inline"><button>完工</button></form>
+          <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
+            <input name="notes" placeholder="完工备注（可选）">
+            <button>完工</button>
+          </form>
         {% elif t.status == 'pending' %}
           <span class="muted small">前置未完成</span>
         {% endif %}
