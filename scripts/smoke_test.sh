@@ -92,6 +92,18 @@ c=$(code -b $J --get --data-urlencode "q=13711112222" $B/customers)
 has "测试客户张三" && ok "按客户本人手机号搜索命中" || bad "客户手机号搜索未命中"
 c=$(code -b $J --get --data-urlencode "q=张三" $B/ui/customer-search); chk "HTMX 客户片段" 200 "$c"
 
+c=$(code -b $J "$B/customers/new"); chk "新建客户页" 200 "$c"
+has "华润紫玥台" > /dev/null 2>&1 || true
+has "测试楼盘A-合肥-包河区" && ok "楼盘下拉带城市/区县（名称-城市-区县）" || bad "楼盘下拉未带城市区县"
+has "按标准工序模板生成施工节点任务" && ok "文案已去掉「9 个」" || bad "文案未更新"
+has "<details class=\"ms\"" && ok "意向产品为下拉式多选控件" || bad "意向产品未改为下拉多选"
+has 'name="products"' && ok "下拉多选仍提交 products 字段" || bad "下拉多选缺 products 字段"
+c=$(code -b $J "$B/customers"); has "测试楼盘A-合肥-包河区" && ok "客户列表楼盘筛选也带城市/区县" || bad "客户列表楼盘筛选未更新"
+c=$(code -b $J --get --data-urlencode "q=测试楼盘A" "$B/projects/rooms/search?project_id=$PID")
+chk "按楼盘名称搜房号" 200 "$c"
+has "测试楼盘A" && ok "搜索命中楼盘名称" || bad "按楼盘名搜索未命中"
+has "1203" && ok "搜索结果含该楼盘下的房号" || bad "按楼盘名搜索未返回房号"
+
 echo "== 3b. 工序模板 CRUD =="
 c=$(code -b $J -X POST --data-urlencode "name=临时工序$RUN" --data-urlencode "sort_order=99" --data-urlencode "default_days=2" --data-urlencode "require_photo=1" $B/admin/stages/new)
 chk "新增工序模板" 303 "$c"
