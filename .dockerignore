@@ -1,0 +1,19 @@
+# 构建上下文排除：数据、密钥、虚拟环境、版本库（镜像里只应包含代码）
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+data/
+config/
+*.db
+*.db-wal
+*.db-shm
+*.log
+tests/
+.pytest_cache/
