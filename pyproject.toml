@@ -1,0 +1,19 @@
+[project]
+name = "homeliving-crm"
+version = "0.8.0"
+description = "家居建材客户管理系统（CRM）— NAS 自托管版"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn==0.34.0",
+    "jinja2==3.1.5",
+    "python-multipart==0.0.20",
+    "sqlalchemy==2.0.36",
+    "alembic==1.14.0",
+    "apscheduler==3.11.0",
+    "pydantic-settings==2.7.0",
+    "pillow==11.1.0",
+]
+
+[tool.uv]
+package = false

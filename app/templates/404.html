@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}未找到{% endblock %}
+{% block content %}
+<div class="card center">
+  <h1>404 · 页面或记录不存在</h1>
+  <p class="muted">{{ detail or '请检查链接是否正确。' }}</p>
+  <p><a href="/">返回看板</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+# NAS 部署用 compose（绝对主机路径，避免在 NAS 之外执行时 bind mount 解析错误）
+# 用法（在 NAS 上、于本目录内执行）：docker compose -f docker-compose.nas.yml up -d --build
+services:
+  crm:
+    build: .
+    image: crm:local
+    container_name: crm
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "8090:8000"
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY is required}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
+      - DB_PATH=/data/crm.db
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - /vol1/1000/crm/data:/data
+      - /vol1/1000/crm/config:/config:ro
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}楼盘列表{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>楼盘 / 房号 <span class="muted small">共 {{ projects|length }} 个楼盘</span></h1>
+  {% if can('customer:edit') or can('admin:setting') %}<a class="btn" href="/projects/new">＋ 新建楼盘</a>{% endif %}
+</div>
+
+<section class="card">
+  <form method="get" action="/projects" class="filterbar">
+    <input name="q" value="{{ q }}" placeholder="搜索楼盘名称 / 城市 / 地址">
+    <button type="submit">搜索</button>
+    <a class="btn ghost" href="/projects">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <table>
+    <thead><tr><th>楼盘</th><th>城市</th><th>开发商</th><th>房号数</th><th>已成交客户</th><th>交房日期</th><th></th></tr></thead>
+    <tbody>
+    {% for p in projects %}
+      <tr>
+        <td><a href="/projects/{{ p.id }}"><strong>{{ p.name }}</strong></a></td>
+        <td>{{ p.city or '-' }}{% if p.district %} {{ p.district }}{% endif %}</td>
+        <td>{{ p.developer or '-' }}</td>
+        <td>{{ room_counts.get(p.id, 0) }}</td>
+        <td>{{ cust_counts.get(p.id, 0) }}</td>
+        <td>{{ p.delivery_date or '-' }}</td>
+        <td><a href="/projects/{{ p.id }}">管理房号 →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not projects %}<p class="muted">还没有楼盘，先去 <a href="/projects/new">新建楼盘</a>。</p>{% endif %}
+</section>
+{% endblock %}

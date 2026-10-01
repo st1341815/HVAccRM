@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block title %}施工看板{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>施工看板</h1>
+  <div class="kpis compact">
+    <div class="kpi {{ 'alert' if delayed|length else '' }}"><span class="kpi-num">{{ delayed|length }}</span><span class="kpi-label">延期</span></div>
+    <div class="kpi"><span class="kpi-num">{{ due_week|length }}</span><span class="kpi-label">本周到期</span></div>
+    <div class="kpi"><span class="kpi-num">{{ tasks|length }}</span><span class="kpi-label">筛选结果</span></div>
+  </div>
+</div>
+
+<section class="card">
+  <form method="get" action="/tasks" class="filterbar"
+        hx-get="/tasks?partial=1" hx-target="#task-table" hx-swap="innerHTML" hx-trigger="change from:select,submit from:form">
+    <select name="scope">
+      <option value="open" {{ 'selected' if filters.scope == 'open' else '' }}>仅未完成</option>
+      <option value="all" {{ 'selected' if filters.scope == 'all' else '' }}>全部工序</option>
+    </select>
+    <select name="assignee">
+      <option value="">全部责任人</option>
+      {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if filters.assignee == u.id|string else '' }}>{{ u.username }}</option>{% endfor %}
+    </select>
+    <select name="stage">
+      <option value="">全部工序节点</option>
+      {% for s in stages %}<option value="{{ s }}" {{ 'selected' if filters.stage == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">全部状态</option>
+      {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if filters.status == k else '' }}>{{ v }}</option>{% endfor %}
+    </select>
+    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/tasks">重置</a>
+  </form>
+</section>
+
+<section class="card" id="task-table">
+  {% include "_fragments/task_rows.html" with context %}
+</section>
+{% endblock %}

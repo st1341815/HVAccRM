@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block title %}新建楼盘{% endblock %}
+{% block content %}
+<h1>新建楼盘</h1>
+<form method="post" action="/projects/new" class="card stack">
+  <div class="grid3">
+    <label>楼盘名称 *<input name="name" required value="{{ project.name if project else '' }}"></label>
+    <label>城市<input name="city"></label>
+    <label>区县<input name="district"></label>
+    <label>开发商<input name="developer"></label>
+    <label>交房日期<input name="delivery_date" placeholder="YYYY-MM-DD"></label>
+    <label>总户数<input name="total_units" inputmode="numeric"></label>
+  </div>
+  <label>地址<input name="address"></label>
+  <label>备注<textarea name="notes" rows="3"></textarea></label>
+  <div class="actions">
+    <button type="submit">保存</button>
+    <a class="btn ghost" href="/projects">取消</a>
+  </div>
+</form>
+{% endblock %}

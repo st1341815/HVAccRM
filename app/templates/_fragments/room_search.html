@@ -1,0 +1,19 @@
+{% if rooms %}
+<table class="tight">
+  <thead><tr><th>楼盘</th><th>楼栋</th><th>单元</th><th>房号</th><th>面积</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for r in rooms %}
+    <tr>
+      <td>{{ projects.get(r.project_id, '') }}</td>
+      <td>{{ r.building }}</td>
+      <td>{{ r.unit or '-' }}</td>
+      <td><strong>{{ r.room_no }}</strong></td>
+      <td>{{ r.area or '-' }}</td>
+      <td><a href="/projects/{{ r.project_id }}">进入楼盘</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">没有匹配「{{ q }}」的房号。</p>
+{% endif %}

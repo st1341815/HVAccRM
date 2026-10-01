@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}客户列表{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>客户列表 <span class="muted small">共 {{ customers|length }} 位</span></h1>
+  {% if can('customer:edit') %}<a class="btn" href="/customers/new">＋ 新建客户</a>{% endif %}
+</div>
+
+<section class="card">
+  <form method="get" action="/customers" class="filterbar">
+    <input name="q" value="{{ q }}" placeholder="搜索：客户名 / 行业 / 备注 / 联系人电话（FTS5）">
+    <select name="status">
+      <option value="">全部状态</option>
+      {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="level">
+      <option value="">全部等级</option>
+      {% for l in levels %}<option value="{{ l }}" {{ 'selected' if level == l else '' }}>{{ l }}</option>{% endfor %}
+    </select>
+    <select name="source">
+      <option value="">全部来源</option>
+      {% for s in sources %}<option value="{{ s }}" {{ 'selected' if source == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="project_id">
+      <option value="">全部楼盘</option>
+      {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if project_id == p.id|string else '' }}>{{ p.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/customers">重置</a>
+  </form>
+</section>
+
+<section class="card" id="customer-table">
+  {% include "_fragments/customer_rows.html" with context %}
+</section>
+{% endblock %}

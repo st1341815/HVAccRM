@@ -1,0 +1,194 @@
+{% extends "layout.html" %}
+{% block title %}合同 {{ contract.no or contract.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>合同 {{ contract.no or ('#' ~ contract.id) }}
+    <span class="badge">{{ summary.status }}</span>
+  </h1>
+  <div class="actions">
+    <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
+    <a class="btn ghost" href="/contracts">合同列表</a>
+  </div>
+</div>
+
+<div class="meta">
+  <span>签订日：{{ contract.sign_date }}</span>
+  <span>状态：{{ contract.status }}</span>
+  <span>创建：{{ contract.created_at }}</span>
+</div>
+
+{% if can_amount %}
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ summary.base|money }}</span><span class="kpi-label">合同额（减优惠）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.change|money }}</span><span class="kpi-label">增项合计</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.total|money }}</span><span class="kpi-label">应收总额</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.plans_total|money }}</span><span class="kpi-label">计划应收合计</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.received|money }}</span><span class="kpi-label">已收合计</span></div>
+  <div class="kpi {{ 'alert' if summary.outstanding > 0 else '' }}"><span class="kpi-num">{{ summary.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
+  <div class="kpi {{ 'alert' if summary.overdue > 0 else '' }}"><span class="kpi-num">{{ summary.overdue|money }}</span><span class="kpi-label">逾期金额</span></div>
+  <div class="kpi"><span class="kpi-num">{{ summary.recovery_rate }}%</span><span class="kpi-label">回款率</span></div>
+</div>
+{% if summary.needs_plan %}
+<div class="flash warn">提示：应收计划合计 {{ summary.plans_total|money }} 少于应收总额 {{ summary.total|money }}，请检查分期计划是否遗漏。</div>
+{% endif %}
+{% endif %}
+
+{% if can_pay %}
+<section class="card">
+  <h2>登记收款 / 退款</h2>
+  <form method="post" action="/payments/record" class="filterbar">
+    <input type="hidden" name="contract_id" value="{{ contract.id }}">
+    <input type="hidden" name="back" value="/contracts/{{ contract.id }}">
+    <input name="amount" placeholder="金额（退款填负数）" inputmode="decimal" required>
+    <input name="paid_at" type="date" value="{{ today }}">
+    <select name="method">
+      {% for m in ['微信','支付宝','银行转账','刷卡','现金','对公转账','其他'] %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+    </select>
+    <input name="voucher_no" placeholder="凭证号">
+    <input name="remark" placeholder="备注">
+    <button type="submit">登记</button>
+  </form>
+  <p class="muted small">入库前校验：已收 + 本次 ≤ 应收总额（含增项），超收会被拦截。</p>
+</section>
+{% endif %}
+
+<div class="grid2">
+  <section class="card">
+    <h2>应收计划</h2>
+    <table class="tight">
+      <thead><tr><th>#</th><th>期次</th><th>金额</th><th>已分摊</th><th>约定日期</th><th>状态</th><th></th></tr></thead>
+      <tbody>
+      {% for p in summary.plans %}
+        <tr class="{{ 'row-alert' if p.status == 'overdue' else '' }}">
+          <td>{{ p.sort_order }}</td>
+          <td>{{ p.label }}</td>
+          <td>{{ p.amount|money }}</td>
+          <td>{{ p.paid_amount|money }}</td>
+          <td>{{ p.due_date or '-' }}</td>
+          <td><span class="badge">{{ p.status }}</span></td>
+          <td>
+            {% if can_edit %}
+            <form method="post" action="/contracts/plans/{{ p.id }}/delete" class="inline" onsubmit="return confirm('删除该期计划？');">
+              <button class="ghost danger">删除</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if can_edit %}
+    <form method="post" action="/contracts/{{ contract.id }}/plans" class="filterbar">
+      <input name="label" placeholder="期次名称" required>
+      <input name="amount" placeholder="金额" inputmode="decimal" required>
+      <input name="due_date" type="date">
+      <button type="submit">＋ 添加期次</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>增项（变更单）</h2>
+    <table class="tight">
+      <thead><tr><th>原因</th><th>金额</th><th>审批时间</th><th></th></tr></thead>
+      <tbody>
+      {% for co in changes %}
+        <tr>
+          <td>{{ co.reason }}</td><td>{{ co.amount|money }}</td><td>{{ co.approved_at or '-' }}</td>
+          <td>
+            {% if can_edit %}
+            <form method="post" action="/contracts/change-orders/{{ co.id }}/delete" class="inline">
+              <button class="ghost danger">删除</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if can_edit %}
+    <form method="post" action="/contracts/{{ contract.id }}/change-orders" class="filterbar">
+      <input name="reason" placeholder="增项原因" required>
+      <input name="amount" placeholder="金额" inputmode="decimal" required>
+      <input name="due_date" type="date">
+      <label class="checkline"><input type="checkbox" name="sync_plan" value="1" checked> 同步追加一期应收</label>
+      <button type="submit">＋ 登记增项</button>
+    </form>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>合同明细</h2>
+  <table class="tight">
+    <thead><tr><th>产品</th><th>规格</th><th>数量</th><th>单位</th><th>单价</th><th>金额</th><th></th></tr></thead>
+    <tbody>
+    {% for it in items %}
+      <tr>
+        <td>{{ it.product_name }}</td><td>{{ it.spec or '-' }}</td><td>{{ it.qty }}</td>
+        <td>{{ it.unit or '-' }}</td><td>{{ it.unit_price|money }}</td><td>{{ it.amount|money }}</td>
+        <td>
+          {% if can_edit %}
+          <form method="post" action="/contracts/items/{{ it.id }}/delete" class="inline">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if can_edit %}
+  <form method="post" action="/contracts/{{ contract.id }}/items" class="filterbar">
+    <input name="product_name" placeholder="产品名称 *" required>
+    <input name="spec" placeholder="规格">
+    <input name="qty" placeholder="数量" inputmode="decimal">
+    <input name="unit" placeholder="单位">
+    <input name="unit_price" placeholder="单价" inputmode="decimal">
+    <input name="amount" placeholder="金额（留空自动算）" inputmode="decimal">
+    <button type="submit">＋ 添加明细</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>收款流水</h2>
+  <table class="tight">
+    <thead><tr><th>收款日期</th><th>金额</th><th>方式</th><th>凭证号</th><th>收款人</th><th>备注</th></tr></thead>
+    <tbody>
+    {% for p in payments %}
+      <tr class="{{ 'row-alert' if p.amount < 0 else '' }}">
+        <td>{{ p.paid_at }}</td>
+        <td class="{{ 'red' if p.amount < 0 else '' }}">{{ p.amount|money }}</td>
+        <td>{{ p.method or '-' }}</td>
+        <td>{{ p.voucher_no or '-' }}</td>
+        <td>{{ users[p.received_by].username if p.received_by and users.get(p.received_by) else '-' }}</td>
+        <td>{{ p.remark or '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not payments %}<p class="muted">还没有收款记录。</p>{% endif %}
+</section>
+
+{% if can_edit %}
+<section class="card">
+  <h2>修改合同</h2>
+  <form method="post" action="/contracts/{{ contract.id }}/edit" class="stack">
+    <div class="grid3">
+      <label>合同号<input name="no" value="{{ contract.no or '' }}"></label>
+      <label>签订日<input name="sign_date" type="date" value="{{ contract.sign_date }}"></label>
+      <label>合同总额<input name="total_amount" value="{{ contract.total_amount }}" inputmode="decimal"></label>
+      <label>优惠<input name="discount" value="{{ contract.discount or 0 }}" inputmode="decimal"></label>
+      <label>状态
+        <select name="status">
+          {% for s in ['active','done','void'] %}<option value="{{ s }}" {{ 'selected' if contract.status == s else '' }}>{{ s }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>备注<textarea name="notes" rows="2">{{ contract.notes or '' }}</textarea></label>
+    <button type="submit">保存修改</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

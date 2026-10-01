@@ -1,0 +1,50 @@
+{% if tasks %}
+<table class="tight">
+  <thead>
+    <tr><th>客户 / 房号</th><th>工序</th><th>计划</th><th>责任人</th><th>状态</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+  {% for t in tasks %}
+    {% set c = customers.get(t.customer_id) %}
+    <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+      <td>
+        {% if c %}<a href="/customers/{{ c.id }}?tab=tasks">{{ c.name }}</a><div class="muted small">{{ c.room_label }}</div>{% else %}#{{ t.customer_id }}{% endif %}
+      </td>
+      <td>{{ t.sort_order }}. {{ t.stage }}
+        {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}
+        {% if t.delay_reason %}<div class="muted small red">延期：{{ t.delay_reason }}</div>{% endif %}
+      </td>
+      <td>{{ t.planned_start or '-' }}<br><span class="{{ 'red' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">{{ t.planned_end or '-' }}</span></td>
+      <td>
+        {% if can_assign %}
+        <form method="post" action="/tasks/{{ t.id }}/assign" class="inline">
+          <select name="assignee_id" onchange="this.form.submit()">
+            <option value="">未指派</option>
+            {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if t.assignee_id == u.id else '' }}>{{ u.username }}</option>{% endfor %}
+          </select>
+        </form>
+        {% else %}{{ users_map[t.assignee_id].username if t.assignee_id and users_map.get(t.assignee_id) else '未指派' }}{% endif %}
+      </td>
+      <td><span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>
+      <td class="actions-cell">
+        {% if t.status == 'ready' %}
+          <form method="post" action="/tasks/{{ t.id }}/start" class="inline"><button>开工</button></form>
+        {% elif t.status == 'doing' %}
+          <form method="post" action="/tasks/{{ t.id }}/done" class="inline"><button>完工</button></form>
+        {% elif t.status == 'pending' %}
+          <span class="muted small">前置未完成</span>
+        {% endif %}
+        {% if t.status not in ['done','skipped'] %}
+          <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
+            <input name="skip_reason" placeholder="跳过原因（必填）" required>
+            <button class="ghost">跳过</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">没有符合条件的工序任务。</p>
+{% endif %}

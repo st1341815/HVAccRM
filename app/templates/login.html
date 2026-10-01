@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block title %}登录{% endblock %}
+{% block content %}
+<div class="login-card">
+  <h1>家居建材客户管理系统</h1>
+  <p class="muted">内网自用 · 请使用管理员分配的账号登录</p>
+  <form method="post" action="/login" class="stack">
+    <input type="hidden" name="next" value="{{ next or '/' }}">
+    <label>账号<input name="username" value="{{ username or '' }}" required autofocus autocomplete="username"></label>
+    <label>密码<input type="password" name="password" required autocomplete="current-password"></label>
+    <label>动态验证码（已开启二步验证时填写）
+      <input name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位数字" {% if need_totp %}autofocus{% endif %}>
+    </label>
+    <button type="submit">登录</button>
+  </form>
+</div>
+{% endblock %}
