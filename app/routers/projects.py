@@ -193,6 +193,34 @@ def add_room(
     return redirect(f"/projects/{project_id}", f"房号 {room.label} 已添加")
 
 
+@router.post("/{project_id}/delete")
+def delete_project(
+    request: Request,
+    project_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_any("admin:setting", "customer:delete")),
+):
+    """删除楼盘（连带其房号）。楼盘下若已挂客户，必须先处理客户，禁止直接删除。"""
+    project = db.get(Project, project_id)
+    if not project:
+        return redirect("/projects", "楼盘不存在", "err")
+    room_ids = select(Room.id).where(Room.project_id == project_id)
+    used = db.scalar(select(func.count(Customer.id)).where(Customer.room_id.in_(room_ids))) or 0
+    if used:
+        return redirect(
+            f"/projects/{project_id}",
+            f"该楼盘下有 {used} 个客户，不能删除；请先改动或删除这些客户的房号",
+            "err",
+        )
+    room_count = db.scalar(select(func.count(Room.id)).where(Room.project_id == project_id)) or 0
+    name = project.name
+    log_action(db, user, "delete", "projects", project.id, old=project, ip=client_ip(request))
+    db.delete(project)  # rooms 关系是 cascade="all, delete-orphan"，房号随之删除
+    commit_retry(db)
+    suffix = f"及其 {room_count} 个房号" if room_count else ""
+    return redirect("/projects", f"楼盘「{name}」{suffix}已删除")
+
+
 @router.post("/rooms/{room_id}/delete")
 def delete_room(
     request: Request,

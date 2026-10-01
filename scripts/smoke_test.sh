@@ -94,6 +94,16 @@ USED_SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g'
 c=$(code -b $J -X POST "$B/admin/stages/$USED_SID/delete"); chk "删除在用工序被拒（重定向）" 303 "$c"
 c=$(code -b $J "$B/admin/stages"); has "调试验收" && ok "在用工序未被误删" || bad "在用工序被删掉了"
 
+echo "== 3c. 楼盘删除 =="
+c=$(code -b $J -X POST "$B/projects/$PID/delete"); chk "删除有客户的楼盘被拒（重定向）" 303 "$c"
+c=$(code -b $J "$B/projects"); has "测试楼盘A" && ok "有客户的楼盘未被删除" || bad "有客户的楼盘被删掉了"
+c=$(code -b $J -X POST --data-urlencode "name=待删楼盘$RUN" $B/projects/new); chk "新建待删楼盘" 303 "$c"; DPID=$(last_id)
+c=$(code -b $J -X POST --data-urlencode "building=1号楼" --data-urlencode "room_no=101" "$B/projects/$DPID/rooms"); chk "待删楼盘添加房号" 303 "$c"
+c=$(code -b $J "$B/projects/$DPID"); has "1号楼" && ok "房号已存在" || bad "房号未创建"
+c=$(code -b $J -X POST "$B/projects/$DPID/delete"); chk "删除空楼盘（连带房号）" 303 "$c"
+c=$(code -b $J "$B/projects"); has "待删楼盘$RUN" && bad "空楼盘未删除" || ok "空楼盘已删除"
+c=$(code -b $J "$B/projects/999999"); chk "已删楼盘详情 404" 404 "$c"
+
 echo "== 4. 合同 + 收款（三数核对 / 超额拦截 / 增项） =="
 c=$(code -b $J -X POST --data-urlencode "customer_id=$CID" --data-urlencode "no=HT-$RUN-001" --data-urlencode "sign_date=2026-01-15" --data-urlencode "total_amount=30000" --data-urlencode "discount=0" --data-urlencode "plan_labels=定金
 首期款

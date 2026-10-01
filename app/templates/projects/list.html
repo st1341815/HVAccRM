@@ -19,14 +19,24 @@
     <thead><tr><th>楼盘</th><th>城市</th><th>开发商</th><th>房号数</th><th>已成交客户</th><th>交房日期</th><th></th></tr></thead>
     <tbody>
     {% for p in projects %}
+      {% set rc = room_counts.get(p.id, 0) %}
+      {% set cc = cust_counts.get(p.id, 0) %}
       <tr>
         <td><a href="/projects/{{ p.id }}"><strong>{{ p.name }}</strong></a></td>
         <td>{{ p.city or '-' }}{% if p.district %} {{ p.district }}{% endif %}</td>
         <td>{{ p.developer or '-' }}</td>
-        <td>{{ room_counts.get(p.id, 0) }}</td>
-        <td>{{ cust_counts.get(p.id, 0) }}</td>
+        <td>{{ rc }}</td>
+        <td>{{ cc }}</td>
         <td>{{ p.delivery_date or '-' }}</td>
-        <td><a href="/projects/{{ p.id }}">管理房号 →</a></td>
+        <td class="nowrap">
+          <a href="/projects/{{ p.id }}">管理房号 →</a>
+          {% if can('admin:setting') or can('customer:delete') %}
+          <form method="post" action="/projects/{{ p.id }}/delete" class="inline"
+                onsubmit="return confirm('删除楼盘「{{ p.name }}」{% if rc %}及其 {{ rc }} 个房号{% endif %}？此操作不可恢复。{% if cc %}（该楼盘下有 {{ cc }} 个客户，将被拒绝）{% endif %}');">
+            <button class="ghost danger">删除</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
     </tbody>
