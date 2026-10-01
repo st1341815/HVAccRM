@@ -20,6 +20,8 @@
   --shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 * { box-sizing: border-box; }
+/* 图片兜底：任何未单独约束的图片都不超过容器宽度（手机端溢出的根因防线） */
+img { max-width: 100%; height: auto; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -110,7 +112,7 @@ form.inline { display: inline-flex; gap: .3rem; align-items: center; }
 label { display: block; font-size: .85rem; color: #374151; }
 label.checkline { display: flex; align-items: center; gap: .3rem; }
 .task-photos { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.task-photos img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
+img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: inline-block; vertical-align: middle; }
 .task-upload { display: flex; align-items: center; gap: .25rem; }
 .task-upload input[type=file] { max-width: 11rem; font-size: .72rem; }
 .checkgrid { row-gap: .3rem; }
@@ -325,6 +327,11 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   .tc-actions .tc-done input { font-size: 16px; }
   .tc-actions button { min-height: 2.5rem; }
   .tc-skip > summary { padding: .45rem .8rem; }
+
+  /* 缩略图：手机上放大便于点按 */
+  img.mini { width: 56px; height: 56px; }
+  .gallery a { display: block; }
+  .task-photos { gap: .45rem; }
 
   /* 其它 */
   .meta { padding: .5rem .6rem; font-size: .85rem; gap: .2rem .8rem; }
