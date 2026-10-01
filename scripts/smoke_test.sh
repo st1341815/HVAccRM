@@ -208,6 +208,8 @@ echo "== 5b. 施工页照片上传 =="
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
+has "filter-collapse" && ok "施工页筛选条可折叠（手机端默认收起）" || bad "施工页筛选条未折叠"
+has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样式）" || bad "任务表缺 tasks class"
 TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
 echo "  上传到任务 TID=$TT"
 # 复用已上传过的图（物理文件被去重复用），避免影响第 6 节的物理文件净增计数

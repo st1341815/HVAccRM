@@ -11,6 +11,10 @@
 </div>
 
 <section class="card">
+  <details class="ms filter-collapse" id="task_filters" open>
+    <summary>筛选
+      <span class="muted small">{{ filters.scope == 'all' and '全部工序' or '仅未完成' }} · {{ tasks|length }} 条</span>
+    </summary>
   <form method="get" action="/tasks" class="filterbar"
         hx-get="/tasks?partial=1" hx-target="#task-table" hx-swap="innerHTML" hx-trigger="change from:select,submit from:form">
     <select name="scope">
@@ -33,7 +37,16 @@
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/tasks">重置</a>
   </form>
+  </details>
 </section>
+
+<script>
+  // 手机上默认收起筛选（桌面端保持展开），点标题即可展开
+  (function () {
+    const d = document.getElementById('task_filters');
+    if (d && window.matchMedia('(max-width: 780px)').matches) d.open = false;
+  })();
+</script>
 
 <section class="card" id="task-table">
   {% include "_fragments/task_rows.html" with context %}
