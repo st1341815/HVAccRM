@@ -11,12 +11,27 @@
 </div>
 
 <section class="card">
+  <div class="quick-row">
+    <div class="chips">
+      <a class="chip {{ 'on' if filters.scope == 'open' and not filters.due and not filters.delayed and not filters.assignee else '' }}" href="{{ quick_links.all }}">全部未完成</a>
+      <a class="chip {{ 'on' if filters.due == 'today' else '' }}" href="{{ quick_links.today }}">今日到期</a>
+      <a class="chip {{ 'on' if filters.due == 'week' else '' }}" href="{{ quick_links.week }}">本周到期</a>
+      <a class="chip {{ 'on' if filters.delayed else '' }}" href="{{ quick_links.delayed }}">只看延期</a>
+      <a class="chip {{ 'on' if filters.assignee == user.id|string else '' }}" href="{{ quick_links.mine }}">我负责的</a>
+    </div>
+    <div class="chips views">
+      <a class="chip {{ 'on' if view != 'customer' else '' }}" href="{{ quick_links.view_tasks }}">按任务</a>
+      <a class="chip {{ 'on' if view == 'customer' else '' }}" href="{{ quick_links.view_customer }}">按客户</a>
+    </div>
+  </div>
+
   <details class="ms filter-collapse" id="task_filters" open>
-    <summary>筛选
+    <summary>更多筛选
       <span class="muted small">{{ filters.scope == 'all' and '全部工序' or '仅未完成' }} · {{ tasks|length }} 条</span>
     </summary>
   <form method="get" action="/tasks" class="filterbar"
         hx-get="/tasks?partial=1" hx-target="#task-table" hx-swap="innerHTML" hx-trigger="change from:select,submit from:form">
+    <input type="hidden" name="view" value="{{ view }}">
     <select name="scope">
       <option value="open" {{ 'selected' if filters.scope == 'open' else '' }}>仅未完成</option>
       <option value="all" {{ 'selected' if filters.scope == 'all' else '' }}>全部工序</option>
@@ -33,6 +48,15 @@
       <option value="">全部状态</option>
       {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if filters.status == k else '' }}>{{ v }}</option>{% endfor %}
     </select>
+    <select name="due">
+      <option value="">到期：不限</option>
+      <option value="today" {{ 'selected' if filters.due == 'today' else '' }}>今日到期</option>
+      <option value="week" {{ 'selected' if filters.due == 'week' else '' }}>本周到期</option>
+    </select>
+    <select name="delayed">
+      <option value="">延期：不限</option>
+      <option value="1" {{ 'selected' if filters.delayed else '' }}>只看延期</option>
+    </select>
     <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/tasks">重置</a>
@@ -40,15 +64,19 @@
   </details>
 </section>
 
+<section class="card" id="task-table">
+  {% if view == 'customer' %}
+    {% include "_fragments/task_cards.html" with context %}
+  {% else %}
+    {% include "_fragments/task_rows.html" with context %}
+  {% endif %}
+</section>
+
 <script>
-  // 手机上默认收起筛选（桌面端保持展开），点标题即可展开
+  // 手机上默认收起「更多筛选」（桌面端保持展开），点标题即可展开
   (function () {
     const d = document.getElementById('task_filters');
     if (d && window.matchMedia('(max-width: 780px)').matches) d.open = false;
   })();
 </script>
-
-<section class="card" id="task-table">
-  {% include "_fragments/task_rows.html" with context %}
-</section>
 {% endblock %}

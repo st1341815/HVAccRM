@@ -229,6 +229,34 @@ if [ -n "$TD" ]; then
   has "提示：该节点模板标记为" && ok "需照片节点未拍照即完工 → 给出上传提示" || bad "需照片节点完工未给出提示"
 fi
 
+echo "== 5c. 施工看板增强（快捷筛选 / 分组视图 / 拍照 / 完工备注） =="
+c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板" 200 "$c"
+has 'capture="environment"' && ok "手机端相机直拍按钮（capture=environment）" || bad "缺相机直拍按钮"
+has "今日到期" && has "只看延期" && has "我负责的" && ok "快捷筛选 chips 齐全" || bad "快捷筛选 chips 缺失"
+has "按客户" && has "按任务" && ok "视图切换（按任务 / 按客户）" || bad "缺视图切换"
+PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/plan' | head -1 | grep -o '[0-9]*')
+if [ -z "$PTID" ]; then PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*'); fi
+c=$(code -b $J -X POST --data-urlencode "planned_end=2000-01-01" $B/tasks/$PTID/plan)
+chk "把节点计划完成日改到过去（造延期）" 303 "$c"
+c=$(code -b $J "$B/tasks?scope=open&delayed=1"); chk "快捷筛选：只看延期" 200 "$c"
+has "2000-01-01" && ok "延期任务命中筛选" || bad "延期筛选未命中"
+has 'chip on' && ok "延期 chip 高亮" || bad "chip 未高亮"
+c=$(code -b $J "$B/tasks?scope=open&due=today"); chk "快捷筛选：今日到期" 200 "$c"
+has "今日到期" && ok "今日到期 chip 存在" || bad "今日到期 chip 缺失"
+c=$(code -b $J "$B/tasks?scope=all&view=customer"); chk "按客户分组视图" 200 "$c"
+has "task-cards" && ok "分组卡片渲染" || bad "分组卡片缺失"
+has "上门勘测" && has "调试验收" && ok "客户卡内展示该客户全部节点" || bad "客户卡节点不完整"
+DTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+if [ -n "$DTID" ]; then
+  code -b $J -X POST "$B/tasks/$DTID/start" > /dev/null
+  c=$(code -b $J -X POST --data-urlencode "notes=完工备注测试$RUN" "$B/tasks/$DTID/done")
+  chk "完工并登记备注" 303 "$c"
+  c=$(code -b $J "$B/tasks?scope=all")
+  has "完工备注测试$RUN" && ok "完工备注已入库并在列表展示" || bad "完工备注未展示"
+else
+  bad "找不到可开工的节点用于完工备注测试"
+fi
+
 echo "== 6. 照片上传 / 缩略图 / Hash 去重 =="
 PYTHONPATH= .venv/bin/python - <<'PY'
 import random

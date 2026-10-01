@@ -17,6 +17,7 @@
       <input type="hidden" name="task_id" value="{{ t.id }}">
       <input type="hidden" name="kind" value="{{ stage_kind.get(t.stage, '其他') }}">
       <input type="hidden" name="back" value="{{ back_path }}">
+      <label class="cam-btn" title="直接用相机拍照并上传">📷<input type="file" name="files" accept="image/*" capture="environment" hidden onchange="this.form.submit()"></label>
       <input type="file" name="files" accept="image/*" multiple required>
       <button class="ghost">上传</button>
     </form>

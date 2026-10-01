@@ -150,6 +150,41 @@ details.ms .ms-picked { font-weight: 400; }
 details.ms .ms-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem .6rem; padding-top: .2rem; border-top: 1px dashed var(--line); }
 details.ms .ms-panel label.checkline { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .3rem .5rem; cursor: pointer; }
 details.ms .ms-panel label.checkline:has(input:checked) { border-color: var(--brand); background: #eef2ff; color: var(--brand-dark); font-weight: 600; }
+/* 快捷筛选 chips + 视图切换（施工看板） */
+.quick-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .7rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.chips.views { margin-left: auto; }
+.chip { display: inline-block; padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: .84rem; color: #374151; white-space: nowrap; }
+.chip:hover { border-color: var(--brand); text-decoration: none; }
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* 按客户分组：一个工地一张卡，节点为步骤 */
+.task-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(345px, 1fr)); gap: .9rem; }
+.task-card { border: 1px solid var(--line); border-radius: 10px; padding: .7rem .8rem; background: #fff; }
+.task-card.is-alert { border-color: #fca5a5; }
+.tc-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.tc-head strong { font-size: 1rem; }
+.tc-meta { margin: .1rem 0 .3rem; }
+.tc-steps { list-style: none; margin: .3rem 0 0; padding: 0; }
+.tc-step { border-top: 1px dashed var(--line); padding: .45rem 0 .55rem; }
+.tc-step.is-alert { background: #fff7f7; }
+.tc-step-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.tc-stage { font-weight: 600; }
+.tc-step-meta { margin-top: .1rem; }
+.tc-note { color: #374151; white-space: pre-line; }
+.tc-step-body { margin-top: .35rem; }
+.tc-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
+.tc-actions .tc-done { flex: 1 1 14rem; }
+.tc-actions .tc-done input { flex: 1 1 auto; min-width: 6rem; }
+.tc-skip > summary { cursor: pointer; font-size: .84rem; color: var(--muted); padding: .25rem .5rem; border: 1px solid var(--line); border-radius: 6px; display: inline-block; }
+.tc-skip[open] > summary { margin-bottom: .35rem; }
+.tc-skip form { width: 100%; }
+.tc-skip form input { flex: 1 1 auto; min-width: 8rem; }
+
+/* 相机直拍按钮（手机端显示，一键拍照即上传） */
+.cam-btn { display: none; align-items: center; justify-content: center; min-width: 2.4rem; min-height: 2.4rem; border-radius: 8px; background: #eef2ff; color: var(--brand-dark); font-size: 1.15rem; cursor: pointer; }
+.cam-btn:active { background: #e0e7ff; }
+
 /* 折叠式筛选条（施工看板） */
 details.filter-collapse { padding: .4rem .6rem; }
 details.filter-collapse > summary { font-weight: 600; }
@@ -276,6 +311,20 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.tasks.js-stack td.actions-cell button { min-height: 2.6rem; font-size: 1rem; }
   table.tasks.js-stack td.actions-cell input { font-size: 16px; }
   table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
+
+  /* 施工看板：chips 横向滑动、客户卡单列、相机按钮显形 */
+  .quick-row { gap: .4rem; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: .1rem; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips.views { margin-left: 0; }
+  .chip { padding: .45rem .75rem; min-height: 2.3rem; display: inline-flex; align-items: center; }
+  .task-cards { grid-template-columns: 1fr; gap: .7rem; }
+  .task-card { padding: .65rem .7rem; }
+  .cam-btn { display: inline-flex; }
+  .tc-actions .tc-done { flex: 1 1 100%; }
+  .tc-actions .tc-done input { font-size: 16px; }
+  .tc-actions button { min-height: 2.5rem; }
+  .tc-skip > summary { padding: .45rem .8rem; }
 
   /* 其它 */
   .meta { padding: .5rem .6rem; font-size: .85rem; gap: .2rem .8rem; }

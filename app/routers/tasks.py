@@ -56,6 +56,9 @@ def task_board(
     status: str = "",
     customer_id: str = "",
     scope: str = "open",
+    due: str = "",
+    delayed: str = "",
+    view: str = "tasks",
     partial: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
@@ -74,6 +77,17 @@ def task_board(
         stmt = stmt.where(Task.customer_id == parse_int(customer_id))
     if scope == "open":
         stmt = stmt.where(Task.status.notin_(["done", "skipped"]))
+    # 快捷筛选：今日到期 / 本周到期 / 只看延期
+    if due == "today":
+        stmt = stmt.where(Task.planned_end == today_str())
+    elif due == "week":
+        stmt = stmt.where(Task.planned_end.is_not(None)).where(Task.planned_end <= _plus_days(7))
+    if delayed:
+        stmt = (
+            stmt.where(Task.planned_end.is_not(None))
+            .where(Task.planned_end < today_str())
+            .where(Task.status.notin_(list(task_svc.DONE_STATES)))
+        )
     tasks = list(db.scalars(stmt.limit(500)).all())
 
     customers = {c.id: c for c in db.scalars(select(Customer)).all()}
@@ -85,8 +99,49 @@ def task_board(
     due_week = [
         t for t in tasks if t.planned_end and today_str() <= t.planned_end <= week_end and t.status not in task_svc.DONE_STATES
     ]
+    filters = {
+        "assignee": assignee,
+        "stage": stage,
+        "status": status,
+        "customer_id": customer_id,
+        "scope": scope,
+        "due": due,
+        "delayed": delayed,
+        "view": view,
+    }
+    # 按客户分组视图：先按筛选条件定位「有相关工序的客户」，再展示这些客户的全部节点
+    groups = []
+    if view == "customer" and tasks:
+        cids = list(dict.fromkeys(t.customer_id for t in tasks))
+        gstmt = select(Task).where(Task.customer_id.in_(cids)).order_by(Task.customer_id, Task.sort_order)
+        if cond is not None:
+            gstmt = gstmt.where(cond)
+        all_tasks = list(db.scalars(gstmt).all())
+        by_customer: dict[int, list[Task]] = {}
+        for t in all_tasks:
+            by_customer.setdefault(t.customer_id, []).append(t)
+        for cid in cids:
+            rows = sorted(by_customer.get(cid, []), key=lambda t: t.sort_order or 0)
+            groups.append(
+                {
+                    "customer": customers.get(cid),
+                    "tasks": rows,
+                    "progress": task_svc.progress(rows),
+                    "delayed": sum(1 for t in rows if task_svc.is_delayed(t)),
+                    "next_end": min((t.planned_end for t in rows if t.planned_end and t.status not in task_svc.DONE_STATES), default="9999-12-31"),
+                }
+            )
+        groups.sort(key=lambda g: (g["delayed"] == 0, g["next_end"]))
+
+    def _qs(**over) -> str:
+        params = {k: v for k, v in filters.items() if v and k != "view"}
+        params.update({k: v for k, v in over.items() if v})
+        params["view"] = over.get("view", view)
+        return "/tasks?" + "&".join(f"{k}={v}" for k, v in params.items())
+
     ctx = dict(
         tasks=tasks,
+        groups=groups,
         customers=customers,
         users=users,
         users_map=users_map,
@@ -94,13 +149,24 @@ def task_board(
         delayed=delayed,
         due_week=due_week,
         status_labels=STATUS_LABELS,
-        filters={"assignee": assignee, "stage": stage, "status": status, "customer_id": customer_id, "scope": scope},
+        filters=filters,
+        view=view,
+        quick_links={
+            "all": _qs(scope="open", due="", delayed="", assignee="", view="tasks"),
+            "today": _qs(scope="open", due="today", delayed="", view="tasks"),
+            "week": _qs(scope="open", due="week", delayed="", view="tasks"),
+            "delayed": _qs(scope="open", due="", delayed="1", view="tasks"),
+            "mine": _qs(scope="open", due="", delayed="", assignee=user.id, view="tasks"),
+            "view_tasks": _qs(view="tasks"),
+            "view_customer": _qs(view="customer"),
+        },
         can_assign=has_perm(user, "task:assign"),
         today=today_str(),
-        **_photo_ctx(db, tasks, user, request),
+        **_photo_ctx(db, tasks if view != "customer" else [t for g in groups for t in g["tasks"]], user, request),
     )
     if partial:
-        return render(request, "_fragments/task_rows.html", **ctx)
+        name = "_fragments/task_cards.html" if view == "customer" else "_fragments/task_rows.html"
+        return render(request, name, **ctx)
     return render(request, "tasks/board.html", **ctx)
 
 
@@ -138,7 +204,11 @@ def done(
     if not _can_touch(db, user, task):
         return render(request, "403.html", status_code=403)
     if notes.strip():
-        task.notes = notes.strip()
+        # 追加而非覆盖：保留原有备注（如计划备注/延期原因），带上完工日期便于追溯
+        stamp = today_str()
+        prev = (task.notes or "").strip()
+        entry = f"[{stamp} 完工] {notes.strip()}"
+        task.notes = f"{prev}\n{entry}" if prev else entry
     ok, msg = task_svc.finish_task(db, task)
     if ok and task_svc.stage_photo_requirements(db).get(task.stage):
         have = db.scalar(select(func.count(Photo.id)).where(Photo.task_id == task.id)) or 0
