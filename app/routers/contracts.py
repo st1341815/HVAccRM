@@ -103,9 +103,14 @@ def create_contract(
     customer = db.get(Customer, cid) if cid else None
     if not customer:
         return redirect("/contracts", "请选择有效客户", "err")
+    no = no.strip() or None
+    if no and db.scalars(select(Contract).where(Contract.no == no)).first():
+        return redirect(
+            f"/contracts/new?customer_id={customer.id}", f"合同号 {no} 已存在，请换一个", "err"
+        )
     contract = Contract(
         customer_id=customer.id,
-        no=no.strip() or None,
+        no=no,
         sign_date=sign_date or today_str(),
         total_amount=parse_float(total_amount),
         discount=parse_float(discount),
@@ -190,6 +195,13 @@ def update_contract(
     user: User = Depends(require("contract:edit")),
 ):
     contract = get_or_404(db, Contract, contract_id, "合同")
+    no = no.strip() or None
+    if no:
+        dup = db.scalars(
+            select(Contract).where(Contract.no == no).where(Contract.id != contract.id)
+        ).first()
+        if dup:
+            return redirect(f"/contracts/{contract_id}", f"合同号 {no} 已被其他合同占用", "err")
     before = {
         "no": contract.no,
         "sign_date": contract.sign_date,
@@ -198,7 +210,7 @@ def update_contract(
         "status": contract.status,
         "notes": contract.notes,
     }
-    contract.no = no.strip() or None
+    contract.no = no
     contract.sign_date = sign_date or contract.sign_date
     contract.total_amount = parse_float(total_amount)
     contract.discount = parse_float(discount)
