@@ -1,14 +1,25 @@
 """合同管理：明细、收款计划、增项、三数核对视图。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import ChangeOrder, Contract, ContractItem, Customer, PaymentPlan, User, now_iso, today_str
+from ..models import (
+    PRODUCT_OPTIONS,
+    ChangeOrder,
+    Contract,
+    ContractItem,
+    Customer,
+    PaymentPlan,
+    Photo,
+    User,
+    now_iso,
+    today_str,
+)
 from ..permissions import (
     can_see_amount,
     customer_scope_conditions,
@@ -16,10 +27,13 @@ from ..permissions import (
     require,
 )
 from ..services import finance as finance_svc
+from ..services import numbering as numbering_svc
+from ..services import photos as photo_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
+CONTRACT_PHOTO_KIND = "纸质合同"
 
 
 @router.get("")
@@ -81,21 +95,20 @@ def new_contract_form(
         customers=customers,
         customer_id=customer_id,
         today=today_str(),
+        next_no=numbering_svc.next_contract_no(db),
+        product_types=PRODUCT_OPTIONS,
     )
 
 
 @router.post("/new")
-def create_contract(
+async def create_contract(
     request: Request,
     customer_id: str = Form(...),
-    no: str = Form(""),
     sign_date: str = Form(...),
     total_amount: str = Form("0"),
-    discount: str = Form("0"),
+    product_type: str = Form(""),
     notes: str = Form(""),
-    plan_labels: str = Form(""),
-    plan_amounts: str = Form(""),
-    plan_dates: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
     user: User = Depends(require("contract:edit")),
 ):
@@ -103,17 +116,18 @@ def create_contract(
     customer = db.get(Customer, cid) if cid else None
     if not customer:
         return redirect("/contracts", "请选择有效客户", "err")
-    no = no.strip() or None
-    if no and db.scalars(select(Contract).where(Contract.no == no)).first():
-        return redirect(
-            f"/contracts/new?customer_id={customer.id}", f"合同号 {no} 已存在，请换一个", "err"
-        )
+    ptype = product_type.strip()
+    if ptype and ptype not in PRODUCT_OPTIONS:
+        return redirect(f"/contracts/new?customer_id={customer.id}", "产品类型请从下拉中选择", "err")
+    # 合同号由服务端生成：ONE + 8 位年月日 + 4 位顺数（按年重置），前端不可改写
+    no = numbering_svc.reserve_contract_no(db)
     contract = Contract(
         customer_id=customer.id,
         no=no,
         sign_date=sign_date or today_str(),
         total_amount=parse_float(total_amount),
-        discount=parse_float(discount),
+        product_type=ptype or None,
+        discount=0,
         status="active",
         notes=notes.strip() or None,
         created_by=user.id,
@@ -121,29 +135,83 @@ def create_contract(
     )
     db.add(contract)
     db.flush()
-
-    labels = plan_labels.split("\n")
-    amounts = plan_amounts.split("\n")
-    dates = plan_dates.split("\n")
-    for i, label in enumerate(labels):
-        label = label.strip()
-        if not label:
-            continue
-        amount = parse_float(amounts[i]) if i < len(amounts) else 0.0
-        due = (dates[i].strip() if i < len(dates) else "") or None
-        db.add(
-            PaymentPlan(
-                contract_id=contract.id,
-                label=label,
-                amount=amount,
-                due_date=due,
-                sort_order=i + 1,
-                status="pending",
-            )
-        )
     log_action(db, user, "create", "contracts", contract.id, new=contract, ip=client_ip(request))
+
+    saved, dedup, errors = 0, 0, []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        raw = await f.read()
+        photo, msg = photo_svc.save_photo(
+            db,
+            customer_id=customer.id,
+            kind=CONTRACT_PHOTO_KIND,
+            raw=raw,
+            orig_name=f.filename,
+            uploaded_by=user.id,
+            contract_id=contract.id,
+        )
+        if photo is None:
+            errors.append(f"{f.filename}: {msg}")
+        else:
+            if "重复" in msg:
+                dedup += 1
+            else:
+                saved += 1
     commit_retry(db)
-    return redirect(f"/contracts/{contract.id}", "合同已创建")
+    message = f"合同 {contract.no} 已创建"
+    if saved or dedup:
+        message += f"；纸质合同图片新增 {saved} 张、去重 {dedup} 张"
+    if errors:
+        return redirect(f"/contracts/{contract.id}", message + "；失败：" + "；".join(errors), "err")
+    return redirect(f"/contracts/{contract.id}", message)
+
+
+@router.post("/{contract_id}/photos")
+async def upload_contract_photos(
+    request: Request,
+    contract_id: int,
+    files: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("contract:edit")),
+):
+    """给已有合同补传纸质合同照片。"""
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    saved, dedup, errors = 0, 0, []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        raw = await f.read()
+        photo, msg = photo_svc.save_photo(
+            db,
+            customer_id=contract.customer_id,
+            kind=CONTRACT_PHOTO_KIND,
+            raw=raw,
+            orig_name=f.filename,
+            uploaded_by=user.id,
+            contract_id=contract.id,
+        )
+        if photo is None:
+            errors.append(f"{f.filename}: {msg}")
+        else:
+            if "重复" in msg:
+                dedup += 1
+            else:
+                saved += 1
+            log_action(
+                db,
+                user,
+                "upload",
+                "photos",
+                None,
+                new={"file": f.filename, "kind": CONTRACT_PHOTO_KIND, "contract": contract.id},
+                ip=client_ip(request),
+            )
+    commit_retry(db)
+    message = f"纸质合同图片：新增 {saved} 张，去重 {dedup} 张"
+    if errors:
+        message += "；失败 " + "；".join(errors)
+    return redirect(f"/contracts/{contract.id}", message, "err" if errors else "ok")
 
 
 @router.get("/{contract_id}")
@@ -164,6 +232,13 @@ def contract_detail(
     payments = sorted(contract.payments, key=lambda p: p.paid_at or "", reverse=True)
     changes = list(contract.change_orders)
     users = {u.id: u for u in db.scalars(select(User)).all()}
+    contract_photos = list(
+        db.scalars(
+            select(Photo)
+            .where(Photo.contract_id == contract.id)
+            .order_by(Photo.created_at.desc(), Photo.id.desc())
+        ).all()
+    )
     return render(
         request,
         "contracts/detail.html",
@@ -173,10 +248,13 @@ def contract_detail(
         payments=payments,
         changes=changes,
         users=users,
+        contract_photos=contract_photos,
+        product_types=PRODUCT_OPTIONS,
         can_amount=can_see_amount(user),
         can_edit=has_perm(user, "contract:edit"),
         can_pay=has_perm(user, "payment:edit"),
         can_refund=has_perm(user, "payment:refund"),
+        can_delete_photo=has_perm(user, "photo:delete"),
         today=today_str(),
     )
 
@@ -188,7 +266,7 @@ def update_contract(
     no: str = Form(""),
     sign_date: str = Form(""),
     total_amount: str = Form("0"),
-    discount: str = Form("0"),
+    product_type: str = Form(""),
     status: str = Form("active"),
     notes: str = Form(""),
     db: Session = Depends(get_db),
@@ -206,14 +284,17 @@ def update_contract(
         "no": contract.no,
         "sign_date": contract.sign_date,
         "total_amount": contract.total_amount,
-        "discount": contract.discount,
+        "product_type": contract.product_type,
         "status": contract.status,
         "notes": contract.notes,
     }
     contract.no = no
     contract.sign_date = sign_date or contract.sign_date
     contract.total_amount = parse_float(total_amount)
-    contract.discount = parse_float(discount)
+    ptype = (product_type or "").strip()
+    if ptype and ptype not in PRODUCT_OPTIONS:
+        return redirect(f"/contracts/{contract_id}", "产品类型请从下拉中选择", "err")
+    contract.product_type = ptype or None
     contract.status = status or "active"
     contract.notes = notes.strip() or None
     log_action(db, user, "update", "contracts", contract.id, old=before, new=contract, ip=client_ip(request))

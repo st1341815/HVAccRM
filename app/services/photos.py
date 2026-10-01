@@ -86,6 +86,7 @@ def save_photo(
     orig_name: str,
     uploaded_by: int | None,
     task_id: int | None = None,
+    contract_id: int | None = None,
 ) -> tuple[Photo | None, str]:
     """保存一张照片。返回 (Photo, 状态信息)。
 
@@ -113,6 +114,7 @@ def save_photo(
         photo = Photo(
             customer_id=customer_id,
             task_id=task_id,
+            contract_id=contract_id,
             kind=kind,
             path=existing.path,
             thumb_path=existing.thumb_path,
@@ -148,6 +150,7 @@ def save_photo(
     photo = Photo(
         customer_id=customer_id,
         task_id=task_id,
+        contract_id=contract_id,
         kind=kind,
         path=str(rel_path),
         thumb_path=str(thumb_rel) if thumb_rel else None,

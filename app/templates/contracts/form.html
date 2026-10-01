@@ -2,7 +2,7 @@
 {% block title %}新建合同{% endblock %}
 {% block content %}
 <h1>新建合同</h1>
-<form method="post" action="/contracts/new" class="card stack">
+<form method="post" action="/contracts/new" class="card stack" enctype="multipart/form-data">
   <div class="grid3">
     <label>客户 *
       <select name="customer_id" required>
@@ -10,32 +10,31 @@
         {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if customer_id == c.id|string else '' }}>{{ c.name }}{% if c.room_label %}（{{ c.room_label }}）{% endif %}</option>{% endfor %}
       </select>
     </label>
-    <label>合同号<input name="no" placeholder="如 HT2026-001"></label>
+    <label>合同号（自动生成）
+      <input value="{{ next_no }}" readonly title="格式：ONE + 8 位年月日 + 4 位顺数，顺数每年重置">
+    </label>
     <label>签订日期 *<input name="sign_date" type="date" value="{{ today }}" required></label>
     <label>合同总额 *<input name="total_amount" inputmode="decimal" placeholder="0.00" required></label>
-    <label>优惠/折让<input name="discount" inputmode="decimal" placeholder="0.00"></label>
+    <label>产品类型
+      <select name="product_type">
+        <option value="">未填写</option>
+        {% for p in product_types %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+    </label>
   </div>
-  <label>备注<textarea name="notes" rows="2"></textarea></label>
 
   <fieldset>
-    <legend>收款计划（每行一期，可留空稍后添加）</legend>
-    <div class="grid3">
-      <label>期次名称
-        <textarea name="plan_labels" rows="4" placeholder="定金&#10;首期款&#10;尾款"></textarea>
-      </label>
-      <label>金额
-        <textarea name="plan_amounts" rows="4" placeholder="5000&#10;15000&#10;10000"></textarea>
-      </label>
-      <label>约定日期
-        <textarea name="plan_dates" rows="4" placeholder="2026-03-01&#10;2026-04-01&#10;2026-06-01"></textarea>
-      </label>
-    </div>
-    <p class="muted small">三行按顺序一一对应；空行忽略。系统会实时核算「合同总额 / 应收计划 / 已收款」三数差异。</p>
+    <legend>纸质合同图片（可多张，拍照或扫描件）</legend>
+    <input type="file" name="files" accept="image/*" multiple>
+    <p class="muted small">保存后自动生成缩略图，并出现在该客户的相册「纸质合同」分类下；重复文件按内容自动去重。</p>
   </fieldset>
+
+  <label>备注<textarea name="notes" rows="2"></textarea></label>
 
   <div class="actions">
     <button type="submit">保存合同</button>
     <a class="btn ghost" href="/contracts">取消</a>
   </div>
 </form>
+<p class="muted small">收款计划（分期应收）在合同保存后，到合同详情页逐期添加；系统会实时核算「合同总额 / 应收计划 / 已收款」三数差异。</p>
 {% endblock %}

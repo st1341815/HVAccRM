@@ -30,6 +30,8 @@ login_user() { # username password jar [newpass]
   return 0
 }
 
+mkdir -p /tmp/crmtest
+
 echo "== 1. 认证与页面 =="
 code -c $J -b $J -X POST -d "username=admin&password=$APW&next=/" $B/login > /dev/null
 chk "admin 登录" 303 "$(grep -c . $HDR >/dev/null; echo 303)"
@@ -111,19 +113,43 @@ c=$(code -b $J -X POST "$B/projects/$DPID/delete"); chk "删除空楼盘（连�
 c=$(code -b $J "$B/projects"); has "待删楼盘$RUN" && bad "空楼盘未删除" || ok "空楼盘已删除"
 c=$(code -b $J "$B/projects/999999"); chk "已删楼盘详情 404" 404 "$c"
 
-echo "== 4. 合同 + 收款（三数核对 / 超额拦截 / 增项） =="
-c=$(code -b $J -X POST --data-urlencode "customer_id=$CID" --data-urlencode "no=HT-$RUN-001" --data-urlencode "sign_date=2026-01-15" --data-urlencode "total_amount=30000" --data-urlencode "discount=0" --data-urlencode "plan_labels=定金
-首期款
-尾款" --data-urlencode "plan_amounts=5000
-15000
-10000" --data-urlencode "plan_dates=2026-02-01
-2026-03-01
-2026-04-01" $B/contracts/new)
-chk "新建合同(3 期计划)" 303 "$c"; CTID=$(last_id); echo "  CTID=$CTID"
+echo "== 4. 合同 + 收款（合同号自动生成 / 产品类型 / 纸质合同图 / 三数核对 / 超额拦截 / 增项） =="
+PYTHONPATH= .venv/bin/python - <<'PY'
+from PIL import Image
+Image.new("RGB", (1400, 1900), (245, 243, 235)).save("/tmp/crmtest/contract1.jpg", quality=85)
+print("  纸质合同测试图 ready")
+PY
+c=$(code -b $J "$B/contracts/new"); chk "新建合同页" 200 "$c"
+has "ONE" && ok "表单预填自动生成的合同号" || bad "表单缺少自动合同号"
+c=$(code -b $J -F "customer_id=$CID" -F "sign_date=2026-01-15" -F "total_amount=30000" -F "product_type=地暖" -F "files=@/tmp/crmtest/contract1.jpg" $B/contracts/new)
+chk "新建合同(带纸质合同图)" 303 "$c"; CTID=$(last_id); echo "  CTID=$CTID"
 c=$(code -b $J "$B/contracts/$CTID"); chk "合同详情" 200 "$c"
-DUP=$(curl -s -L -c $J -b $J -X POST --data-urlencode "customer_id=$CID" --data-urlencode "no=HT-$RUN-001" --data-urlencode "sign_date=2026-01-16" --data-urlencode "total_amount=1000" $B/contracts/new | grep -o "合同号[^<]*" | head -1)
-echo "  重复合同号提示：$DUP"
-echo "$DUP" | grep -q "已存在" && ok "重复合同号被拒且提示可读（无 500）" || bad "重复合同号处理异常: $DUP"
+CNO=$(curl -s -b $J "$B/contracts/$CTID" | grep -oE 'ONE[0-9]{12}' | head -1)
+echo "  合同号=$CNO"
+echo "$CNO" | grep -qE '^ONE[0-9]{12}$' && ok "合同号格式 = ONE + 8 位年月日 + 4 位顺数" || bad "合同号格式异常: $CNO"
+has "地暖" && ok "产品类型已入库并展示" || bad "产品类型未展示"
+has "纸质合同" && ok "详情页出现纸质合同区" || bad "纸质合同区缺失"
+CPH=$(curl -s -b $J "$B/contracts/$CTID" | grep -o '/photos/[0-9]*/thumb' | head -1 | grep -o '[0-9]*')
+[ -n "$CPH" ] && ok "纸质合同缩略图已生成（photo=$CPH）" || bad "纸质合同缩略图缺失"
+c=$(code -b $J "$B/photos/$CPH/file"); chk "纸质合同原图可下载" 200 "$c"
+c=$(code -b $J -F "customer_id=$CID" -F "sign_date=2026-01-16" -F "total_amount=1000" $B/contracts/new)
+chk "第二份合同" 303 "$c"; CT2=$(last_id)
+CNO2=$(curl -s -b $J "$B/contracts/$CT2" | grep -oE 'ONE[0-9]{12}' | head -1)
+echo "  合同号2=$CNO2"
+[ "$((10#${CNO2: -4}))" -eq "$((10#${CNO: -4} + 1))" ] && ok "顺数递增（${CNO: -4} → ${CNO2: -4}）" || bad "顺数未递增: $CNO → $CNO2"
+c=$(code -b $J -F "customer_id=$CID" -F "no=WILLBEIGNORED" -F "sign_date=2026-01-17" -F "total_amount=500" $B/contracts/new); CT3=$(last_id)
+code -b $J "$B/contracts/$CT3" > /dev/null
+has "WILLBEIGNORED" && bad "手填合同号竟被采纳" || ok "手填合同号被忽略（一律服务端生成）"
+CNTB=$(curl -s -b $J "$B/contracts" | grep -oE '共 [0-9]+ 份' | grep -o '[0-9]*')
+c=$(code -b $J -F "customer_id=$CID" -F "sign_date=2026-01-18" -F "total_amount=100" -F "product_type=不存在产品" $B/contracts/new)
+chk "非法产品类型被拒（重定向）" 303 "$c"
+CNTA=$(curl -s -b $J "$B/contracts" | grep -oE '共 [0-9]+ 份' | grep -o '[0-9]*')
+[ "$CNTB" == "$CNTA" ] && ok "非法产品类型未创建合同（$CNTB 份未变）" || bad "非法产品类型竟创建合同（$CNTB → $CNTA）"
+for row in "定金|5000|2026-02-01" "首期款|15000|2026-03-01" "尾款|10000|2026-04-01"; do
+  lb=${row%%|*}; rest=${row#*|}; am=${rest%%|*}; du=${rest#*|}
+  c=$(code -b $J -X POST --data-urlencode "label=$lb" --data-urlencode "amount=$am" --data-urlencode "due_date=$du" $B/contracts/$CTID/plans)
+  chk "详情页添加收款期次 $lb" 303 "$c"
+done
 # 原始应收 30000，先记一笔 8000 增项 → 应收 38000；此时尝试收 35000 应被拦截
 c=$(code -b $J -X POST --data-urlencode "contract_id=$CTID" --data-urlencode "amount=35000" --data-urlencode "paid_at=2026-02-01" --data-urlencode "method=微信" --data-urlencode "back=/contracts/$CTID" $B/payments/record)
 chk "超额收款被拦截" 303 "$c"

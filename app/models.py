@@ -204,7 +204,8 @@ class Contract(Base):
     no = Column(String, unique=True)
     sign_date = Column(String, nullable=False)
     total_amount = Column(Float, nullable=False, default=0)
-    discount = Column(Float, default=0)
+    product_type = Column(String)  # 产品类型（单选，PRODUCT_OPTIONS 白名单）
+    discount = Column(Float, default=0)  # 已不在表单采集，保留列以兼容历史数据
     status = Column(String, default="active")
     notes = Column(Text)
     created_by = Column(Integer, ForeignKey("users.id"))
@@ -323,6 +324,7 @@ class Photo(Base):
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
     task_id = Column(Integer, ForeignKey("tasks.id"))
+    contract_id = Column(Integer, ForeignKey("contracts.id"))  # 纸质合同照片归属
     kind = Column(String, nullable=False)
     path = Column(String, nullable=False)  # 相对 data/media 的路径
     thumb_path = Column(String)
