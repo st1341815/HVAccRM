@@ -56,14 +56,12 @@ def task_board(
     status: str = "",
     customer_id: str = "",
     scope: str = "open",
-    due: str = "",
-    delayed: str = "",
     view: str = "tasks",
     partial: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
 ):
-    stmt = select(Task).order_by(Task.planned_end, Task.sort_order)
+    stmt = select(Task).order_by(Task.customer_id, Task.sort_order, Task.id)
     cond = task_scope_conditions(db, user)
     if cond is not None:
         stmt = stmt.where(cond)
@@ -77,36 +75,18 @@ def task_board(
         stmt = stmt.where(Task.customer_id == parse_int(customer_id))
     if scope == "open":
         stmt = stmt.where(Task.status.notin_(["done", "skipped"]))
-    # 快捷筛选：今日到期 / 本周到期 / 只看延期
-    if due == "today":
-        stmt = stmt.where(Task.planned_end == today_str())
-    elif due == "week":
-        stmt = stmt.where(Task.planned_end.is_not(None)).where(Task.planned_end <= _plus_days(7))
-    if delayed:
-        stmt = (
-            stmt.where(Task.planned_end.is_not(None))
-            .where(Task.planned_end < today_str())
-            .where(Task.status.notin_(list(task_svc.DONE_STATES)))
-        )
     tasks = list(db.scalars(stmt.limit(500)).all())
 
     customers = {c.id: c for c in db.scalars(select(Customer)).all()}
     users = list(db.scalars(select(User).where(User.is_active == 1)).all())
     users_map = {u.id: u for u in users}
     stages = [s.name for s in task_svc.active_stages(db)]
-    delayed = [t for t in tasks if task_svc.is_delayed(t)]
-    week_end = _plus_days(7)
-    due_week = [
-        t for t in tasks if t.planned_end and today_str() <= t.planned_end <= week_end and t.status not in task_svc.DONE_STATES
-    ]
     filters = {
         "assignee": assignee,
         "stage": stage,
         "status": status,
         "customer_id": customer_id,
         "scope": scope,
-        "due": due,
-        "delayed": delayed,
         "view": view,
     }
     # 按客户分组视图：先按筛选条件定位「有相关工序的客户」，再展示这些客户的全部节点
@@ -127,11 +107,10 @@ def task_board(
                     "customer": customers.get(cid),
                     "tasks": rows,
                     "progress": task_svc.progress(rows),
-                    "delayed": sum(1 for t in rows if task_svc.is_delayed(t)),
-                    "next_end": min((t.planned_end for t in rows if t.planned_end and t.status not in task_svc.DONE_STATES), default="9999-12-31"),
+                    "open": sum(1 for t in rows if t.status not in task_svc.DONE_STATES),
                 }
             )
-        groups.sort(key=lambda g: (g["delayed"] == 0, g["next_end"]))
+        groups.sort(key=lambda g: (-g["open"], g["customer"].name if g["customer"] else ""))
 
     def _qs(**over) -> str:
         params = {k: v for k, v in filters.items() if v and k != "view"}
@@ -146,17 +125,12 @@ def task_board(
         users=users,
         users_map=users_map,
         stages=stages,
-        delayed=delayed,
-        due_week=due_week,
         status_labels=STATUS_LABELS,
         filters=filters,
         view=view,
         quick_links={
-            "all": _qs(scope="open", due="", delayed="", assignee="", view="tasks"),
-            "today": _qs(scope="open", due="today", delayed="", view="tasks"),
-            "week": _qs(scope="open", due="week", delayed="", view="tasks"),
-            "delayed": _qs(scope="open", due="", delayed="1", view="tasks"),
-            "mine": _qs(scope="open", due="", delayed="", assignee=user.id, view="tasks"),
+            "all": _qs(scope="open", assignee="", view="tasks"),
+            "mine": _qs(scope="open", assignee=user.id, view="tasks"),
             "view_tasks": _qs(view="tasks"),
             "view_customer": _qs(view="customer"),
         },
@@ -169,11 +143,6 @@ def task_board(
         return render(request, name, **ctx)
     return render(request, "tasks/board.html", **ctx)
 
-
-def _plus_days(days: int) -> str:
-    from datetime import date, timedelta
-
-    return (date.today() + timedelta(days=days)).isoformat()
 
 
 @router.post("/{task_id}/start")
@@ -253,24 +222,3 @@ def assign(
     return redirect(return_path(None, request.headers.get("referer"), "/tasks"), "已指派")
 
 
-@router.post("/{task_id}/plan")
-def plan(
-    request: Request,
-    task_id: int,
-    planned_start: str = Form(""),
-    planned_end: str = Form(""),
-    notes: str = Form(""),
-    delay_reason: str = Form(""),
-    db: Session = Depends(get_db),
-    user: User = Depends(require("task:assign")),
-):
-    task = get_or_404(db, Task, task_id, "工序任务")
-    before = {"planned_start": task.planned_start, "planned_end": task.planned_end}
-    task.planned_start = planned_start.strip() or None
-    task.planned_end = planned_end.strip() or None
-    task.notes = notes.strip() or task.notes
-    task.delay_reason = delay_reason.strip() or None
-    task.updated_at = now_iso()
-    log_action(db, user, "task_plan", "tasks", task.id, old=before, new={"planned_start": task.planned_start, "planned_end": task.planned_end}, ip=client_ip(request))
-    commit_retry(db)
-    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), "工期已更新")

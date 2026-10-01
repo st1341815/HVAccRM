@@ -254,7 +254,6 @@ def customer_detail(
         shares=shares,
         share_users=share_users,
         progress=task_svc.progress(tasks),
-        delayed=task_svc.delay_count(db, tasks),
         task_photos=photo_svc.photos_by_task(db, [t.id for t in tasks]),
         stage_requires_photo=task_svc.stage_photo_requirements(db),
         stage_kind=task_svc.STAGE_PHOTO_KIND,

@@ -15,7 +15,7 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>序号</th><th>节点名称</th><th>默认工期(天)</th><th>需照片</th><th>产出物</th><th>启用</th><th>保存 / 删除</th></tr></thead>
+    <thead><tr><th>序号</th><th>节点名称</th><th>需照片</th><th>产出物</th><th>启用</th><th>保存 / 删除</th></tr></thead>
     <tbody>
     {% for s in stages %}
       <tr>
@@ -24,7 +24,6 @@
         <td colspan="5">
           <form method="post" action="/admin/stages/{{ s.id }}/update" class="filterbar">
             <input name="sort_order" value="{{ s.sort_order }}" inputmode="numeric" style="width:5rem">
-            <input name="default_days" value="{{ s.default_days }}" inputmode="numeric" style="width:5rem">
             <label class="checkline"><input type="checkbox" name="require_photo" value="1" {{ 'checked' if s.require_photo else '' }}> 需照片</label>
             <span class="muted small">{{ s.output_doc or '' }}</span>
             <label class="checkline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if s.is_active else '' }}> 启用</label>
@@ -40,7 +39,7 @@
     {% endfor %}
     </tbody>
   </table>
-  <p class="muted small">模板变更只影响之后新建的客户；存量客户可用客户详情页的「按模板补齐缺失节点」。</p>
+  <p class="muted small">施工计划不在系统内跟踪，模板不设工期；模板变更只影响之后新建的客户，存量客户可用客户详情页的「按模板补齐缺失节点」。</p>
 </section>
 
 <section class="card">
@@ -48,7 +47,6 @@
   <form method="post" action="/admin/stages/new" class="filterbar">
     <input name="name" placeholder="节点名称" required>
     <input name="sort_order" placeholder="顺序" inputmode="numeric">
-    <input name="default_days" placeholder="默认工期天数" inputmode="numeric">
     <input name="output_doc" placeholder="产出物说明">
     <label class="checkline"><input type="checkbox" name="require_photo" value="1"> 需照片</label>
     <button type="submit">＋ 添加</button>

@@ -1,21 +1,19 @@
 {% if tasks %}
 <table class="tight tasks">
   <thead>
-    <tr><th>客户 / 房号</th><th>工序</th><th>计划</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr>
+    <tr><th>客户 / 房号</th><th>工序</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr>
   </thead>
   <tbody>
   {% for t in tasks %}
     {% set c = customers.get(t.customer_id) %}
-    <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+    <tr>
       <td>
         {% if c %}<a href="/customers/{{ c.id }}?tab=tasks">{{ c.name }}</a><div class="muted small">{{ c.room_label }}</div>{% else %}#{{ t.customer_id }}{% endif %}
       </td>
       <td>{{ t.sort_order }}. {{ t.stage }}
         {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}
-        {% if t.delay_reason %}<div class="muted small red">延期：{{ t.delay_reason }}</div>{% endif %}
         {% if t.notes %}<div class="muted small">备注：{{ t.notes }}</div>{% endif %}
       </td>
-      <td>{{ t.planned_start or '-' }}<br><span class="{{ 'red' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">{{ t.planned_end or '-' }}</span></td>
       <td>
         {% if can_assign %}
         <form method="post" action="/tasks/{{ t.id }}/assign" class="inline">

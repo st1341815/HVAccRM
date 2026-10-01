@@ -4,8 +4,6 @@
 <div class="page-head">
   <h1>施工看板</h1>
   <div class="kpis compact">
-    <div class="kpi {{ 'alert' if delayed|length else '' }}"><span class="kpi-num">{{ delayed|length }}</span><span class="kpi-label">延期</span></div>
-    <div class="kpi"><span class="kpi-num">{{ due_week|length }}</span><span class="kpi-label">本周到期</span></div>
     <div class="kpi"><span class="kpi-num">{{ tasks|length }}</span><span class="kpi-label">筛选结果</span></div>
   </div>
 </div>
@@ -13,10 +11,7 @@
 <section class="card">
   <div class="quick-row">
     <div class="chips">
-      <a class="chip {{ 'on' if filters.scope == 'open' and not filters.due and not filters.delayed and not filters.assignee else '' }}" href="{{ quick_links.all }}">全部未完成</a>
-      <a class="chip {{ 'on' if filters.due == 'today' else '' }}" href="{{ quick_links.today }}">今日到期</a>
-      <a class="chip {{ 'on' if filters.due == 'week' else '' }}" href="{{ quick_links.week }}">本周到期</a>
-      <a class="chip {{ 'on' if filters.delayed else '' }}" href="{{ quick_links.delayed }}">只看延期</a>
+      <a class="chip {{ 'on' if filters.scope == 'open' and not filters.assignee else '' }}" href="{{ quick_links.all }}">全部未完成</a>
       <a class="chip {{ 'on' if filters.assignee == user.id|string else '' }}" href="{{ quick_links.mine }}">我负责的</a>
     </div>
     <div class="chips views">
@@ -47,15 +42,6 @@
     <select name="status">
       <option value="">全部状态</option>
       {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if filters.status == k else '' }}>{{ v }}</option>{% endfor %}
-    </select>
-    <select name="due">
-      <option value="">到期：不限</option>
-      <option value="today" {{ 'selected' if filters.due == 'today' else '' }}>今日到期</option>
-      <option value="week" {{ 'selected' if filters.due == 'week' else '' }}>本周到期</option>
-    </select>
-    <select name="delayed">
-      <option value="">延期：不限</option>
-      <option value="1" {{ 'selected' if filters.delayed else '' }}>只看延期</option>
     </select>
     <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
     <button type="submit">筛选</button>

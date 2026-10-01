@@ -66,7 +66,6 @@ DEMO_CUSTOMERS = [
                      "paper_photos": 2},
         "task_done": (1, "现场勘测完成，层高 2.75m，分水器位置定在厨房阳台"),
         "task_doing": 2,
-        "task_delay": None,
     },
     {
         "name": f"李慧敏（{MARK}）", "project": 0, "building": "5号楼", "unit": "2单元", "room_no": "1203", "floor": 12, "area": 121.0,
@@ -81,7 +80,6 @@ DEMO_CUSTOMERS = [
                      "paper_photos": 1},
         "task_done": (1, "已上门勘测，确认吊顶方案"),
         "task_doing": None,
-        "task_delay": 2,
     },
     {
         "name": f"杭州优家装饰工程有限公司（{MARK}）", "project": 1, "building": "A栋", "unit": "1单元", "room_no": "2101", "floor": 21, "area": 143.0,
@@ -94,14 +92,14 @@ DEMO_CUSTOMERS = [
                                ("施工费用", 18000.0, "installer", "拆除旧暖气 + 新装，4 人 6 天"),
                                ("售后成本", 1200.0, None, "预留质保上门费")],
                      "paper_photos": 1},
-        "task_done": None, "task_doing": None, "task_delay": None,
+        "task_done": None, "task_doing": None,
     },
     {
         "name": f"陈志远（{MARK}）", "project": 1, "building": "B栋", "unit": "3单元", "room_no": "1602", "floor": 16, "area": 110.0,
         "phone": "13711110003", "wechat": "chenzy_001", "type": "家装业主", "source": "自然到店", "level": "C",
         "products": ["净水", "水机"],
         "contract": None,
-        "task_done": None, "task_doing": None, "task_delay": None,
+        "task_done": None, "task_doing": None,
     },
     {
         "name": f"赵晓婷（{MARK}）", "project": 0, "building": "7号楼", "unit": "1单元", "room_no": "0805", "floor": 8, "area": 95.0,
@@ -113,7 +111,7 @@ DEMO_CUSTOMERS = [
                      "costs": [("材料成本", 15600.0, "supplier:1", "明装暖气片 6 组 + 铝塑管"),
                                ("施工费用", 5200.0, "installer", "明装走管，2 人 2 天")],
                      "paper_photos": 1},
-        "task_done": None, "task_doing": None, "task_delay": None,
+        "task_done": None, "task_doing": None,
     },
 ]
 
@@ -308,15 +306,6 @@ def main(force: bool = False) -> None:
                 t = tasks[doing - 1]
                 t.status = "doing"
                 t.actual_start = (today - timedelta(days=1)).isoformat()
-                t.assignee_id = installer.id
-                stats["tasks_touched"] += 1
-
-            delay = item.get("task_delay")
-            if delay and len(tasks) >= delay:
-                t = tasks[delay - 1]
-                t.status = "ready"
-                t.planned_start = (today - timedelta(days=9)).isoformat()
-                t.planned_end = (today - timedelta(days=4)).isoformat()
                 t.assignee_id = installer.id
                 stats["tasks_touched"] += 1
 

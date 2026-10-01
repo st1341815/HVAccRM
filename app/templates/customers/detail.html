@@ -24,7 +24,7 @@
   <span>📱 手机：<strong>{{ customer.phone or '未填写' }}</strong></span>
   <span>💬 微信：{{ customer.wechat or '未填写' }}</span>
   <span>🎯 意向：{% for p in customer.product_list %}<span class="badge">{{ p }}</span>{% else %}未填写{% endfor %}</span>
-  <span>📈 施工进度：<strong>{{ progress }}%</strong>{% if delayed %} <span class="red">（延期 {{ delayed }} 个节点）</span>{% endif %}</span>
+  <span>📈 施工进度：<strong>{{ progress }}%</strong></span>
   <span>🗓 建档：{{ customer.created_at[:10] }}</span>
 </div>
 
@@ -50,13 +50,12 @@
 <section class="card">
   <h2>施工工序（{{ tasks|length }} 个节点）</h2>
   <table class="tight">
-    <thead><tr><th>#</th><th>工序</th><th>计划</th><th>实际</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>#</th><th>工序</th><th>实际</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
     {% for t in tasks %}
-      <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
+      <tr>
         <td>{{ t.sort_order }}</td>
         <td>{{ t.stage }}{% if t.skip_reason %}<div class="muted small">跳过原因：{{ t.skip_reason }}</div>{% endif %}</td>
-        <td>{{ t.planned_start or '-' }} ~ {{ t.planned_end or '-' }}</td>
         <td>{{ t.actual_start or '-' }} ~ {{ t.actual_end or '-' }}</td>
         <td>{{ t.assignee.display_name if t.assignee else '-' }}</td>
         <td>{% include "_fragments/task_photos.html" with context %}</td>
@@ -200,11 +199,11 @@
     <h2>工序进度</h2>
     <div class="progress"><span style="width: {{ progress }}%"></span></div>
     <table class="tight">
-      <thead><tr><th>工序</th><th>状态</th><th>计划完成</th></tr></thead>
+      <thead><tr><th>工序</th><th>状态</th></tr></thead>
       <tbody>
       {% for t in tasks[:9] %}
-        <tr class="{{ 'row-alert' if t.planned_end and t.planned_end < today and t.status not in ['done','skipped'] else '' }}">
-          <td>{{ t.stage }}</td><td><span class="badge">{{ t.status }}</span></td><td>{{ t.planned_end or '-' }}</td>
+        <tr>
+          <td>{{ t.stage }}</td><td><span class="badge">{{ t.status }}</span></td>
         </tr>
       {% endfor %}
       </tbody>
