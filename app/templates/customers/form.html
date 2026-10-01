@@ -42,15 +42,15 @@
     </label>
   </div>
 
-  <fieldset class="product-picker">
-    <legend>意向产品（可多选）</legend>
-    <div class="grid3 checkgrid">
-      {% set chosen = customer.product_list if customer else [] %}
+  {% set chosen = customer.product_list if customer else [] %}
+  <details class="ms" id="products_ms">
+    <summary>意向产品（可多选）<span class="ms-picked muted small" id="products_picked">{{ '已选：' ~ chosen|join('、') if chosen else '未选择' }}</span></summary>
+    <div class="ms-panel">
       {% for p in product_options %}
-      <label class="checkline"><input type="checkbox" name="products" value="{{ p }}" {{ 'checked' if p in chosen else '' }}> {{ p }}</label>
+      <label class="checkline"><input type="checkbox" name="products" value="{{ p }}" {{ 'checked' if p in chosen else '' }} onchange="syncProducts()"> {{ p }}</label>
       {% endfor %}
     </div>
-  </fieldset>
+  </details>
 
   <fieldset class="room-picker">
     <legend>房号（楼盘 → 楼栋 → 房号 级联）</legend>
@@ -58,7 +58,7 @@
       <label>楼盘
         <select name="project_sel" id="project_sel" onchange="loadBuildings(this.value)">
           <option value="">请选择楼盘</option>
-          {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if customer and customer.room and customer.room.project_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}
+          {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if customer and customer.room and customer.room.project_id == p.id else '' }}>{{ p.label }}</option>{% endfor %}
         </select>
       </label>
       <label>楼栋
@@ -95,7 +95,7 @@
         {% for u in owners %}<option value="{{ u.id }}">{{ u.display_name }}</option>{% endfor %}
       </select>
     </label>
-    <p class="muted small">保存后自动按标准工序模板生成 9 个施工节点任务。</p>
+    <p class="muted small">保存后自动按标准工序模板生成施工节点任务。</p>
   </fieldset>
   {% endif %}
 
@@ -127,6 +127,11 @@ function loadRooms(pid, building) {
   fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building), {cache: 'no-store'})
     .then(r => r.text()).then(html => { sel.innerHTML = html; });
 }
+function syncProducts() {
+  const boxes = document.querySelectorAll('#products_ms input[name=products]');
+  const picked = Array.from(boxes).filter(b => b.checked).map(b => b.value);
+  document.getElementById('products_picked').textContent = picked.length ? ('已选：' + picked.join('、')) : '未选择';
+}
 function searchRooms() {
   const q = document.getElementById('room_q').value.trim();
   const pid = document.getElementById('project_sel').value;
@@ -134,5 +139,6 @@ function searchRooms() {
   fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q), {cache: 'no-store'})
     .then(r => r.text()).then(html => { document.getElementById('room_result').innerHTML = html; });
 }
+syncProducts();
 </script>
 {% endblock %}

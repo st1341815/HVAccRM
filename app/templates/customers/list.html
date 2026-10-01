@@ -23,7 +23,7 @@
     </select>
     <select name="project_id">
       <option value="">全部楼盘</option>
-      {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if project_id == p.id|string else '' }}>{{ p.name }}</option>{% endfor %}
+      {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if project_id == p.id|string else '' }}>{{ p.label }}</option>{% endfor %}
     </select>
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/customers">重置</a>

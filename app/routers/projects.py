@@ -291,12 +291,20 @@ def room_search(
     db: Session = Depends(get_db),
     user: User = Depends(require_any(*VIEW_PERMS)),
 ):
-    """同一楼盘下模糊搜索房号：输入 1203 列出所有楼栋的 1203。"""
-    stmt = select(Room).where(Room.room_no.like(f"%{q.strip()}%"))
+    """模糊搜索房号：支持按房号（1203）或楼盘名称（华润紫玥台）搜索。
+
+    未指定楼盘时跨楼盘搜；指定楼盘时只搜该楼盘。
+    """
+    key = q.strip()
+    project_ids = [p.id for p in db.scalars(select(Project)).all() if key and key in (p.name or "")]
+    conds = [Room.room_no.like(f"%{key}%")]
+    if project_ids:
+        conds.append(Room.project_id.in_(project_ids))  # 命中的楼盘下的全部房号
+    stmt = select(Room).where(or_(*conds))
     if project_id:
         stmt = stmt.where(Room.project_id == project_id)
     rooms = list(db.scalars(stmt.order_by(Room.building, Room.room_no).limit(50)).all())
-    projects = {p.id: p.name for p in db.scalars(select(Project)).all()}
+    projects = {p.id: p.label for p in db.scalars(select(Project)).all()}
     return render(
         request,
         "_fragments/room_search.html",

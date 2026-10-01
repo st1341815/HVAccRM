@@ -102,6 +102,11 @@ class Project(Base):
 
     rooms = relationship("Room", back_populates="project", cascade="all, delete-orphan")
 
+    @property
+    def label(self) -> str:
+        """选择器里的展示名：楼盘名称-城市-区县（防止同名楼盘混淆）。"""
+        return "-".join(p for p in (self.name, self.city, self.district) if p)
+
 
 # 单元只允许从固定下拉中选择：1单元 ~ 9单元（空 = 该楼栋无单元概念，如自建/独栋）
 UNIT_OPTIONS = [f"{i}单元" for i in range(1, 10)]
