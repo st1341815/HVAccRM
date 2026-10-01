@@ -15,18 +15,20 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>ID</th><th>账号</th><th>角色</th><th>数据范围</th><th>状态</th><th>最后登录</th><th>调整</th><th>重置密码</th></tr></thead>
+    <thead><tr><th>ID</th><th>姓名</th><th>登录账号</th><th>角色</th><th>数据范围</th><th>状态</th><th>最后登录</th><th>调整</th><th>重置密码</th></tr></thead>
     <tbody>
     {% for u in users %}
       <tr id="u{{ u.id }}" class="{{ 'row-muted' if not u.is_active else '' }}">
         <td>{{ u.id }}</td>
-        <td><strong>{{ u.username }}</strong>{% if u.must_change_password %}<span class="badge warn">待改密</span>{% endif %}{% if u.totp_enabled %}<span class="badge">TOTP</span>{% endif %}</td>
+        <td><strong>{{ u.display_name }}</strong>{% if not u.full_name %}<span class="muted small">（未填姓名）</span>{% endif %}</td>
+        <td class="muted">{{ u.username }}{% if u.must_change_password %}<span class="badge warn">待改密</span>{% endif %}{% if u.totp_enabled %}<span class="badge">TOTP</span>{% endif %}</td>
         <td>{{ roles.get(u.role, u.role) }}</td>
         <td>{{ u.data_scope }}</td>
         <td>{{ '启用' if u.is_active else '已禁用' }}</td>
         <td>{{ u.last_login_at or '-' }}</td>
         <td>
           <form method="post" action="/admin/users/{{ u.id }}/update" class="stack tight-stack">
+            <input name="full_name" value="{{ u.full_name or '' }}" placeholder="姓名（表单里优先显示）">
             <select name="role">
               {% for key, label in roles.items() %}<option value="{{ key }}" {{ 'selected' if u.role == key else '' }}>{{ label }}</option>{% endfor %}
             </select>
@@ -53,7 +55,8 @@
 <section class="card">
   <h2>新增用户</h2>
   <form method="post" action="/admin/users/new" class="filterbar">
-    <input name="username" placeholder="账号" required>
+    <input name="full_name" placeholder="姓名（如 张三，表单里显示这个）">
+    <input name="username" placeholder="登录账号（如 zhangsan）" required>
     <input name="password" placeholder="初始密码（≥8位，含字母数字）" required>
     <select name="role">
       {% for key, label in roles.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
@@ -64,6 +67,6 @@
     </select>
     <button type="submit">＋ 创建</button>
   </form>
-  <p class="muted small">新用户首次登录必须修改密码。</p>
+  <p class="muted small">新用户首次登录必须修改密码。姓名会优先显示在「负责人 / 责任人 / 收款人」等所有选择框里；留空则回落到登录账号。</p>
 </section>
 {% endblock %}

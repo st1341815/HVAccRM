@@ -34,6 +34,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
+    full_name = Column(String)  # 姓名（界面优先展示，账号仅用于登录/审计）
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="sales")
     data_scope = Column(String, default="self")
@@ -47,6 +48,17 @@ class User(Base):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<User {self.id} {self.username} {self.role}>"
+
+    @property
+    def display_name(self) -> str:
+        """界面展示名：优先姓名，未填则回落到登录账号。"""
+        return (self.full_name or "").strip() or self.username
+
+    @property
+    def name_with_account(self) -> str:
+        """姓名（账号）——需要同时看清是谁和用哪个账号登录时使用。"""
+        name = (self.full_name or "").strip()
+        return f"{name}（{self.username}）" if name and name != self.username else self.username
 
 
 class AuditLog(Base):

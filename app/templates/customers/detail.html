@@ -20,7 +20,7 @@
 
 <div class="meta">
   <span>🏢 房号：<strong>{{ customer.room_label or '未关联' }}</strong></span>
-  <span>👤 负责人：{{ customer.owner.username if customer.owner else '-' }}</span>
+  <span>👤 负责人：{{ customer.owner.display_name if customer.owner else '-' }}</span>
   <span>📱 手机：<strong>{{ customer.phone or '未填写' }}</strong></span>
   <span>💬 微信：{{ customer.wechat or '未填写' }}</span>
   <span>🎯 意向：{% for p in customer.product_list %}<span class="badge">{{ p }}</span>{% else %}未填写{% endfor %}</span>
@@ -59,7 +59,7 @@
         <td>{{ t.stage }}{% if t.skip_reason %}<div class="muted small">跳过原因：{{ t.skip_reason }}</div>{% endif %}</td>
         <td>{{ t.planned_start or '-' }} ~ {{ t.planned_end or '-' }}</td>
         <td>{{ t.actual_start or '-' }} ~ {{ t.actual_end or '-' }}</td>
-        <td>{{ t.assignee.username if t.assignee else '-' }}</td>
+        <td>{{ t.assignee.display_name if t.assignee else '-' }}</td>
         <td>{% include "_fragments/task_photos.html" with context %}</td>
         <td><span class="badge">{{ t.status }}</span></td>
         <td>
@@ -135,7 +135,7 @@
     <tbody>
     {% for s in shares %}
       <tr>
-        <td>{{ share_users[s.user_id].username if share_users.get(s.user_id) else s.user_id }}</td>
+        <td>{{ share_users[s.user_id].display_name if share_users.get(s.user_id) else s.user_id }}</td>
         <td>{{ s.granted_at }}</td>
         <td>
           <form method="post" action="/customers/{{ customer.id }}/unshare" class="inline">
@@ -150,7 +150,7 @@
   {% if can_edit %}
   <form method="post" action="/customers/{{ customer.id }}/share" class="inline">
     <select name="user_id">
-      {% for u in assignees %}<option value="{{ u.id }}">{{ u.username }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
+      {% for u in assignees %}<option value="{{ u.id }}">{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
     </select>
     <button type="submit">添加共享</button>
   </form>

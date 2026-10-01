@@ -296,6 +296,19 @@ c=$(code -b $D "$B/customers")
 has "sales自有客户$RUN" && ok "sales 能看到自己新建的客户" || bad "自己客户不可见"
 c=$(code -b $D $B/admin); chk "sales 访问系统管理" 403 "$c"
 
+echo "== 7b. 用户姓名（表单优先显示） =="
+c=$(code -b $J -X POST --data-urlencode "full_name=张三名" --data-urlencode "username=name$RUN" --data-urlencode "password=Abcd1234$RUN" -d "role=sales" $B/admin/users/new)
+chk "新建带姓名的用户" 303 "$c"
+c=$(code -b $J "$B/admin/users"); has "张三名" && ok "用户列表显示姓名" || bad "用户列表未显示姓名"
+has "name$RUN" && ok "用户列表保留登录账号列" || bad "用户列表缺少账号"
+c=$(code -b $J "$B/customers/new"); has "张三名（销售）" && ok "客户表单负责人下拉优先显示姓名" || bad "负责人下拉未显示姓名"
+c=$(code -b $J "$B/tasks?scope=all"); has ">张三名<" && ok "施工看板责任人筛选显示姓名" || bad "施工看板未显示姓名"
+c=$(code -b $J -c $J -X POST --data-urlencode "full_name=李四" $B/account/profile); chk "本人修改姓名" 303 "$c"
+c=$(code -b $J "$B/account"); has "李四" && ok "账户页显示新姓名" || bad "账户页未显示新姓名"
+c=$(code -b $J -c $J -X POST --data-urlencode "full_name=" $B/account/profile); chk "清空姓名" 303 "$c"
+c=$(code -b $J "$B/account"); has "admin" && ok "姓名清空后回落显示登录账号" || bad "清空后未回落账号"
+c=$(code -b $J -X POST --data-urlencode "full_name=超长姓名$(printf 'x%.0s' {1..40})" $B/account/profile); chk "超长姓名被拒" 303 "$c"
+
 echo "== 8. 会话失效 / 备份 / 审计 =="
 login_user $SU sales12345 $D sales12345x && ok "sales 重新登录" || bad "sales 重新登录失败"
 c=$(code -b $D $B/customers); chk "sales 会话有效" 200 "$c"

@@ -36,7 +36,7 @@
     <label>负责人
       <select name="owner_id">
         {% for u in owners %}
-        <option value="{{ u.id }}" {{ 'selected' if customer and customer.owner_id == u.id else '' }}>{{ u.username }}（{{ role_labels.get(u.role, u.role) }}）</option>
+        <option value="{{ u.id }}" {{ 'selected' if customer and customer.owner_id == u.id else '' }}>{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>
         {% endfor %}
       </select>
     </label>
@@ -92,7 +92,7 @@
     <label>工序默认执行人
       <select name="default_assignee">
         <option value="">与负责人一致</option>
-        {% for u in owners %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
+        {% for u in owners %}<option value="{{ u.id }}">{{ u.display_name }}</option>{% endfor %}
       </select>
     </label>
     <p class="muted small">保存后自动按标准工序模板生成 9 个施工节点任务。</p>

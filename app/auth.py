@@ -206,6 +206,25 @@ def account_page(request: Request, user: User = Depends(current_user_or_redirect
     )
 
 
+@router.post("/account/profile")
+def update_profile(
+    request: Request,
+    full_name: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user_or_redirect),
+):
+    """本人修改姓名（表决不用管理员，改完立刻在各类表单里生效）。"""
+    me = fresh_user(db, user)
+    before = {"full_name": me.full_name}
+    new_name = full_name.strip() or None
+    if new_name and len(new_name) > 32:
+        return redirect("/account", "姓名过长（≤32 字）", "err")
+    me.full_name = new_name
+    log_action(db, me, "profile_update", "users", me.id, old=before, new={"full_name": new_name}, ip=get_client_ip(request))
+    db.commit()
+    return redirect("/account", f"姓名已更新为「{me.display_name}」")
+
+
 @router.post("/account/password")
 def change_password(
     request: Request,

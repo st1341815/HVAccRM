@@ -194,7 +194,7 @@
         <td class="{{ 'red' if p.amount < 0 else '' }}">{{ p.amount|money }}</td>
         <td>{{ p.method or '-' }}</td>
         <td>{{ p.voucher_no or '-' }}</td>
-        <td>{{ users[p.received_by].username if p.received_by and users.get(p.received_by) else '-' }}</td>
+        <td>{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
         <td>{{ p.remark or '-' }}</td>
       </tr>
     {% endfor %}
