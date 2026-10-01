@@ -247,6 +247,7 @@ def contract_detail(
     can_cost = has_perm(user, "cost:view") and can_see_amount(user)
     costs = list(contract.costs) if can_cost else []
     profit = cost_svc.profit_summary(db, contract) if can_cost else None
+    cost_photos = photo_svc.photos_by_cost(db, [c.id for c in costs]) if can_cost else {}
     installers, other_users = cost_svc.contract_installers(db) if can_cost else ([], [])
     return render(
         request,
@@ -261,6 +262,7 @@ def contract_detail(
         payment_photos=payment_photos,
         product_types=PRODUCT_OPTIONS,
         costs=costs,
+        cost_photos=cost_photos,
         profit=profit,
         cost_categories=COST_CATEGORIES,
         suppliers=cost_svc.active_suppliers(db) if can_cost else [],

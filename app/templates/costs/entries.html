@@ -32,7 +32,7 @@
 
 <section class="card">
   <table class="tight">
-    <thead><tr><th>日期</th><th>合同号</th><th>客户</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>录入人</th><th></th></tr></thead>
+    <thead><tr><th>日期</th><th>合同号</th><th>客户</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>附图</th><th>录入人</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
       {% set c = contract_map.get(r.contract_id) %}
@@ -45,6 +45,14 @@
         <td>{{ suppliers[r.supplier_id].name if r.supplier_id and suppliers.get(r.supplier_id) else '-' }}</td>
         <td>{{ users[r.installer_id].display_name if r.installer_id and users.get(r.installer_id) else '-' }}</td>
         <td class="break">{{ r.remark or '-' }}</td>
+        <td>
+          {% set phs = cost_photos.get(r.id, []) %}
+          {% for ph in phs[:3] %}
+            <a href="/photos/{{ ph.id }}/file" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
+          {% endfor %}
+          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {% if not phs %}<span class="muted small">—</span>{% endif %}
+        </td>
         <td>{{ users[r.created_by].display_name if r.created_by and users.get(r.created_by) else '-' }}</td>
         <td>
           {% if can_edit %}

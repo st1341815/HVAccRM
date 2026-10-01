@@ -348,10 +348,14 @@ def delete_customer(
     user: User = Depends(require("customer:delete")),
 ):
     customer = get_or_404(db, Customer, customer_id, "客户")
+    # 先清理该客户的所有照片（含纸质合同 / 付款截图 / 成本凭证 / 施工照片），
+    # 否则它们引用的合同、收款、成本记录被删除时会触发外键约束
+    detached = photo_svc.delete_photos_for(db, customer_id=customer.id)
     log_action(db, user, "delete", "customers", customer.id, old=customer, ip=client_ip(request))
     db.delete(customer)
     commit_retry(db)
-    return redirect("/customers", f"客户「{customer.name}」及其关联数据已删除")
+    suffix = f"（含 {detached} 张照片）" if detached else ""
+    return redirect("/customers", f"客户「{customer.name}」及其关联数据已删除{suffix}")
 
 
 @router.post("/{customer_id}/regenerate-tasks")
