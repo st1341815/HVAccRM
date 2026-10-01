@@ -1,13 +1,12 @@
 {% extends "layout.html" %}
-{% block title %}逾期应收{% endblock %}
+{% block title %}欠款预警{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>逾期应收与欠款预警 <span class="muted small">{{ today }}</span></h1>
+  <h1>欠款预警（按未收金额） <span class="muted small">{{ today }}</span></h1>
   <a class="btn ghost" href="/payments">收款流水 →</a>
 </div>
 
 <div class="kpis">
-  <div class="kpi {{ 'alert' if total_overdue > 0 else '' }}"><span class="kpi-num">{{ total_overdue|money }}</span><span class="kpi-label">逾期应收总额</span></div>
   <div class="kpi"><span class="kpi-num">{{ total_outstanding|money }}</span><span class="kpi-label">未收总额</span></div>
 </div>
 
@@ -15,7 +14,7 @@
 <section class="card">
   <h2>Top5 欠款客户</h2>
   <table class="tight">
-    <thead><tr><th>客户</th><th>逾期金额</th><th></th></tr></thead>
+    <thead><tr><th>客户</th><th>未收金额</th><th></th></tr></thead>
     <tbody>
     {% for c, amount in debtors %}
       <tr><td>{{ c.name }}</td><td class="red">{{ amount|money }}</td><td><a href="/customers/{{ c.id }}?tab=finance">查看 →</a></td></tr>
@@ -28,7 +27,7 @@
 <section class="card">
   <h2>合同应收明细</h2>
   <table>
-    <thead><tr><th>合同号</th><th>客户</th><th>应收总额</th><th>已收</th><th>未收</th><th>逾期</th><th>回款率</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>合同号</th><th>客户</th><th>应收总额</th><th>已收</th><th>未收</th><th>回款率</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
       <tr class="{{ 'row-alert' if s.overdue > 0 else '' }}">
@@ -45,6 +44,6 @@
     {% endfor %}
     </tbody>
   </table>
-  {% if not rows %}<p class="muted">所有合同均已结清，没有逾期应收。</p>{% endif %}
+  {% if not rows %}<p class="muted">所有合同均已结清，没有未收应收。</p>{% endif %}
 </section>
 {% endblock %}

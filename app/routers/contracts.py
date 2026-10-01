@@ -236,9 +236,11 @@ def contract_detail(
         db.scalars(
             select(Photo)
             .where(Photo.contract_id == contract.id)
+            .where(Photo.payment_id.is_(None))  # 收款截图单独归到各自收款行，不混进纸质合同区
             .order_by(Photo.created_at.desc(), Photo.id.desc())
         ).all()
     )
+    payment_photos = photo_svc.photos_by_payment(db, [p.id for p in payments])
     return render(
         request,
         "contracts/detail.html",
@@ -249,6 +251,7 @@ def contract_detail(
         changes=changes,
         users=users,
         contract_photos=contract_photos,
+        payment_photos=payment_photos,
         product_types=PRODUCT_OPTIONS,
         can_amount=can_see_amount(user),
         can_edit=has_perm(user, "contract:edit"),

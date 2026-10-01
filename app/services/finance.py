@@ -169,11 +169,15 @@ def refresh_all(db: Session, only_overdue: bool = True) -> dict[str, int]:
 
 
 def top_debtors(db: Session, limit: int = 5) -> list[tuple[Customer, float]]:
+    """欠款客户排行：按「未收金额」（合同额 + 增项 - 已收）排序。
+
+    分期应收计划（payment_plans）已停用，逾期口径不再可用，故统一按未收金额。
+    """
     rows: list[tuple[Customer, float]] = []
     for customer in db.scalars(select(Customer)).all():
         s = customer_summary(db, customer)
-        if s.overdue > TOL:
-            rows.append((customer, s.overdue))
+        if s.outstanding > TOL:
+            rows.append((customer, s.outstanding))
     rows.sort(key=lambda r: r[1], reverse=True)
     return rows[:limit]
 

@@ -1,7 +1,7 @@
 """收款管理：实收流水、超额拦截、退款登记、逾期视图。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,12 +11,14 @@ from ..db import commit_retry, get_db
 from ..models import Contract, Payment, User, now_iso, today_str
 from ..permissions import has_perm, require, visible_customer_ids
 from ..services import finance as finance_svc
+from ..services import photos as photo_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 METHODS = ["微信", "支付宝", "银行转账", "刷卡", "现金", "对公转账", "其他"]
+PAYMENT_PHOTO_KIND = "收款截图"
 
 
 @router.get("")
@@ -51,6 +53,7 @@ def list_payments(
         ]
 
     users = {u.id: u for u in db.scalars(select(User)).all()}
+    payment_photos = photo_svc.photos_by_payment(db, [p.id for p in payments])
     total = round(sum(p.amount or 0 for p in payments), 2)
     month = today_str()[:7]
     month_total = round(sum(p.amount or 0 for p in payments if (p.paid_at or "").startswith(month)), 2)
@@ -61,6 +64,7 @@ def list_payments(
         payments=payments,
         contract_map=contract_map,
         users=users,
+        payment_photos=payment_photos,
         total=total,
         month_total=month_total,
         refund_total=refund_total,
@@ -109,7 +113,7 @@ def overdue_view(
 
 
 @router.post("/record")
-def record_payment(
+async def record_payment(
     request: Request,
     contract_id: str = Form(...),
     amount: str = Form(...),
@@ -118,6 +122,7 @@ def record_payment(
     voucher_no: str = Form(""),
     remark: str = Form(""),
     back: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
     user: User = Depends(require("payment:edit")),
 ):
@@ -146,6 +151,29 @@ def record_payment(
     )
     db.add(payment)
     db.flush()
+    # 付款截图：与收款记录绑定，出现在收款流水里（重复图按 Hash 去重）
+    saved, dedup, errors = 0, 0, []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        raw = await f.read()
+        photo, msg = photo_svc.save_photo(
+            db,
+            customer_id=contract.customer_id,
+            kind=PAYMENT_PHOTO_KIND,
+            raw=raw,
+            orig_name=f.filename,
+            uploaded_by=user.id,
+            contract_id=contract.id,
+            payment_id=payment.id,
+        )
+        if photo is None:
+            errors.append(f"{f.filename}: {msg}")
+        else:
+            if "重复" in msg:
+                dedup += 1
+            else:
+                saved += 1
     finance_svc.allocate_plans(db, contract)
     log_action(
         db,
@@ -158,7 +186,12 @@ def record_payment(
     )
     commit_retry(db)
     verb = "退款登记" if is_refund else "收款登记"
-    return redirect(back or f"/contracts/{contract.id}", f"{verb}成功：{amt:,.2f}")
+    message = f"{verb}成功：{amt:,.2f}"
+    if saved or dedup:
+        message += f"；付款截图新增 {saved} 张、去重 {dedup} 张"
+    if errors:
+        return redirect(back or f"/contracts/{contract.id}", message + "；截图失败：" + "；".join(errors), "err")
+    return redirect(back or f"/contracts/{contract.id}", message)
 
 
 @router.post("/{payment_id}/delete")

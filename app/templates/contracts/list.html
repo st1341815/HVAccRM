@@ -11,7 +11,6 @@
   <div class="kpi"><span class="kpi-num">{{ totals.total|money }}</span><span class="kpi-label">合同总额</span></div>
   <div class="kpi"><span class="kpi-num">{{ totals.received|money }}</span><span class="kpi-label">已收合计</span></div>
   <div class="kpi {{ 'alert' if totals.outstanding > 0 else '' }}"><span class="kpi-num">{{ totals.outstanding|money }}</span><span class="kpi-label">未收金额</span></div>
-  <div class="kpi {{ 'alert' if totals.overdue > 0 else '' }}"><span class="kpi-num">{{ totals.overdue|money }}</span><span class="kpi-label">逾期金额</span></div>
 </div>
 {% endif %}
 
@@ -29,7 +28,7 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>合同号</th><th>客户</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>逾期</th><th>回款率</th>{% endif %}<th>收款期数</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>合同号</th><th>客户</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>回款率</th>{% endif %}<th>收款期数</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
       <tr>

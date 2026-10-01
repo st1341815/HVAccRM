@@ -17,7 +17,7 @@ from ..utils import client_ip, get_or_404, parse_int, return_path
 
 router = APIRouter(tags=["photos"])
 
-KINDS = ["量尺", "复尺", "现场", "到货", "施工", "安装", "验收", "完工", "售后", "纸质合同", "其他"]
+KINDS = ["量尺", "复尺", "现场", "到货", "施工", "安装", "验收", "完工", "售后", "纸质合同", "收款截图", "其他"]
 
 
 def _may_upload(db: Session, user: User, customer: Customer) -> bool:

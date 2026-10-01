@@ -145,28 +145,32 @@ c=$(code -b $J -F "customer_id=$CID" -F "sign_date=2026-01-18" -F "total_amount=
 chk "非法产品类型被拒（重定向）" 303 "$c"
 CNTA=$(curl -s -b $J "$B/contracts" | grep -oE '共 [0-9]+ 份' | grep -o '[0-9]*')
 [ "$CNTB" == "$CNTA" ] && ok "非法产品类型未创建合同（$CNTB 份未变）" || bad "非法产品类型竟创建合同（$CNTB → $CNTA）"
-for row in "定金|5000|2026-02-01" "首期款|15000|2026-03-01" "尾款|10000|2026-04-01"; do
-  lb=${row%%|*}; rest=${row#*|}; am=${rest%%|*}; du=${rest#*|}
-  c=$(code -b $J -X POST --data-urlencode "label=$lb" --data-urlencode "amount=$am" --data-urlencode "due_date=$du" $B/contracts/$CTID/plans)
-  chk "详情页添加收款期次 $lb" 303 "$c"
-done
+c=$(code -b $J "$B/contracts/$CTID")
+has "应收计划" && bad "合同详情页仍残留应收计划模块" || ok "合同详情页已移除应收计划模块"
+has "计划应收合计" && bad "KPI 仍显示计划应收合计" || ok "KPI 已去掉计划应收合计"
+c=$(code -b $J -X POST --data-urlencode "label=尾款三" -d "amount=2000&due_date=2026-06-01" $B/contracts/$CTID/plans)
+chk "收款期次接口保留（页面已不展示）" 303 "$c"
 # 原始应收 30000，先记一笔 8000 增项 → 应收 38000；此时尝试收 35000 应被拦截
-c=$(code -b $J -X POST --data-urlencode "contract_id=$CTID" --data-urlencode "amount=35000" --data-urlencode "paid_at=2026-02-01" --data-urlencode "method=微信" --data-urlencode "back=/contracts/$CTID" $B/payments/record)
+c=$(code -b $J -F "contract_id=$CTID" -F "amount=35000" -F "paid_at=2026-02-01" -F "method=微信" -F "back=/contracts/$CTID" $B/payments/record)
 chk "超额收款被拦截" 303 "$c"
 code -b $J $B/payments > /dev/null
 has "35,000.00" && bad "超额款项被写入流水" || ok "超额拦截：未写入流水"
-c=$(code -b $J -X POST -d "contract_id=$CTID&amount=5000&paid_at=2026-02-01&method=%E5%BE%AE%E4%BF%A1&back=/contracts/$CTID" $B/payments/record)
-chk "正常收款 5000" 303 "$c"
+c=$(code -b $J -F "contract_id=$CTID" -F "amount=5000" -F "paid_at=2026-02-01" -F "method=微信" -F "back=/contracts/$CTID" -F "files=@/tmp/crmtest/contract1.jpg" $B/payments/record)
+chk "正常收款 5000（带付款截图）" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID")
 has "25,000.00" && ok "三数核对：未收 25000 已实时计算" || bad "三数核对未生效"
+has "付款截图" && ok "登记收款表单含付款截图控件" || bad "登记收款表单缺少付款截图控件"
+has "/photos/" && ok "合同页收款流水出现付款截图缩略图" || bad "合同页未显示付款截图"
+c=$(code -b $J "$B/payments"); chk "收款流水页" 200 "$c"
+has "/photos/" && ok "收款流水页显示付款截图" || bad "收款流水页未显示截图"
 c=$(code -b $J -X POST --data-urlencode "reason=客户加装吊柜" -d "amount=8000&sync_plan=1&due_date=2026-05-01" $B/contracts/$CTID/change-orders)
 chk "增项 + 同步追加应收" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID")
 has "38,000.00" && ok "增项后应收总额 38000 已重算" || bad "增项未计入应收"
-c=$(code -b $J -X POST -d "contract_id=$CTID&amount=99999&paid_at=2026-02-02&back=/contracts/$CTID" $B/payments/record)
+c=$(code -b $J -F "contract_id=$CTID" -F "amount=99999" -F "paid_at=2026-02-02" -F "back=/contracts/$CTID" $B/payments/record)
 code -b $J $B/payments > /dev/null
 has "99,999.00" && bad "超额拦截未生效" || ok "超额拦截生效（无新流水）"
-c=$(code -b $J -X POST -d "contract_id=$CTID&amount=-1000&paid_at=2026-03-02&back=/contracts/$CTID" $B/payments/record)
+c=$(code -b $J -F "contract_id=$CTID" -F "amount=-1000" -F "paid_at=2026-03-02" -F "back=/contracts/$CTID" $B/payments/record)
 chk "退款登记(负数)" 303 "$c"
 c=$(code -b $J -X POST --data-urlencode "label=尾款二" -d "amount=2000&due_date=2026-06-01" $B/contracts/$CTID/plans)
 chk "追加收款期次" 303 "$c"
@@ -194,7 +198,8 @@ has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || ba
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
 TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
 echo "  上传到任务 TID=$TT"
-LOC=$(curl -s -b $J -c $J -o /dev/null -D $HDR -F "task_id=$TT" -F "kind=现场" -F "back=/tasks?scope=all" -F "files=@/tmp/crmtest/site1.jpg" $B/api/customers/$CID/photos; loc)
+# 复用已上传过的图（物理文件被去重复用），避免影响第 6 节的物理文件净增计数
+LOC=$(curl -s -b $J -c $J -o /dev/null -D $HDR -F "task_id=$TT" -F "kind=现场" -F "back=/tasks?scope=all" -F "files=@/tmp/crmtest/contract1.jpg" $B/api/customers/$CID/photos; loc)
 echo "  上传后 Location：$LOC"
 echo "$LOC" | grep -q "scope=all" && ok "从施工页上传后跳回施工页" || bad "上传后未跳回施工页: $LOC"
 c=$(code -b $J "$B/tasks?scope=all")
