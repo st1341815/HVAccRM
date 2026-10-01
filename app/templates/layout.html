@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
   <title>{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
@@ -35,5 +36,25 @@
   {% block content %}{% endblock %}
 </main>
 <footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
+<script>
+// 手机端宽表格自动转「标签 + 值」卡片：把表头文字写到每个单元格的 data-label 上，
+// 由 CSS（@media max-width:780px 的 table.js-stack 规则）接管显示。
+// 跳过：键值表(.kv)、含合并单元格的表（表头与列对不上）。
+(function () {
+  document.querySelectorAll('table').forEach(function (t) {
+    if (t.classList.contains('kv')) return;
+    if (t.querySelector('td[colspan], td[rowspan], th[colspan], th[rowspan]')) return;
+    const ths = Array.from(t.querySelectorAll('thead th'));
+    if (ths.length < 4) return;
+    const labels = ths.map(function (th) { return th.textContent.trim(); });
+    t.querySelectorAll('tbody tr').forEach(function (tr) {
+      Array.from(tr.children).forEach(function (cell, i) {
+        if (labels[i]) cell.setAttribute('data-label', labels[i]);
+      });
+    });
+    t.classList.add('js-stack');
+  });
+})();
+</script>
 </body>
 </html>
