@@ -18,7 +18,7 @@
     <thead><tr><th>ID</th><th>账号</th><th>角色</th><th>数据范围</th><th>状态</th><th>最后登录</th><th>调整</th><th>重置密码</th></tr></thead>
     <tbody>
     {% for u in users %}
-      <tr class="{{ 'row-muted' if not u.is_active else '' }}">
+      <tr id="u{{ u.id }}" class="{{ 'row-muted' if not u.is_active else '' }}">
         <td>{{ u.id }}</td>
         <td><strong>{{ u.username }}</strong>{% if u.must_change_password %}<span class="badge warn">待改密</span>{% endif %}{% if u.totp_enabled %}<span class="badge">TOTP</span>{% endif %}</td>
         <td>{{ roles.get(u.role, u.role) }}</td>

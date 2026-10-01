@@ -119,7 +119,9 @@ def create_user(
     db.flush()
     log_action(db, user, "create", "users", new_user.id, new={"username": username, "role": role}, ip=client_ip(request))
     commit_retry(db)
-    return redirect("/admin/users", f"用户 {username} 已创建，首次登录需修改密码")
+    return redirect(
+        f"/admin/users#u{new_user.id}", f"用户 {username} 已创建，首次登录需修改密码"
+    )
 
 
 @router.post("/users/{user_id}/update")

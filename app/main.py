@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 
 from . import __version__
 from .auth import NotAuthenticated, load_user, router as auth_router
@@ -144,6 +145,16 @@ async def validation_handler(request: Request, exc: RequestValidationError):
     if request.url.path.startswith("/api"):
         return JSONResponse({"detail": exc.errors()}, status_code=422)
     return render(request, "error.html", status_code=422, detail=f"表单参数不合法：{exc.errors()[:2]}")
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_handler(request: Request, exc: IntegrityError):
+    """唯一约束/外键冲突：给出可读提示而不是 500。"""
+    log.warning("数据完整性冲突 %s %s: %s", request.method, request.url.path, exc.orig)
+    detail = f"数据冲突（唯一性或关联约束）：{exc.orig}"
+    if request.url.path.startswith("/api"):
+        return JSONResponse({"detail": detail}, status_code=409)
+    return render(request, "error.html", status_code=409, detail=detail)
 
 
 @app.exception_handler(Exception)
