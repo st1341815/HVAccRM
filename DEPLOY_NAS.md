@@ -102,6 +102,8 @@ trim-cli --profile home --allow-insecure-http docker container create \
 | 应用文件日志只有一行 | Alembic `fileConfig()` 默认 `disable_existing_loggers=True`，关掉了应用 logger | `migrations/env.py` 改为 `disable_existing_loggers=False`，并在迁移后恢复 root 级别 |
 | `file extract` 长时间无结果 | 该接口是异步任务（先解出 `.tar` 再解包） | 等待并轮询 `file ls`；或用 `docker:cli` 容器内 `tar` |
 | 改密/改权限后仍是旧状态 | 路由里改的是中间件加载的 detached ORM 对象 | `app/auth.py::fresh_user()` 重新加载后再写入 |
+| 更新 NAS 上已存在的文件没生效 | `file mv` 到「已有同名文件」的目录会被静默改名成 `xxx_1`，原文件不变 | 直接用 `file upload <目标目录> <本地文件> --overwrite replace --yes` 覆盖；上传后核对 `file ls` 的 size/mtime |
+| 构建上下文被塞进整个项目目录 | 无 `.dockerignore` 时 `docker compose build` 会把 `data/`（含 DB/照片）、`config/`、`.env`、`.git` 一起传给 daemon | 仓库已加 `.dockerignore`；`Dockerfile` 只 `COPY` 代码目录，不会把数据打进镜像 |
 
 NAS 侧无法读取容器 stdout 时，本次的做法是临时起一个 `python:3.12-slim` 静态文件服务容器
 （`python3 -m http.server 8099 -d /work`，挂载 `/vol1/1000`）来读取 `data/logs/crm.log`、
