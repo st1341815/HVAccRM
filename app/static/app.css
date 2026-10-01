@@ -150,6 +150,11 @@ details.ms .ms-picked { font-weight: 400; }
 details.ms .ms-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem .6rem; padding-top: .2rem; border-top: 1px dashed var(--line); }
 details.ms .ms-panel label.checkline { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .3rem .5rem; cursor: pointer; }
 details.ms .ms-panel label.checkline:has(input:checked) { border-color: var(--brand); background: #eef2ff; color: var(--brand-dark); font-weight: 600; }
+/* 折叠式筛选条（施工看板） */
+details.filter-collapse { padding: .4rem .6rem; }
+details.filter-collapse > summary { font-weight: 600; }
+details.filter-collapse[open] > summary { margin-bottom: .55rem; }
+details.filter-collapse .filterbar { padding-top: .1rem; }
 
 /* ---------------------------------------------------------------- 提示与标签 */
 .flash { padding: .6rem .9rem; border-radius: 8px; margin-bottom: .8rem; border: 1px solid transparent; }
@@ -257,6 +262,20 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.js-stack td .task-upload input[type=file] { max-width: none; font-size: 14px; }
   .filterbar input[type=file] { font-size: 14px; }
   table.kv th { width: 6.5rem; }
+
+  /* 施工看板：紧凑指标三项一行；卡片化的任务卡更好点 */
+  .kpis.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis.compact .kpi { padding: .45rem .5rem; }
+  .kpis.compact .kpi-num { font-size: 1.1rem; }
+  table.tasks.js-stack tr { padding: .5rem .6rem; }
+  table.tasks.js-stack td:first-child { font-weight: 700; font-size: .95rem; }
+  table.tasks.js-stack td:first-child .muted { font-weight: 400; }
+  table.tasks.js-stack tr.row-alert { border-color: #fca5a5; }
+  table.tasks.js-stack td.actions-cell form,
+  table.tasks.js-stack td.actions-cell button { width: 100%; }
+  table.tasks.js-stack td.actions-cell button { min-height: 2.6rem; font-size: 1rem; }
+  table.tasks.js-stack td.actions-cell input { font-size: 16px; }
+  table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
 
   /* 其它 */
   .meta { padding: .5rem .6rem; font-size: .85rem; gap: .2rem .8rem; }
