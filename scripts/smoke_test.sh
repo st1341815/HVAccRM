@@ -327,8 +327,8 @@ n=$(curl -s -b $J "$B/costs/suppliers" | grep -c "测试供应商$RUN")
 c=$(code -b $J -F "contract_id=$CTID" -F "category=材料成本" -F "amount=8000" -F "remark=缺供应商测试" $B/costs/new)
 chk "材料成本缺供应商被拒（重定向）" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID"); has "缺供应商测试" && bad "缺供应商的材料成本竟入库" || ok "缺供应商的材料成本未入库"
-c=$(code -b $J -F "contract_id=$CTID" -F "category=材料成本" -F "amount=8000" -F "supplier_id=$SPID" -F "spent_at=2026-02-10" -F "remark=锅炉主机及管材" $B/costs/new)
-chk "登记材料成本（关联供应商）" 303 "$c"
+c=$(code -b $J -F "contract_id=$CTID" -F "category=材料成本" -F "amount=8000" -F "supplier_id=$SPID" -F "spent_at=2026-02-10" -F "remark=锅炉主机及管材" -F "files=@/tmp/crmtest/contract1.jpg" $B/costs/new)
+chk "登记材料成本（关联供应商 + 附图）" 303 "$c"
 c=$(code -b $J -F "contract_id=$CTID" -F "category=施工费用" -F "amount=3000" -F "remark=缺师傅测试" $B/costs/new)
 chk "施工费用缺安装师傅被拒（重定向）" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID"); has "缺师傅测试" && bad "缺师傅的施工费用竟入库" || ok "缺安装师傅的施工费用未入库"
@@ -345,6 +345,14 @@ c=$(code -b $J "$B/costs"); chk "利润核算页" 200 "$c"
 has "11,000.00" && ok "利润页成本合计一致" || bad "利润页成本合计不一致"
 c=$(code -b $J "$B/costs/entries"); chk "成本明细页" 200 "$c"
 has "锅炉主机及管材" && ok "明细展示备注" || bad "明细缺备注"
+has "/photos/" && ok "明细页显示附图缩略图" || bad "明细页未显示附图"
+CPID=$(curl -s -b $J "$B/costs/entries" | grep -o '/photos/[0-9]*/thumb' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J "$B/photos/$CPID/thumb"); chk "成本附图缩略图可访问" 200 "$c"
+c=$(code -b $J "$B/photos/$CPID/file"); chk "成本附图原图可访问" 200 "$c"
+c=$(code -b $J "$B/contracts/$CTID")
+has "/photos/" && ok "合同页成本清单显示附图" || bad "合同页成本清单未显示附图"
+has 'name="files"' && ok "成本登记表单含附图控件" || bad "成本登记表单缺附图控件"
+has 'enctype="multipart/form-data"' && ok "成本登记表单为 multipart" || bad "成本表单非 multipart"
 c=$(code -b $J --get --data-urlencode "keyword=两工两日" "$B/costs/entries")
 has "两工两日" && ok "备注关键词可检索" || bad "备注检索失效"
 c=$(code -b $J --get --data-urlencode "category=材料成本" "$B/costs/entries")
@@ -354,6 +362,20 @@ has "锅炉主机及管材" && ok "按供应商筛选" || bad "按供应商筛�
 DELC=$(curl -s -b $J "$B/contracts/$CTID" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '锅炉主机及管材' | grep -o 'costs/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST "$B/costs/$DELC/delete"); chk "删除成本记录" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID"); has "35,000.00" && ok "删除成本后毛利重算为 35000" || bad "删除成本后毛利未重算"
+# 附件清理：删除带付款截图的收款记录不应报外键错误
+PAYID=$(curl -s -b $J "$B/payments" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '/photos/' | grep -o 'payments/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
+if [ -n "$PAYID" ]; then
+  c=$(code -b $J -X POST "$B/payments/$PAYID/delete"); chk "删除带付款截图的收款记录（附件一并清理）" 303 "$c"
+  c=$(code -b $J "$B/payments"); has "/photos/" && ok "其余收款截图仍在" || bad "其他截图被误删"
+else
+  bad "未找到带截图的收款记录（附件清理未覆盖）"
+fi
+# 附件清理：删除带照片/凭证的客户不应报外键错误
+c=$(code -b $J -X POST --data-urlencode "name=待删客户$RUN" $B/customers/new); chk "新建待删客户" 303 "$c"; CUST2=$(last_id)
+c=$(code -b $J -F "kind=现场" -F "files=@/tmp/crmtest/site3.jpg" $B/api/customers/$CUST2/photos)
+chk "待删客户传照片" 303 "$c"
+c=$(code -b $J -X POST "$B/customers/$CUST2/delete"); chk "删除带照片的客户（附件一并清理）" 303 "$c"
+c=$(code -b $J "$B/customers/$CUST2"); chk "已删客户 404" 404 "$c"
 DX=/tmp/crmtest/designer_cost_jar.txt
 login_user $DU designer12345 $DX designer12345  # 第 7 节已把 designer 密码改成 designer12345 > /dev/null
 c=$(code -b $DX "$B/costs"); chk "designer 访问成本页被拒" 403 "$c"

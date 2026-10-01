@@ -203,6 +203,7 @@ def delete_payment(
 ):
     payment = get_or_404(db, Payment, payment_id, "收款记录")
     contract = db.get(Contract, payment.contract_id)
+    photo_svc.delete_photos_for(db, payment_id=payment.id)  # 先清付款截图，避免外键阻挡
     log_action(db, user, "delete", "payments", payment.id, old=payment, ip=client_ip(request))
     db.delete(payment)
     db.flush()

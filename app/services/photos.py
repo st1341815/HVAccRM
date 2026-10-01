@@ -78,6 +78,20 @@ def find_by_hash(db: Session, sha: str) -> Photo | None:
     return db.scalars(select(Photo).where(Photo.sha256 == sha).limit(1)).first()
 
 
+def photos_by_cost(db: Session, cost_ids: list[int]) -> dict[int, list[Photo]]:
+    """按成本记录分组凭证图片。"""
+    ids = [i for i in cost_ids if i]
+    if not ids:
+        return {}
+    rows = db.scalars(
+        select(Photo).where(Photo.cost_id.in_(ids)).order_by(Photo.created_at.desc(), Photo.id.desc())
+    ).all()
+    grouped: dict[int, list[Photo]] = {}
+    for ph in rows:
+        grouped.setdefault(ph.cost_id, []).append(ph)
+    return grouped
+
+
 def photos_by_payment(db: Session, payment_ids: list[int]) -> dict[int, list[Photo]]:
     """按收款记录分组截图（收款流水/合同详情展示用）。"""
     ids = [i for i in payment_ids if i]
@@ -116,6 +130,7 @@ def save_photo(
     task_id: int | None = None,
     contract_id: int | None = None,
     payment_id: int | None = None,
+    cost_id: int | None = None,
 ) -> tuple[Photo | None, str]:
     """保存一张照片。返回 (Photo, 状态信息)。
 
@@ -145,6 +160,7 @@ def save_photo(
             task_id=task_id,
             contract_id=contract_id,
             payment_id=payment_id,
+            cost_id=cost_id,
             kind=kind,
             path=existing.path,
             thumb_path=existing.thumb_path,
@@ -182,6 +198,7 @@ def save_photo(
         task_id=task_id,
         contract_id=contract_id,
         payment_id=payment_id,
+        cost_id=cost_id,
         kind=kind,
         path=str(rel_path),
         thumb_path=str(thumb_rel) if thumb_rel else None,
@@ -196,6 +213,23 @@ def save_photo(
     )
     db.add(photo)
     return photo, "已保存"
+
+
+def delete_photos_for(db: Session, **filters) -> int:
+    """删除与某个业务对象关联的全部照片记录（含物理文件，若无其他记录引用）。
+
+    用于删除成本/收款/客户等业务对象之前先清理附件，避免外键约束阻止删除。
+    """
+    conds = []
+    for field in ("customer_id", "contract_id", "payment_id", "cost_id", "task_id"):
+        if field in filters and filters[field] is not None:
+            conds.append(getattr(Photo, field) == filters[field])
+    if not conds:
+        return 0
+    rows = list(db.scalars(select(Photo).where(*conds)).all())
+    for ph in rows:
+        delete_photo(db, ph)
+    return len(rows)
 
 
 def delete_photo(db: Session, photo: Photo) -> str:

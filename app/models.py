@@ -386,6 +386,7 @@ class Photo(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"))
     contract_id = Column(Integer, ForeignKey("contracts.id"))  # 纸质合同照片归属
     payment_id = Column(Integer, ForeignKey("payments.id"))  # 收款/退款截图归属
+    cost_id = Column(Integer, ForeignKey("contract_costs.id"))  # 成本凭证（发票/收据）归属
     kind = Column(String, nullable=False)
     path = Column(String, nullable=False)  # 相对 data/media 的路径
     thumb_path = Column(String)

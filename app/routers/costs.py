@@ -1,7 +1,7 @@
 """成本模块：供应商维护、合同成本录入、利润核算与成本明细查询。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,11 +21,13 @@ from ..models import (
 )
 from ..permissions import can_see_amount, customer_scope_conditions, has_perm, require, visible_customer_ids
 from ..services import costs as cost_svc
+from ..services import photos as photo_svc
 from ..services import finance as finance_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
 router = APIRouter(prefix="/costs", tags=["costs"])
+COST_PHOTO_KIND = "成本凭证"
 
 
 def _visible_contracts(db: Session, user: User) -> list[Contract]:
@@ -120,6 +122,7 @@ def entries(
         request,
         "costs/entries.html",
         rows=rows,
+        cost_photos=photo_svc.photos_by_cost(db, [r.id for r in rows]),
         contract_map=contract_map,
         suppliers=suppliers,
         users=users,
@@ -210,7 +213,7 @@ def update_supplier(
 
 
 @router.post("/new")
-def create_cost(
+async def create_cost(
     request: Request,
     contract_id: str = Form(...),
     category: str = Form(...),
@@ -220,6 +223,7 @@ def create_cost(
     remark: str = Form(""),
     spent_at: str = Form(""),
     back: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
     user: User = Depends(require("cost:edit")),
 ):
@@ -254,9 +258,37 @@ def create_cost(
     )
     db.add(cost)
     db.flush()
+    # 附图（发票/收据/对账单）：与成本记录绑定，便于后续查询核对
+    saved, dedup, errors = 0, 0, []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        raw = await f.read()
+        photo, msg = photo_svc.save_photo(
+            db,
+            customer_id=contract.customer_id,
+            kind=COST_PHOTO_KIND,
+            raw=raw,
+            orig_name=f.filename,
+            uploaded_by=user.id,
+            contract_id=contract.id,
+            cost_id=cost.id,
+        )
+        if photo is None:
+            errors.append(f"{f.filename}: {msg}")
+        else:
+            if "重复" in msg:
+                dedup += 1
+            else:
+                saved += 1
     log_action(db, user, "create", "contract_costs", cost.id, new=cost, ip=client_ip(request))
     commit_retry(db)
-    return redirect(target, f"已登记{category} {amt:,.2f}")
+    message = f"已登记{category} {amt:,.2f}"
+    if saved or dedup:
+        message += f"；附图新增 {saved} 张、去重 {dedup} 张"
+    if errors:
+        return redirect(target, message + "；附图失败：" + "；".join(errors), "err")
+    return redirect(target, message)
 
 
 @router.post("/{cost_id}/delete")
@@ -269,7 +301,9 @@ def delete_cost(
 ):
     cost = get_or_404(db, ContractCost, cost_id, "成本记录")
     contract_id = cost.contract_id
+    detach = photo_svc.delete_photos_for(db, cost_id=cost.id)  # 先清附图，避免外键阻挡
     log_action(db, user, "delete", "contract_costs", cost.id, old=cost, ip=client_ip(request))
     db.delete(cost)
     commit_retry(db)
-    return redirect(back or f"/contracts/{contract_id}", "成本记录已删除")
+    suffix = f"（同时删除 {detach} 张附图）" if detach else ""
+    return redirect(back or f"/contracts/{contract_id}", "成本记录已删除" + suffix)

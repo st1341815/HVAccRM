@@ -87,7 +87,7 @@
     <span class="muted small">毛利 {{ profit.gross_profit|money }} · 毛利率 {{ profit.gross_margin }}%</span>
   </h2>
   <table class="tight">
-    <thead><tr><th>日期</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>录入人</th><th></th></tr></thead>
+    <thead><tr><th>日期</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>附图</th><th>录入人</th><th></th></tr></thead>
     <tbody>
     {% for r in costs %}
       <tr>
@@ -97,6 +97,14 @@
         <td>{{ r.supplier.name if r.supplier else '-' }}</td>
         <td>{{ r.installer.display_name if r.installer else '-' }}</td>
         <td class="break">{{ r.remark or '-' }}</td>
+        <td>
+          {% set phs = cost_photos.get(r.id, []) %}
+          {% for ph in phs[:3] %}
+            <a href="/photos/{{ ph.id }}/file" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
+          {% endfor %}
+          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {% if not phs %}<span class="muted small">—</span>{% endif %}
+        </td>
         <td>{{ cost_users[r.created_by].display_name if r.created_by and cost_users.get(r.created_by) else '-' }}</td>
         <td>
           {% if can_cost %}
@@ -111,8 +119,9 @@
     </tbody>
   </table>
   {% if not costs %}<p class="muted">还没有成本记录。材料成本需选供应商，施工费用需选安装师傅。</p>{% endif %}
+
   {% if can_cost %}
-  <form method="post" action="/costs/new" class="filterbar">
+  <form method="post" action="/costs/new" class="filterbar" enctype="multipart/form-data">
     <input type="hidden" name="contract_id" value="{{ contract.id }}">
     <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
     <select name="category" id="cost_cat" onchange="syncCostFields()">
@@ -133,7 +142,10 @@
       </optgroup>{% endif %}
     </select>
     <input name="spent_at" type="date" value="{{ today }}">
-    <input name="remark" placeholder="备注（材料规格 / 工序 / 结算方式，便于后续查询）">
+    <input name="remark" placeholder="备注（材料规格 / 工序 / 结算方式）">
+    <label class="inline-label" title="可多张：发票 / 收据 / 对账单，便于后续查询核对">附图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
     <button type="submit">＋ 登记成本</button>
   </form>
   <p class="muted small">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）；供应商在 <a href="/costs/suppliers">成本 → 供应商</a> 维护。</p>
