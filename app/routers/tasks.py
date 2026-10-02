@@ -39,12 +39,18 @@ def _can_touch(db: Session, user: User, task: Task) -> bool:
 
 def _photo_ctx(db: Session, tasks: list[Task], user: User, request: Request) -> dict:
     """施工页照片上下文：每个节点的已有照片 + 是否需照片 + 上传权限 + 返回路径。"""
+    # back_path 要指向「完整页面」而非 htmx 局部刷新地址（partial=1），
+    # 否则上传后跳转会落回裸片段页、看不到完整布局。
+    from urllib.parse import parse_qsl, urlencode
+
+    query = urlencode([(k, v) for k, v in parse_qsl(request.url.query, keep_blank_values=True) if k != "partial"])
+    back_path = str(request.url.path) + (f"?{query}" if query else "")
     return {
         "task_photos": photo_svc.photos_by_task(db, [t.id for t in tasks]),
         "stage_requires_photo": task_svc.stage_photo_requirements(db),
         "stage_kind": task_svc.STAGE_PHOTO_KIND,
         "can_upload_photo": has_perm(user, "photo:upload"),
-        "back_path": str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
+        "back_path": back_path,
     }
 
 
