@@ -139,7 +139,13 @@ def task_board(
 
     def _qs(**over) -> str:
         params = {k: v for k, v in filters.items() if v and k != "view"}
-        params.update({k: v for k, v in over.items() if v})
+        for k, v in over.items():
+            if k == "view":
+                continue
+            if v:
+                params[k] = v
+            else:
+                params.pop(k, None)  # 空值 = 清除该筛选（如「全部未完成」要清掉 assignee）
         params["view"] = over.get("view", view)
         return "/tasks?" + "&".join(f"{k}={v}" for k, v in params.items())
 
