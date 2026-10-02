@@ -9,7 +9,7 @@
 
 1. [架构概览](#1-架构概览)
 2. [前置条件](#2-前置条件)
-3. [快速开始](#3-快速开始)
+3. [Compose 部署教程](#3-compose-部署教程)
 4. [配置说明（环境变量）](#4-配置说明环境变量)
 5. [数据持久化与目录结构](#5-数据持久化与目录结构)
 6. [镜像与容器详解](#6-镜像与容器详解)
@@ -54,29 +54,199 @@
 
 ---
 
-## 3. 快速开始
+## 3. Compose 部署教程
 
-```bash
-# 1) 获取源码（git clone 或解压发布包）并进入目录
-git clone https://github.com/st1341815/oneCRM.git
-cd oneCRM
+oneCRM 提供开箱即用的 Docker Compose 编排，单机/局域网自托管只需一个 `docker compose up` 即可跑起来。
 
-# 2) 准备运行配置（至少改 APP_SECRET_KEY 与 ADMIN_PASS）
-cp .env.example .env
-#    编辑 .env：APP_SECRET_KEY 用随机串，ADMIN_PASS 用强密码
+### 3.1 完整 compose 文件（可直接复制）
 
-# 3) 构建并启动
-docker compose up -d --build
+仓库根目录已自带 `docker-compose.yml`，内容如下（已加注释）：
 
-# 4) 查看状态与健康检查
-docker compose ps
-curl -s http://127.0.0.1:8090/health
-# 期望：{"status":"ok","db":true,"version":"..."}
+```yaml
+services:
+  crm:
+    build: .                       # 用仓库里的 Dockerfile 构建
+    image: crm:local               # 镜像名（可自定义）
+    container_name: crm            # 容器名
+    restart: unless-stopped        # 开机/崩溃自动拉起
+    user: "1000:1000"              # 非 root 运行（NAS 普通用户 UID/GID）
 
-# 5) 浏览器打开 http://<宿主机IP>:8090 ，用 ADMIN_USER / ADMIN_PASS 登录
+    ports:
+      - "8090:8000"                # 宿主机 8090 → 容器内 8000
+
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY is required}  # 必填，缺了会报错
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
+      - DB_PATH=/data/crm.db       # 容器内路径，一般不动
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    volumes:
+      - ./data:/data               # 数据库 + 媒体 + 备份 + 日志（持久化）
+      - ./config:/config:ro        # 部署配置（只读）
+
+    mem_limit: 512m
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4).status==200 else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"             # 单日志文件上限
+        max-file: "3"              # 最多保留 3 个
 ```
 
-> **首次启动**会自动执行 `app.bootstrap`：迁移数据库、初始化 admin 账号、写入标准工序模板。之后重复启动不会重建。
+配套的 `.env`（放在 `docker-compose.yml` 同级目录，compose 自动读取）：
+
+```bash
+# 生成随机密钥：python3 -c "import secrets;print(secrets.token_urlsafe(48))"
+APP_SECRET_KEY=改成随机长串
+ADMIN_USER=admin
+ADMIN_PASS=改成强密码
+ADMIN_FORCE_PASSWORD_CHANGE=true     # 生产建议 true：admin 首登强制改密
+LOG_LEVEL=INFO
+```
+
+### 3.2 从零部署（分步教程）
+
+```bash
+# ① 获取源码并进入目录
+git clone https://github.com/st1341815/oneCRM.git && cd oneCRM
+#    （或解压发布包 zip/tar.gz）
+
+# ② 生成配置文件
+cp .env.example .env
+#    编辑 .env：填 APP_SECRET_KEY（随机串）、ADMIN_PASS（强密码）
+
+# ③ 构建镜像（首次会 pip 安装依赖，稍慢）
+docker compose build
+
+# ④ 后台启动
+docker compose up -d
+
+# ⑤ 查看状态，等 STATUS 变为 Up (healthy)
+docker compose ps
+
+# ⑥ 验证健康检查
+curl -s http://127.0.0.1:8090/health
+# 期望输出：{"status":"ok","db":true,"version":"..."}
+
+# ⑦ 浏览器打开 http://<宿主机IP>:8090 登录
+```
+
+> **首次启动**会自动执行 `app.bootstrap`：迁移数据库 → 创建 admin 账号 → 写入 4 个标准工序模板（上门勘测/前期施工/后期施工/调试验收）。之后重复启动是幂等的，不会重建已有数据。
+
+### 3.3 常用命令速查
+
+```bash
+docker compose up -d              # 启动（缺镜像会自动构建）
+docker compose up -d --build      # 重建镜像并启动（改代码后）
+docker compose build              # 只构建，不启动
+docker compose ps                 # 状态（看 healthy）
+docker compose logs -f crm        # 跟踪日志
+docker compose restart crm        # 重启
+docker compose stop / start       # 停止 / 启动
+docker compose down               # 停并删容器（保留数据卷）
+docker compose down -v            # ⚠️ 连数据卷一起删（数据会没，慎用）
+docker compose config             # 校验 compose 语法 / 看最终配置
+docker compose exec crm sh        # 进容器 shell
+```
+
+### 3.4 变体：NAS 绝对路径挂载
+
+在 NAS（如飞牛 fnOS）上，相对路径 `./data` 可能因工作目录解析不同而失效，仓库另提供了 `docker-compose.nas.yml`，用宿主机绝对路径挂载：
+
+```bash
+# 在 NAS 上、源码目录 /vol1/1000/crm 内执行：
+docker compose -f docker-compose.nas.yml up -d --build
+```
+
+其关键差异只有挂载路径：
+
+```yaml
+    volumes:
+      - /vol1/1000/crm/data:/data
+      - /vol1/1000/crm/config:/config:ro
+```
+
+### 3.5 变体：内置 nginx 反代的完整栈（HTTPS）
+
+如果希望「容器 + HTTPS」一整套用 compose 拉起，可另存为 `docker-compose.https.yml`：
+
+```yaml
+services:
+  crm:
+    build: .
+    image: crm:local
+    container_name: crm
+    restart: unless-stopped
+    user: "1000:1000"
+    # 不再对外暴露端口，只在内网 docker 网络里让 nginx 访问
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY is required}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - DB_PATH=/data/crm.db
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    mem_limit: 512m
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro     # 放 fullchain.pem / privkey.pem
+    depends_on:
+      - crm
+```
+
+配套 `deploy/nginx.conf`：
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    return 301 https://$host$request_uri;      # 强制跳 HTTPS
+}
+
+server {
+    listen 443 ssl;
+    server_name crm.example.com;               # 改成你的域名/IP
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+    client_max_body_size 50m;                  # 允许上传大照片
+
+    location / {
+        proxy_pass http://crm:8000;            # 注意是服务名 crm
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+启动：`docker compose -f docker-compose.https.yml up -d --build`，然后访问 `https://<域名>`。
+
+> 证书放 `deploy/certs/`（`fullchain.pem` + `privkey.pem`）。内网自签可用 `mkcert` 或 acme.sh；有公网域名建议用 Let's Encrypt。
 
 ---
 
@@ -224,7 +394,7 @@ docker compose up -d
 
 ## 9. 反向代理与 HTTPS
 
-容器只提供 HTTP，对外建议加一层 HTTPS 反代。
+容器只提供 HTTP，对外建议加一层 HTTPS 反代。想要「crm + nginx 一起用 compose 拉起」的可直接看 [3.5 内置 nginx 反代的完整栈](#35-变体内置-nginx-反代的完整栈https)；下面给的是独立部署 nginx 时的配置。
 
 ### nginx 示例
 
