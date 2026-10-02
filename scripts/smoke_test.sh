@@ -206,7 +206,8 @@ c=$(code -b $J "$B/ui/tasks"); chk "HTMX 任务片段" 200 "$c"
 
 echo "== 5b. 施工页照片上传 =="
 NFF=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'type="file" name="files"' | wc -l)
-[ "$NFF" -le 1 ] && ok "每个上传表单只有一个 files 文件框（无同名空部件）" || bad "上传表单存在多个 files 文件框（会触发 422/500）：$NFF"
+NFM=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'class="inline task-upload"' | wc -l)
+[ "$NFF" -eq "$NFM" ] && ok "每个上传表单只有一个 files 文件框（无同名空部件）" || bad "上传表单 files 框数量异常：文件框 $NFF / 表单 $NFM"
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
@@ -215,6 +216,8 @@ has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样�
 has 'accept="image/*" multiple required' && bad "上传控件仍带 required（另一文件框为空会静默拦截提交）" || ok "上传控件不带 required（拍照/选图都能提交）"
 has 'name="back" value="/tasks?scope=all&' && bad "上传控件 back 带了 partial（局部刷新地址）" || ok "上传控件 back 指向完整页面（不含 partial）"
 has 'name="files" type="file"' > /dev/null 2>&1 || true
+has '选择图片' && ok "上传控件显示「选择图片」" || bad "上传控件仍显示裸「选择文件」"
+has '上传中' && ok "上传按钮有提交中反馈" || bad "缺提交中反馈"
 TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
 echo "  上传到任务 TID=$TT"
 # 复用已上传过的图（物理文件被去重复用），避免影响第 6 节的物理文件净增计数
