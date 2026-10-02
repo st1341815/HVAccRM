@@ -5,7 +5,11 @@
       <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="现场照">
     </a>
   {% endfor %}
-  {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+  {# 超出 3 张的用隐藏锚点保留在 DOM 里，灯箱据此可翻完该节点全部照片 #}
+  {% for ph in phs[3:] %}
+    <a class="photo-link" href="/photos/{{ ph.id }}" hidden aria-hidden="true"></a>
+  {% endfor %}
+  {% if phs|length > 3 %}<span class="muted small" title="点图可翻看全部 {{ phs|length }} 张">+{{ phs|length - 3 }}</span>{% endif %}
   {% if phs %}
     <span class="muted small">{{ phs|length }} 张</span>
   {% elif stage_requires_photo.get(t.stage) %}
