@@ -8,9 +8,11 @@
     <input type="hidden" name="next" value="{{ next or '/' }}">
     <label>账号<input name="username" value="{{ username or '' }}" required autofocus autocomplete="username"></label>
     <label>密码<input type="password" name="password" required autocomplete="current-password"></label>
-    <label>动态验证码（已开启二步验证时填写）
-      <input name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位数字" {% if need_totp %}autofocus{% endif %}>
+    {% if need_totp %}
+    <label>动态验证码（6 位数字）
+      <input name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位数字" autofocus>
     </label>
+    {% endif %}
     <button type="submit">登录</button>
   </form>
 </div>

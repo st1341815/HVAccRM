@@ -515,6 +515,10 @@ def chk(name, cond):
     if cond: print(f"  OK   {name}"); ok += 1
     else: print(f"  FAIL {name}"); fail += 1
 
+# 未开启二步验证时，登录页不应显示验证码输入框
+curl(f"{B}/login")
+chk("登录页默认不显示验证码控件", 'name="totp"' not in body())
+
 chk("admin 登录", curl(f"{B}/login", data=[f"username=admin", f"password={apw}", "next=/"]) == "303")
 curl(f"{B}/account")
 m = re.search(r'name="secret" value="([A-Z2-7]+)"', body())
@@ -522,6 +526,7 @@ chk("取到 TOTP 密钥", bool(m))
 secret = m.group(1)
 chk("开启二步验证", curl(f"{B}/account/totp/enable", data=[f"secret={secret}", f"code={totp(secret)}"]) == "303")
 chk("无验证码登录被拒(401)", curl(f"{B}/login", data=["username=admin", f"password={apw}", "next=/"]) == "401")
+chk("需要验证码时登录页显示输入框", 'name="totp"' in body())
 chk("错误验证码被拒(401)", curl(f"{B}/login", data=["username=admin", f"password={apw}", "totp=000000", "next=/"]) == "401")
 chk("正确验证码登录(303)", curl(f"{B}/login", data=["username=admin", f"password={apw}", f"totp={totp(secret)}", "next=/"]) == "303")
 chk("带 TOTP 会话可用(200)", curl(f"{B}/") == "200")
