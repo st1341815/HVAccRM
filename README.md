@@ -8,6 +8,8 @@ Session/Cookie + TOTP · APScheduler · SQLite FTS5 · 本地文件系统 · Doc
 
 > 📖 **使用手册**（面向使用者：登录、各模块操作、角色权限、手机端、FAQ）：
 > 见 [`docs/使用手册.md`](docs/使用手册.md) —— 日常使用请从这里开始。
+> 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
+> 见 [`docs/Docker部署指南.md`](docs/Docker部署指南.md)。
 > 本文档面向开发者，讲的是环境搭建、部署与实现细节。
 
 ---
