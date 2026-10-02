@@ -36,7 +36,7 @@
   <form method="get" action="/costs" class="filterbar">
     <label class="inline-label">签订日从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
-    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <input name="customer_q" value="{{ filters.customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <label class="checkline"><input type="checkbox" name="only_cost" value="1" {{ 'checked' if filters.only_cost else '' }}> 只看已录成本</label>
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/costs">重置</a>

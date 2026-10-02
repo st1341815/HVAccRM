@@ -28,6 +28,7 @@ from ..permissions import (
     require,
 )
 from ..services import finance as finance_svc
+from ..services import search as search_svc
 from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
@@ -41,14 +42,15 @@ CONTRACT_PHOTO_KIND = "纸质合同"
 @router.get("")
 def list_contracts(
     request: Request,
-    customer_id: str = "",
+    customer_q: str = "",
     status: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(require("contract:view")),
 ):
     stmt = select(Contract).order_by(Contract.sign_date.desc(), Contract.id.desc())
-    if customer_id:
-        stmt = stmt.where(Contract.customer_id == parse_int(customer_id))
+    if customer_q and customer_q.strip():
+        cids = search_svc.customer_ids_by_keyword(db, customer_q)
+        stmt = stmt.where(Contract.customer_id.in_(cids or [-1]))
     if status:
         stmt = stmt.where(Contract.status == status)
     contracts = list(db.scalars(stmt).all())
@@ -70,7 +72,7 @@ def list_contracts(
         "contracts/list.html",
         rows=rows,
         totals=totals,
-        customer_id=customer_id,
+        customer_q=customer_q,
         status=status,
         can_amount=can_see_amount(user),
     )

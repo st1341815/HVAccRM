@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
-from ..models import Customer, Contact
+from ..models import Customer, Contact, Project, Room
 
 
 def _like_conditions(q: str):
@@ -48,6 +48,34 @@ def search_customers(db: Session, q: str, scope_cond=None, limit: int = 200) -> 
         stmt = stmt.where(scope_cond)
     stmt = stmt.order_by(Customer.updated_at.desc()).limit(limit)
     return list(db.scalars(stmt).all())
+
+
+def customer_ids_by_keyword(db: Session, q: str) -> list[int]:
+    """按关键字匹配客户 ID：姓名 / 手机号 / 房号（楼栋·单元·房号）/ 楼盘名。
+
+    供「合同台账 / 收款流水 / 利润核算」等列表筛选使用，替代原来的客户 ID 精确过滤。
+    """
+    q = (q or "").strip()
+    if not q:
+        return []
+    kw = f"%{q}%"
+    return list(
+        db.scalars(
+            select(Customer.id)
+            .outerjoin(Room, Customer.room_id == Room.id)
+            .outerjoin(Project, Room.project_id == Project.id)
+            .where(
+                or_(
+                    Customer.name.like(kw),
+                    Customer.phone.like(kw),
+                    Room.building.like(kw),
+                    Room.unit.like(kw),
+                    Room.room_no.like(kw),
+                    Project.name.like(kw),
+                )
+            )
+        ).all()
+    )
 
 
 def fts_status(db: Session) -> dict:

@@ -16,7 +16,7 @@
 
 <section class="card">
   <form method="get" action="/contracts" class="filterbar">
-    <input name="customer_id" value="{{ customer_id }}" placeholder="客户 ID 过滤" inputmode="numeric">
+    <input name="customer_q" value="{{ customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <select name="status">
       <option value="">全部状态</option>
       {% for s in ['active','done','void'] %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}
