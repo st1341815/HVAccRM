@@ -39,8 +39,8 @@ export ADMIN_USER=admin ADMIN_PASS='你的初始密码'
 ## 2. 部署到 NAS（docker compose）
 
 ```bash
-# NAS 上，源码目录 /vol1/1000/crm
-cd /vol1/1000/crm
+# NAS 上，源码目录 /vol1/1000/Docker/Hvaccrm
+cd /vol1/1000/Docker/Hvaccrm
 set -a; . config/deploy.env; set +a          # APP_SECRET_KEY / ADMIN_PASS 等
 docker compose -f docker-compose.nas.yml up -d --build
 curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
@@ -55,7 +55,7 @@ curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
 ```
 crm/
 ├── docker-compose.yml          # 通用（相对路径挂载）
-├── docker-compose.nas.yml      # NAS 专用（绝对路径 /vol1/1000/crm）
+├── docker-compose.nas.yml      # NAS 专用（绝对路径 /vol1/1000/Docker/Hvaccrm）
 ├── Dockerfile                  # 多阶段构建 → python:3.12-slim，非 root 运行
 ├── pyproject.toml / requirements.txt
 ├── alembic.ini + migrations/   # Alembic 迁移（0001_initial）
