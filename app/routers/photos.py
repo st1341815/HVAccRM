@@ -88,6 +88,14 @@ async def upload_photos(
         return render(request, "403.html", status_code=403)
     saved, skipped, errors = 0, 0, []
     tid = parse_int(task_id)
+    # 工序照片：只有「已开工」（doing / done）的节点才允许上传；未开工直接拒绝
+    if tid:
+        task = db.get(Task, tid)
+        if not task or task.customer_id != customer.id:
+            return render(request, "error.html", status_code=400, detail="工序不存在或不属于该客户")
+        if task.status not in ("doing", "done"):
+            target = return_path(back, request.headers.get("referer"), f"/photos/album/{customer.id}")
+            return redirect(target, "该工序尚未开工，请先点击「开工」再上传照片", "err")
     for f in files:
         if not f or not f.filename:
             continue

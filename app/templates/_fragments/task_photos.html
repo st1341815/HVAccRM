@@ -11,7 +11,7 @@
   {% elif stage_requires_photo.get(t.stage) %}
     <span class="badge warn">需照片</span>
   {% endif %}
-  {% if can_upload_photo %}
+  {% if can_upload_photo and t.status in ('doing', 'done') %}
     <form method="post" action="/api/customers/{{ t.customer_id }}/photos"
           enctype="multipart/form-data" class="inline task-upload"
           onsubmit="return upEnsure(this)">
