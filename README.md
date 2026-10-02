@@ -6,6 +6,10 @@
 技术栈（按开发文档锁定）：Python 3.12 + FastAPI · SQLite(WAL) · HTMX + Jinja2 ·
 Session/Cookie + TOTP · APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose。
 
+> 📖 **使用手册**（面向使用者：登录、各模块操作、角色权限、手机端、FAQ）：
+> 见 [`docs/使用手册.md`](docs/使用手册.md) —— 日常使用请从这里开始。
+> 本文档面向开发者，讲的是环境搭建、部署与实现细节。
+
 ---
 
 ## 1. 快速开始（本地开发）
