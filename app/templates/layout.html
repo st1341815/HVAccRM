@@ -47,16 +47,14 @@
   let items = [], idx = 0, startX = null, startY = null;
 
   function collect(a) {
-    // 相册网格 / 节点照片区 → 按该组翻页；
-    // 表格里的缩略图（收款截图、成本凭证等）按整页翻，避免一组只有 1 张
-    const scope = a.closest('.gallery, .task-photos, .tc-step-body');
-    let list = scope
-      ? Array.from(scope.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'))
-      : [];
-    if (list.length < 2) {
-      list = Array.from(document.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
-    }
-    return list;
+    // 施工节点照片区：包含隐藏的「更多」锚点，保证能翻完该节点的全部照片
+    const tp = a.closest('.task-photos');
+    if (tp) return Array.from(tp.querySelectorAll(ANCHOR_SEL));
+    // 相册网格：按该网格翻页（全部可见）
+    const gallery = a.closest('.gallery');
+    if (gallery) return Array.from(gallery.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
+    // 表格单元格里的单张缩略图（收款截图、成本凭证等）：按整页翻，避免一组只有 1 张
+    return Array.from(document.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
   }
 
   function ensure() {
