@@ -175,6 +175,27 @@
 })();
 </script>
 <script>
+// 上传辅助：选图回显、空选拦截、提交中禁用（三保险，避免"点了没反应"）
+window.upPicked = function (inp) {
+  const form = inp.closest('form');
+  const span = form && form.querySelector('.picked-name');
+  if (!span) return;
+  const names = Array.from(inp.files || []).map(function (f) { return f.name; });
+  span.textContent = names.length
+    ? ('已选 ' + names.length + ' 张：' + names.slice(0, 2).join('、') + (names.length > 2 ? '…' : ''))
+    : '';
+};
+window.upEnsure = function (form) {
+  const inp = form.querySelector('input[type=file]');
+  if (inp && (!inp.files || inp.files.length === 0)) {
+    alert('请先点击「选择图片」或「📷」挑一张图片，再点上传。');
+    return false;
+  }
+  const b = form.querySelector('button[type=submit]');
+  if (b) { b.disabled = true; b.textContent = '上传中…'; }
+  return true;
+};
+
 // 手机端宽表格自动转「标签 + 值」卡片：把表头文字写到每个单元格的 data-label 上，
 // 由 CSS（@media max-width:780px 的 table.js-stack 规则）接管显示。
 // 跳过：键值表(.kv)、含合并单元格的表（表头与列对不上）。
