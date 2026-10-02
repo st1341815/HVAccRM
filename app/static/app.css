@@ -159,14 +159,14 @@ input[type=file] { padding: .3rem; }
 input[type=checkbox] { width: auto; }
 button {
   padding: .42rem .9rem; border: 0; border-radius: 6px; background: var(--brand);
-  color: #fff; font: inherit; cursor: pointer;
+  color: #fff; font: inherit; cursor: pointer; white-space: nowrap;
 }
 button:hover { background: var(--brand-dark); }
 button.ghost { background: #e7ebee; color: var(--brand-dark); }
 button.ghost:hover { background: #d9dfe5; }
 button.danger { background: var(--red); }
 button.tiny { padding: .15rem .4rem; font-size: .75rem; }
-.btn { display: inline-block; padding: .42rem .9rem; border-radius: 6px; background: var(--brand); color: #fff; }
+.btn { display: inline-block; padding: .42rem .9rem; border-radius: 6px; background: var(--brand); color: #fff; white-space: nowrap; }
 .btn:hover { background: var(--brand-dark); text-decoration: none; }
 .btn.ghost { background: #e7ebee; color: var(--brand-dark); }
 
