@@ -437,8 +437,12 @@ c=$(code -b $J --get --data-urlencode "keyword=两工两日" "$B/costs/entries")
 has "两工两日" && ok "备注关键词可检索" || bad "备注检索失效"
 c=$(code -b $J --get --data-urlencode "category=材料成本" "$B/costs/entries")
 has "材料成本" && ok "按费用项目筛选" || bad "按费用项目筛选失效"
-c=$(code -b $J --get --data-urlencode "supplier_id=$SPID" "$B/costs/entries")
-has "锅炉主机及管材" && ok "按供应商筛选" || bad "按供应商筛选失效"
+c=$(code -b $J --get --data-urlencode "supplier_name=测试供应商$RUN" "$B/costs/entries")
+has "锅炉主机及管材" && ok "按供应商名称筛选" || bad "按供应商名称筛选失效"
+c=$(code -b $J --get --data-urlencode "installer_name=$IU" "$B/costs/entries")
+has "安装工费两工两日" && ok "按师傅名称筛选" || bad "按师傅名称筛选失效"
+c=$(code -b $J "$B/costs/entries"); has 'name="supplier_id"' && bad "成本明细仍用供应商 ID" || ok "成本明细已改供应商名称"
+c=$(code -b $J "$B/costs/entries"); has 'name="installer_id"' && bad "成本明细仍用师傅 ID" || ok "成本明细已改师傅名称"
 DELC=$(curl -s -b $J "$B/contracts/$CTID" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '锅炉主机及管材' | grep -o 'costs/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST "$B/costs/$DELC/delete"); chk "删除成本记录" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID"); has "35,000.00" && ok "删除成本后毛利重算为 35000" || bad "删除成本后毛利未重算"

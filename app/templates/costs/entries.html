@@ -20,8 +20,8 @@
       <option value="">全部费用项目</option>
       {% for c in categories %}<option value="{{ c }}" {{ 'selected' if filters.category == c else '' }}>{{ c }}</option>{% endfor %}
     </select>
-    <input name="supplier_id" value="{{ filters.supplier_id }}" placeholder="供应商 ID" inputmode="numeric">
-    <input name="installer_id" value="{{ filters.installer_id }}" placeholder="安装师傅 ID" inputmode="numeric">
+    <input name="supplier_name" value="{{ filters.supplier_name }}" placeholder="供应商名称">
+    <input name="installer_name" value="{{ filters.installer_name }}" placeholder="师傅名称">
     <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
     <input name="keyword" value="{{ filters.keyword }}" placeholder="备注关键词">
