@@ -3,39 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#353a41">
   <title>{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
+<body class="{{ 'has-sidebar' if user else 'login-page' }}">
 {% if user %}
-<header class="topbar">
-  <div class="brand">🌡️ oneCRM</div>
-  <nav>
-    <a href="/" class="{{ 'active' if current_path == '/' else '' }}">看板</a>
-    {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}">客户</a>{% endif %}
-    <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}">楼盘/房号</a>
-    {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}">合同</a>{% endif %}
-    {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}">收款</a>{% endif %}
-    {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}">成本</a>{% endif %}
-    {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}">施工</a>{% endif %}
-    {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}">用户</a>{% endif %}
-    {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}">系统</a>{% endif %}
-  </nav>
-  <div class="me">
-    <span class="who">{{ user.display_name }} · {{ role_label }}</span>
-    <a href="/account">账户</a>
-    <a href="/logout">退出</a>
-  </div>
-</header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">🌡️ <span>oneCRM</span></div>
+    <nav>
+      <a href="/" class="{{ 'active' if current_path == '/' else '' }}"><span class="ico">📊</span>看板</a>
+      {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}"><span class="ico">👥</span>客户</a>{% endif %}
+      <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}"><span class="ico">🏢</span>楼盘/房号</a>
+      {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}"><span class="ico">📄</span>合同</a>{% endif %}
+      {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}"><span class="ico">💰</span>收款</a>{% endif %}
+      {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}"><span class="ico">🧾</span>成本</a>{% endif %}
+      {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}"><span class="ico">🔧</span>施工</a>{% endif %}
+      {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico">👤</span>用户</a>{% endif %}
+      {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico">⚙️</span>系统</a>{% endif %}
+    </nav>
+    <div class="me">
+      <div class="who">{{ user.display_name }}<div class="role">{{ role_label }}</div></div>
+      <div class="me-links">
+        <a href="/account">⚙️ 账户</a>
+        <a href="/logout">↪ 退出</a>
+      </div>
+    </div>
+  </aside>
+  <button type="button" class="sidebar-toggle" aria-label="菜单" onclick="document.body.classList.toggle('nav-open')">☰</button>
+  <div class="scrim" onclick="document.body.classList.remove('nav-open')"></div>
 {% endif %}
 <main class="wrap">
   {% if flash %}<div class="flash {{ flash.level }}">{{ flash.message }}</div>{% endif %}
   {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
+  <footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
 </main>
-<footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }} · 数据存放 {{ settings.data_dir }}</footer>
+{% if user %}
+</div>
+{% endif %}
 <script>
 // 图片放大查看：点缩略图弹灯箱（不再跳转到原图页面 / 触发下载）
 //   左滑 ← / 右滑 → 切换同一组内的上一张、下一张；桌面端可用 ← → 方向键与两侧按钮；
