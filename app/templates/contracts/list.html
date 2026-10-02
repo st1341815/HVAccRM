@@ -28,12 +28,12 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>合同号</th><th>客户</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>回款率</th>{% endif %}<th>收款期数</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>合同号</th><th>房号</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>回款率</th>{% endif %}<th>收款期数</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
       <tr>
         <td>{{ c.no or ('#' ~ c.id) }}</td>
-        <td><a href="/customers/{{ c.customer_id }}?tab=finance">{{ c.customer.name if c.customer else c.customer_id }}</a></td>
+        <td><a href="/customers/{{ c.customer_id }}?tab=finance">{{ (c.customer.room_label or c.customer.name) if c.customer else c.customer_id }}</a></td>
         <td>{{ c.sign_date }}</td>
         {% if can_amount %}
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>

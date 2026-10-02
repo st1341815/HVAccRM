@@ -14,10 +14,10 @@
 <section class="card">
   <h2>Top5 欠款客户</h2>
   <table class="tight">
-    <thead><tr><th>客户</th><th>未收金额</th><th></th></tr></thead>
+    <thead><tr><th>房号</th><th>未收金额</th><th></th></tr></thead>
     <tbody>
     {% for c, amount in debtors %}
-      <tr><td>{{ c.name }}</td><td class="red">{{ amount|money }}</td><td><a href="/customers/{{ c.id }}?tab=finance">查看 →</a></td></tr>
+      <tr><td>{{ c.room_label or c.name }}</td><td class="red">{{ amount|money }}</td><td><a href="/customers/{{ c.id }}?tab=finance">查看 →</a></td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -27,12 +27,12 @@
 <section class="card">
   <h2>合同应收明细</h2>
   <table>
-    <thead><tr><th>合同号</th><th>客户</th><th>应收总额</th><th>已收</th><th>未收</th><th>回款率</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>合同号</th><th>房号</th><th>应收总额</th><th>已收</th><th>未收</th><th>回款率</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
       <tr class="{{ 'row-alert' if s.outstanding > 0 else '' }}">
         <td>{{ c.no or ('#' ~ c.id) }}</td>
-        <td>{{ c.customer.name if c.customer else c.customer_id }}</td>
+        <td>{{ (c.customer.room_label or c.customer.name) if c.customer else c.customer_id }}</td>
         <td>{{ s.total|money }}</td>
         <td>{{ s.received|money }}</td>
         <td class="red">{{ s.outstanding|money }}</td>
