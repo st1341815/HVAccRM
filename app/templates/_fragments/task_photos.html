@@ -13,12 +13,15 @@
   {% endif %}
   {% if can_upload_photo %}
     <form method="post" action="/api/customers/{{ t.customer_id }}/photos"
-          enctype="multipart/form-data" class="inline task-upload">
+          enctype="multipart/form-data" class="inline task-upload"
+          onsubmit="var b=this.querySelector('button[type=submit]');if(b){b.disabled=true;b.textContent='上传中…';}">
       <input type="hidden" name="task_id" value="{{ t.id }}">
       <input type="hidden" name="kind" value="{{ stage_kind.get(t.stage, '其他') }}">
       <input type="hidden" name="back" value="{{ back_path }}">
       <button type="button" class="cam-btn" title="直接用相机拍照并上传">📷</button>
-      <input type="file" name="files" accept="image/*" multiple>
+      <label class="btn ghost file-label" title="从相册 / 文件中选择图片">🖼 选择图片
+        <input type="file" name="files" accept="image/*" multiple>
+      </label>
       <button class="ghost">上传</button>
     </form>
   {% endif %}
