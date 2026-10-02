@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import COST_CATEGORIES, Contract, ContractCost, Supplier, User
@@ -74,8 +74,8 @@ def query_costs(
     db: Session,
     contract_ids: list[int] | None = None,
     category: str = "",
-    supplier_id: int | None = None,
-    installer_id: int | None = None,
+    supplier_name: str = "",
+    installer_name: str = "",
     date_from: str = "",
     date_to: str = "",
     keyword: str = "",
@@ -88,10 +88,16 @@ def query_costs(
         stmt = stmt.where(ContractCost.contract_id.in_(contract_ids))
     if category:
         stmt = stmt.where(ContractCost.category == category)
-    if supplier_id:
-        stmt = stmt.where(ContractCost.supplier_id == supplier_id)
-    if installer_id:
-        stmt = stmt.where(ContractCost.installer_id == installer_id)
+    if supplier_name.strip():
+        kw = f"%{supplier_name.strip()}%"
+        sids = list(db.scalars(select(Supplier.id).where(Supplier.name.like(kw))).all())
+        stmt = stmt.where(ContractCost.supplier_id.in_(sids or [-1]))
+    if installer_name.strip():
+        kw = f"%{installer_name.strip()}%"
+        uids = list(
+            db.scalars(select(User.id).where(or_(User.full_name.like(kw), User.username.like(kw)))).all()
+        )
+        stmt = stmt.where(ContractCost.installer_id.in_(uids or [-1]))
     if date_from:
         stmt = stmt.where(ContractCost.spent_at >= date_from)
     if date_to:
