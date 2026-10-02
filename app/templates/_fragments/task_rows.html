@@ -8,7 +8,7 @@
     {% set c = customers.get(t.customer_id) %}
     <tr>
       <td>
-        {% if c %}<a href="/customers/{{ c.id }}?tab=tasks">{{ c.name }}</a><div class="muted small">{{ c.room_label }}</div>{% else %}#{{ t.customer_id }}{% endif %}
+        {% if c %}<a href="/customers/{{ c.id }}?tab=tasks">{{ c.name }}</a><div class="muted small">{{ c.room_label_short }}</div>{% else %}#{{ t.customer_id }}{% endif %}
       </td>
       <td>{{ t.sort_order }}. {{ t.stage }}
         {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}

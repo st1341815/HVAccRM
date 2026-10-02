@@ -4,7 +4,7 @@
   <tbody>
   {% for t in tasks %}
     <tr>
-      <td>{% if customers.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers[t.customer_id].room_label or customers[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
+      <td>{% if customers.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers[t.customer_id].room_label_short or customers[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
       <td>{{ t.stage }}</td>
       <td>{{ status_labels.get(t.status, t.status) }}</td>
     </tr>

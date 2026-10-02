@@ -53,7 +53,7 @@
     {% for c, fin, p in rows %}
       <tr class="{{ 'row-alert' if p.is_loss else '' }}">
         <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
-        <td>{% if c.customer %}<a href="/customers/{{ c.customer_id }}">{{ c.customer.room_label or c.customer.name }}</a>{% else %}#{{ c.customer_id }}{% endif %}</td>
+        <td>{% if c.customer %}<a href="/customers/{{ c.customer_id }}">{{ c.customer.room_label_short or c.customer.name }}</a>{% else %}#{{ c.customer_id }}{% endif %}</td>
         <td>{{ c.product_type or '-' }}</td>
         <td>{{ c.sign_date }}</td>
         <td>{{ p.income|money }}</td>

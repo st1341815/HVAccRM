@@ -154,6 +154,17 @@ class Room(Base):
     def label(self) -> str:
         return "-".join(p for p in (self.building, self.unit, self.room_no) if p)
 
+    @property
+    def building_alnum(self) -> str:
+        """楼栋号的字母 + 数字部分（去掉中文），用于房号简称。"""
+        return "".join(ch for ch in (self.building or "") if ch.isascii() and ch.isalnum())
+
+    @property
+    def short_label(self) -> str:
+        """房号简称（不含小区名）：楼栋字母数字#房号。"""
+        b = self.building_alnum
+        return f"{b}#{self.room_no}" if b else (self.room_no or "")
+
 
 class Building(Base):
     """楼栋标准化字典：按楼盘预录、去重，房号表单从这里下拉选择，避免自由填写不一致。"""
@@ -204,6 +215,14 @@ class Customer(Base):
         if not self.room:
             return ""
         return f"{self.room.project.name if self.room.project else ''} {self.room.label}"
+
+    @property
+    def room_label_short(self) -> str:
+        """房号简称：小区名 + 楼栋字母数字#房号（去掉中文楼栋名与单元），便于手机查看。"""
+        if not self.room:
+            return ""
+        pname = self.room.project.name if self.room.project else ""
+        return f"{pname}{self.room.short_label}"
 
     @property
     def product_list(self) -> list[str]:

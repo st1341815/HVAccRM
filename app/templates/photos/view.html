@@ -19,7 +19,7 @@
 
 <div class="meta">
   <span>客户：<a href="/customers/{{ customer.id }}">{{ customer.name }}</a></span>
-  <span>房号：{{ customer.room_label or '-' }}</span>
+  <span>房号：{{ customer.room_label_short or '-' }}</span>
   <span>分类：{{ photo.kind }}</span>
   <span>时间：{{ photo.taken_at or photo.created_at }}</span>
   {% if uploader %}<span>上传人：{{ uploader.display_name }}</span>{% endif %}

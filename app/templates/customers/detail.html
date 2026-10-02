@@ -19,7 +19,7 @@
 </div>
 
 <div class="meta">
-  <span>🏢 房号：<strong>{{ customer.room_label or '未关联' }}</strong></span>
+  <span>🏢 房号：<strong>{{ customer.room_label_short or '未关联' }}</strong></span>
   <span>👤 负责人：{{ customer.owner.display_name if customer.owner else '-' }}</span>
   <span>📱 手机：<strong>{{ customer.phone or '未填写' }}</strong></span>
   <span>💬 微信：{{ customer.wechat or '未填写' }}</span>
