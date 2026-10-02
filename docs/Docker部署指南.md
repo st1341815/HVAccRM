@@ -119,7 +119,7 @@ LOG_LEVEL=INFO
 
 ```bash
 # ① 获取源码并进入目录
-git clone https://github.com/st1341815/oneCRM.git && cd oneCRM
+git clone https://github.com/st1341815/HVAccRM.git && cd HVAccRM
 #    （或解压发布包 zip/tar.gz）
 
 # ② 生成配置文件
@@ -352,7 +352,7 @@ docker compose down -v               # ⚠️ 连同数据卷一起删（慎用�
 每次发布新版本时：
 
 ```bash
-cd oneCRM
+cd HVAccRM
 git pull                            # 拉最新代码
 set -a; . .env; set +a              # 载入配置
 docker compose up -d --build        # 重建镜像并滚动更新
