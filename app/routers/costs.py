@@ -23,6 +23,7 @@ from ..permissions import can_see_amount, customer_scope_conditions, has_perm, r
 from ..services import costs as cost_svc
 from ..services import photos as photo_svc
 from ..services import finance as finance_svc
+from ..services import search as search_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
@@ -48,7 +49,7 @@ def overview(
     request: Request,
     date_from: str = "",
     date_to: str = "",
-    customer_id: str = "",
+    customer_q: str = "",
     only_cost: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(require("cost:view")),
@@ -58,8 +59,9 @@ def overview(
         contracts = [c for c in contracts if (c.sign_date or "") >= date_from]
     if date_to:
         contracts = [c for c in contracts if (c.sign_date or "") <= date_to]
-    if customer_id:
-        contracts = [c for c in contracts if str(c.customer_id) == customer_id]
+    if customer_q and customer_q.strip():
+        cids = set(search_svc.customer_ids_by_keyword(db, customer_q))
+        contracts = [c for c in contracts if c.customer_id in cids]
 
     rows = []
     for c in contracts:
@@ -86,7 +88,7 @@ def overview(
         totals=totals,
         categories=COST_CATEGORIES,
         category_totals=cost_svc.category_totals(db, [c.id for c, _, _ in rows]),
-        filters={"date_from": date_from, "date_to": date_to, "customer_id": customer_id, "only_cost": only_cost},
+        filters={"date_from": date_from, "date_to": date_to, "customer_q": customer_q, "only_cost": only_cost},
         can_edit=has_perm(user, "cost:edit"),
         today=today_str(),
     )

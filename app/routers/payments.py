@@ -12,6 +12,7 @@ from ..models import Contract, Payment, User, now_iso, today_str
 from ..permissions import has_perm, require, visible_customer_ids
 from ..services import finance as finance_svc
 from ..services import photos as photo_svc
+from ..services import search as search_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
@@ -24,8 +25,8 @@ PAYMENT_PHOTO_KIND = "收款截图"
 @router.get("")
 def list_payments(
     request: Request,
-    contract_id: str = "",
-    customer_id: str = "",
+    contract_q: str = "",
+    customer_q: str = "",
     date_from: str = "",
     date_to: str = "",
     method: str = "",
@@ -33,8 +34,6 @@ def list_payments(
     user: User = Depends(require("payment:view")),
 ):
     stmt = select(Payment).order_by(Payment.paid_at.desc(), Payment.id.desc())
-    if contract_id:
-        stmt = stmt.where(Payment.contract_id == parse_int(contract_id))
     if date_from:
         stmt = stmt.where(Payment.paid_at >= date_from)
     if date_to:
@@ -47,9 +46,19 @@ def list_payments(
     allowed = visible_customer_ids(db, user)
     if allowed is not None:
         payments = [p for p in payments if contract_map.get(p.contract_id) and contract_map[p.contract_id].customer_id in allowed]
-    if customer_id:
+    # 合同号关键字过滤（如 ONE2026…）
+    if contract_q and contract_q.strip():
+        q = contract_q.strip()
         payments = [
-            p for p in payments if contract_map.get(p.contract_id) and str(contract_map[p.contract_id].customer_id) == customer_id
+            p for p in payments
+            if contract_map.get(p.contract_id) and q in (contract_map[p.contract_id].no or "")
+        ]
+    # 客户关键字过滤：房号 / 姓名 / 手机号 / 楼盘名
+    if customer_q and customer_q.strip():
+        cids = set(search_svc.customer_ids_by_keyword(db, customer_q))
+        payments = [
+            p for p in payments
+            if contract_map.get(p.contract_id) and contract_map[p.contract_id].customer_id in cids
         ]
 
     users = {u.id: u for u in db.scalars(select(User)).all()}
@@ -69,8 +78,8 @@ def list_payments(
         month_total=month_total,
         refund_total=refund_total,
         filters={
-            "contract_id": contract_id,
-            "customer_id": customer_id,
+            "contract_q": contract_q,
+            "customer_q": customer_q,
             "date_from": date_from,
             "date_to": date_to,
             "method": method,

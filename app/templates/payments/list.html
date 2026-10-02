@@ -14,8 +14,8 @@
 
 <section class="card">
   <form method="get" action="/payments" class="filterbar">
-    <input name="contract_id" value="{{ filters.contract_id }}" placeholder="合同 ID" inputmode="numeric">
-    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <input name="contract_q" value="{{ filters.contract_q }}" placeholder="合同号（如 ONE…）">
+    <input name="customer_q" value="{{ filters.customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
     <select name="method">

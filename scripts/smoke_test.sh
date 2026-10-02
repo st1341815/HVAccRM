@@ -461,6 +461,17 @@ login_user $DU designer12345 $DX designer12345  # 第 7 节已把 designer 密�
 c=$(code -b $DX "$B/costs"); chk "designer 访问成本页被拒" 403 "$c"
 c=$(code -b $D "$B/costs"); chk "sales 访问成本页（有 cost:view）" 200 "$c"
 
+echo "== 7d. 关键字筛选（客户手机号/合同号 替代 客户ID/合同ID） =="
+c=$(code -b $J "$B/contracts?customer_q=13711112222"); chk "合同台账按手机号筛选" 200 "$c"
+has "ONE" && ok "手机号筛选命中合同" || bad "手机号筛选未命中合同"
+c=$(code -b $J "$B/contracts"); has 'name="customer_id"' && bad "合同台账仍用客户 ID 筛选" || ok "合同台账已改关键字筛选"
+c=$(code -b $J "$B/payments?contract_q=ONE"); chk "收款按合同号筛选" 200 "$c"
+has "ONE" && ok "合同号筛选命中收款" || bad "合同号筛选未命中收款"
+c=$(code -b $J "$B/payments"); has 'name="contract_id"' && bad "收款仍用合同 ID 筛选" || ok "收款已改合同号关键字筛选"
+c=$(code -b $J "$B/costs?customer_q=13711112222"); chk "利润核算按手机号筛选" 200 "$c"
+has "ONE" && ok "手机号筛选命中利润核算" || bad "手机号筛选未命中利润核算"
+c=$(code -b $J "$B/costs"); has 'name="customer_id"' && bad "利润核算仍用客户 ID 筛选" || ok "利润核算已改关键字筛选"
+
 echo "== 8. 会话失效 / 备份 / 审计 =="
 login_user $SU sales12345 $D sales12345x && ok "sales 重新登录" || bad "sales 重新登录失败"
 c=$(code -b $D $B/customers); chk "sales 会话有效" 200 "$c"
