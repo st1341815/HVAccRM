@@ -165,7 +165,7 @@ docker compose exec crm sh        # 进容器 shell
 在 NAS（如飞牛 fnOS）上，相对路径 `./data` 可能因工作目录解析不同而失效，仓库另提供了 `docker-compose.nas.yml`，用宿主机绝对路径挂载：
 
 ```bash
-# 在 NAS 上、源码目录 /vol1/1000/crm 内执行：
+# 在 NAS 上、源码目录 /vol1/1000/Docker/Hvaccrm 内执行：
 docker compose -f docker-compose.nas.yml up -d --build
 ```
 
@@ -173,8 +173,8 @@ docker compose -f docker-compose.nas.yml up -d --build
 
 ```yaml
     volumes:
-      - /vol1/1000/crm/data:/data
-      - /vol1/1000/crm/config:/config:ro
+      - /vol1/1000/Docker/Hvaccrm/data:/data
+      - /vol1/1000/Docker/Hvaccrm/config:/config:ro
 ```
 
 ### 3.5 变体：内置 nginx 反代的完整栈（HTTPS）
@@ -235,7 +235,7 @@ server {
     client_max_body_size 50m;                  # 允许上传大照片
 
     location / {
-        proxy_pass http://crm:8000;            # 注意是服务名 crm
+        proxy_pass http://hvaccrm:8000;            # 注意是服务名 crm
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -320,7 +320,7 @@ data/
 └── logs/           # crm.log 等应用日志
 ```
 
-- 卷写在宿主机路径（`./data` 相对项目目录；NAS 上用 `docker-compose.nas.yml` 写绝对路径 `/vol1/1000/crm/data`）。
+- 卷写在宿主机路径（`./data` 相对项目目录；NAS 上用 `docker-compose.nas.yml` 写绝对路径 `/vol1/1000/Docker/Hvaccrm/data`）。
 - **备份、迁移、升级只需保住 `data/` 目录**，容器/镜像可随时重建。
 
 ---

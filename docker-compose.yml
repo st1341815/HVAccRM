@@ -1,8 +1,8 @@
 services:
-  crm:
+  hvaccrm:
     build: .
-    image: crm:local
-    container_name: crm
+    image: hvaccrm:local
+    container_name: hvaccrm
     restart: unless-stopped
     user: "1000:1000"
     ports:
