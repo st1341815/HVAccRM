@@ -138,6 +138,27 @@
     imgEl.style.transform = 'scale(2)';
   }
 
+  // 📷 拍照上传：点按钮 → 给同表单的文件框临时加 capture → 打开相机 → 选完自动提交。
+  // 只保留一个 name=files 文件框，避免「同名空文件部件」触发 FastAPI 的 422/500。
+  document.addEventListener('click', function (e) {
+    const cam = e.target.closest && e.target.closest('.cam-btn');
+    if (cam) {
+      e.preventDefault();
+      const form = cam.closest('form');
+      const inp = form && form.querySelector('input[type=file]');
+      if (!inp) return;
+      inp.setAttribute('capture', 'environment');
+      const done = function () {
+        inp.removeAttribute('capture');
+        inp.removeEventListener('change', done);
+        form.submit();  // DOM submit 不触发 HTML5 校验
+      };
+      inp.addEventListener('change', done);
+      inp.click();
+      return;
+    }
+  });
+
   document.addEventListener('click', function (e) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = e.target.closest && e.target.closest(ANCHOR_SEL);

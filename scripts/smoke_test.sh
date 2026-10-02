@@ -205,12 +205,16 @@ c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户硬装未完
 c=$(code -b $J "$B/ui/tasks"); chk "HTMX 任务片段" 200 "$c"
 
 echo "== 5b. 施工页照片上传 =="
+NFF=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'type="file" name="files"' | wc -l)
+[ "$NFF" -le 1 ] && ok "每个上传表单只有一个 files 文件框（无同名空部件）" || bad "上传表单存在多个 files 文件框（会触发 422/500）：$NFF"
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
 has "filter-collapse" && ok "施工页筛选条可折叠（手机端默认收起）" || bad "施工页筛选条未折叠"
 has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样式）" || bad "任务表缺 tasks class"
 has 'accept="image/*" multiple required' && bad "上传控件仍带 required（另一文件框为空会静默拦截提交）" || ok "上传控件不带 required（拍照/选图都能提交）"
+has 'name="back" value="/tasks?scope=all&' && bad "上传控件 back 带了 partial（局部刷新地址）" || ok "上传控件 back 指向完整页面（不含 partial）"
+has 'name="files" type="file"' > /dev/null 2>&1 || true
 TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
 echo "  上传到任务 TID=$TT"
 # 复用已上传过的图（物理文件被去重复用），避免影响第 6 节的物理文件净增计数
@@ -238,7 +242,7 @@ has "计划完成" && bad "客户工序页仍有计划完成列" || ok "客户�
 
 echo "== 5c. 施工看板增强（快捷筛选 / 分组视图 / 拍照 / 完工备注） =="
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板" 200 "$c"
-has 'capture="environment"' && ok "手机端相机直拍按钮（capture=environment）" || bad "缺相机直拍按钮"
+has 'class="cam-btn"' && has "setAttribute('capture'" && ok "相机直拍按钮（点按动态触发 capture）" || bad "缺相机直拍按钮"
 has "全部未完成" && has "我负责的" && ok "快捷筛选 chips（全部未完成 / 我负责的）" || bad "快捷筛选 chips 缺失"
 has "按客户" && has "按任务" && ok "视图切换（按任务 / 按客户）" || bad "缺视图切换"
 # 施工不再做计划排期：计划列/到期/延期相关元素应当全部消失

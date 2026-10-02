@@ -151,11 +151,25 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return render(request, "error.html", status_code=exc.status_code, detail=exc.detail)
 
 
+def _safe_validation_errors(exc: RequestValidationError) -> list:
+    """把校验错误转成可 JSON 序列化的结构（空文件部件会夹带 ValueError，直接序列化会 500）。"""
+    import json as _json
+
+    safe = []
+    for item in exc.errors():
+        try:
+            _json.dumps(item)
+            safe.append(item)
+        except (TypeError, ValueError):
+            safe.append({k: (str(v) if k in ("msg", "type", "input") else v) for k, v in item.items()})
+    return safe
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exc: RequestValidationError):
     if request.url.path.startswith("/api"):
-        return JSONResponse({"detail": exc.errors()}, status_code=422)
-    return render(request, "error.html", status_code=422, detail=f"表单参数不合法：{exc.errors()[:2]}")
+        return JSONResponse({"detail": _safe_validation_errors(exc)}, status_code=422)
+    return render(request, "error.html", status_code=422, detail=f"表单参数不合法：{_safe_validation_errors(exc)[:2]}")
 
 
 @app.exception_handler(IntegrityError)
