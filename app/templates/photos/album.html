@@ -44,7 +44,7 @@
   <div class="gallery">
     {% for p in photos %}
       <figure>
-        <a href="/photos/{{ p.id }}/file" target="_blank">
+        <a class="photo-link" href="/photos/{{ p.id }}" target="_blank">
           <img src="/photos/{{ p.id }}/thumb" alt="{{ p.kind }}" loading="lazy">
         </a>
         <figcaption>

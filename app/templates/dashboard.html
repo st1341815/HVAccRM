@@ -106,7 +106,7 @@
   <h2>最新现场照片</h2>
   <div class="gallery">
     {% for p in recent_photos %}
-      <a href="/photos/{{ p.id }}/file" target="_blank" title="{{ p.kind }} · {{ p.created_at }}">
+      <a class="photo-link" href="/photos/{{ p.id }}" target="_blank" title="{{ p.kind }} · {{ p.created_at }}">
         <img src="/photos/{{ p.id }}/thumb" alt="{{ p.kind }}" loading="lazy">
         <span>{{ p.kind }}</span>
       </a>

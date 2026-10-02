@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}照片查看 · {{ photo.kind }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ photo.kind }}
+    <span class="muted small">{{ photo.width }}×{{ photo.height }}{% if total > 1 %} · 第 {{ pos }} / {{ total }} 张{% endif %}</span>
+  </h1>
+  <div class="actions">
+    <a class="btn ghost" href="{{ back_url }}">← 返回</a>
+    {% if prev_photo %}<a class="btn ghost" href="/photos/{{ prev_photo.id }}">‹ 上一张</a>{% endif %}
+    {% if next_photo %}<a class="btn ghost" href="/photos/{{ next_photo.id }}">下一张 ›</a>{% endif %}
+    <a class="btn" href="/photos/{{ photo.id }}/file" target="_blank">查看原图</a>
+  </div>
+</div>
+
+<section class="card photo-view">
+  <img src="/photos/{{ photo.id }}/file" alt="{{ photo.kind }}">
+</section>
+
+<div class="meta">
+  <span>客户：<a href="/customers/{{ customer.id }}">{{ customer.name }}</a></span>
+  <span>房号：{{ customer.room_label or '-' }}</span>
+  <span>分类：{{ photo.kind }}</span>
+  <span>时间：{{ photo.taken_at or photo.created_at }}</span>
+  {% if uploader %}<span>上传人：{{ uploader.display_name }}</span>{% endif %}
+  <span>原文件：{{ photo.orig_name or '-' }}</span>
+</div>
+
+{% if can_delete %}
+<section class="card">
+  <form method="post" action="/photos/{{ photo.id }}/delete" class="inline"
+        onsubmit="return confirm('删除这张照片？');">
+    <input type="hidden" name="back" value="/photos/album/{{ customer.id }}">
+    <button class="ghost danger">删除这张照片</button>
+  </form>
+  <a class="btn ghost" href="/photos/album/{{ customer.id }}">查看该客户全部照片 →</a>
+</section>
+{% endif %}
+{% endblock %}

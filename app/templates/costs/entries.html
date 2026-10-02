@@ -48,7 +48,7 @@
         <td>
           {% set phs = cost_photos.get(r.id, []) %}
           {% for ph in phs[:3] %}
-            <a href="/photos/{{ ph.id }}/file" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
+            <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
           {% endfor %}
           {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
           {% if not phs %}<span class="muted small">—</span>{% endif %}
