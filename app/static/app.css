@@ -164,7 +164,8 @@ button {
 button:hover { background: var(--brand-dark); }
 button.ghost { background: #e7ebee; color: var(--brand-dark); }
 button.ghost:hover { background: #d9dfe5; }
-button.danger { background: var(--red); }
+button.danger, .btn.danger { background: #f0e0e0; color: #8a4f4f; }
+button.danger:hover, .btn.danger:hover { background: #e7d2d2; color: #7d4545; }
 button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .btn { display: inline-block; padding: .42rem .9rem; border-radius: 6px; background: var(--brand); color: #fff; white-space: nowrap; }
 .btn:hover { background: var(--brand-dark); text-decoration: none; }
