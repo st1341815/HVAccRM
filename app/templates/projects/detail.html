@@ -26,8 +26,10 @@
 <section class="card">
   <h2>快捷添加房号</h2>
   <form method="post" action="/projects/{{ project.id }}/rooms" class="filterbar">
-    <input name="building" placeholder="楼栋 *（如 3号楼）" required list="building-list">
-    <datalist id="building-list">{% for b in buildings %}<option value="{{ b }}">{% endfor %}</datalist>
+    <select name="building" required>
+      <option value="">楼栋 *（请选择）</option>
+      {% for b in buildings %}<option value="{{ b.name }}">{{ b.name }}</option>{% endfor %}
+    </select>
     <select name="unit">
       <option value="">单元（可不选）</option>
       {% for u in unit_options %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
@@ -38,6 +40,10 @@
     <input name="layout" placeholder="户型（如 3室2厅）">
     <input name="delivery_date" placeholder="交房日期">
     <button type="submit">＋ 添加</button>
+  </form>
+  <form method="post" action="/projects/{{ project.id }}/buildings" class="filterbar" style="margin-top:.5rem">
+    <input name="name" placeholder="预录新楼栋（如 3号楼，自动去重）" required>
+    <button type="submit" class="ghost">＋ 新增楼栋</button>
   </form>
 </section>
 {% endif %}

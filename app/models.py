@@ -101,6 +101,7 @@ class Project(Base):
     created_at = Column(String, default=now_iso)
 
     rooms = relationship("Room", back_populates="project", cascade="all, delete-orphan")
+    buildings = relationship("Building", back_populates="project", cascade="all, delete-orphan")
 
     @property
     def label(self) -> str:
@@ -152,6 +153,20 @@ class Room(Base):
     @property
     def label(self) -> str:
         return "-".join(p for p in (self.building, self.unit, self.room_no) if p)
+
+
+class Building(Base):
+    """楼栋标准化字典：按楼盘预录、去重，房号表单从这里下拉选择，避免自由填写不一致。"""
+
+    __tablename__ = "buildings"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_building"),)
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String, nullable=False)
+    created_at = Column(String, default=now_iso)
+
+    project = relationship("Project", back_populates="buildings")
 
 
 class Customer(Base):

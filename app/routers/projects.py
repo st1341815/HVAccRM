@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Project, Room, UNIT_OPTIONS, User
+from ..models import Building, Customer, Project, Room, UNIT_OPTIONS, User
 from ..permissions import require_any
 from ..regions import validate_region
 from ..templating import redirect, render
@@ -17,6 +17,19 @@ from ..utils import client_ip, parse_date, parse_float, parse_int
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 VIEW_PERMS = ("customer:view", "contract:view", "task:view", "report:view", "admin:setting")
+
+
+def _ensure_building(db: Session, project_id: int, name: str) -> Building:
+    """楼栋去重登记：不存在则创建并返回（规范化房号填写）。"""
+    name = (name or "").strip()
+    b = db.scalars(
+        select(Building).where(Building.project_id == project_id).where(Building.name == name)
+    ).first()
+    if not b:
+        b = Building(project_id=project_id, name=name)
+        db.add(b)
+        db.flush()
+    return b
 
 
 @router.get("")
@@ -133,7 +146,9 @@ def project_detail(
     for room in rooms:
         cnt = db.scalar(select(func.count(Customer.id)).where(Customer.room_id == room.id))
         cust_map[room.id] = cnt or 0
-    buildings = sorted({r.building for r in rooms})
+    buildings = list(
+        db.scalars(select(Building).where(Building.project_id == project_id).order_by(Building.id)).all()
+    )
     return render(
         request,
         "projects/detail.html",
@@ -180,6 +195,8 @@ def add_room(
     ).first()
     if exists:
         return redirect(f"/projects/{project_id}", "该房号已存在", "err")
+    # 楼栋标准化：未登记则自动写入 buildings 表（去重）
+    _ensure_building(db, project_id, building.strip())
     room = Room(
         project_id=project_id,
         building=building.strip(),
@@ -253,15 +270,46 @@ def building_options(
     db: Session = Depends(get_db),
     user: User = Depends(require_any(*VIEW_PERMS)),
 ):
-    rows = db.execute(
-        select(Room.building, func.count(Room.id))
-        .where(Room.project_id == project_id)
-        .group_by(Room.building)
-        .order_by(Room.building)
-    ).all()
-    response = render(request, "_fragments/buildings.html", project_id=project_id, buildings=rows)
+    buildings = list(
+        db.scalars(select(Building).where(Building.project_id == project_id).order_by(Building.id)).all()
+    )
+    counts = dict(
+        db.execute(
+            select(Room.building, func.count(Room.id))
+            .where(Room.project_id == project_id)
+            .group_by(Room.building)
+        ).all()
+    )
+    response = render(request, "_fragments/buildings.html", project_id=project_id, buildings=buildings, counts=counts)
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@router.post("/{project_id}/buildings")
+def add_building(
+    request: Request,
+    project_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_any("customer:edit", "admin:setting")),
+):
+    """预录楼栋（去重）。房号表单从该表下拉，保证楼栋命名一致。"""
+    project = db.get(Project, project_id)
+    if not project:
+        return redirect("/projects", "楼盘不存在", "err")
+    name = name.strip()
+    if not name:
+        return redirect(f"/projects/{project_id}", "楼栋名称必填", "err")
+    exists = db.scalars(
+        select(Building).where(Building.project_id == project_id).where(Building.name == name)
+    ).first()
+    if exists:
+        return redirect(f"/projects/{project_id}", f"楼栋「{name}」已存在", "err")
+    db.add(Building(project_id=project_id, name=name))
+    db.flush()
+    log_action(db, user, "create", "buildings", None, new={"project_id": project_id, "name": name}, ip=client_ip(request))
+    commit_retry(db)
+    return redirect(f"/projects/{project_id}", f"楼栋「{name}」已添加")
 
 
 @router.get("/{project_id}/rooms")
