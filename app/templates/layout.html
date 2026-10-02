@@ -12,7 +12,7 @@
 {% if user %}
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">🌡️ <span>oneCRM</span></div>
+    <div class="brand">🌡️ <span>HVAccRM</span></div>
     <nav>
       <a href="/" class="{{ 'active' if current_path == '/' else '' }}"><span class="ico">📊</span>看板</a>
       {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}"><span class="ico">👥</span>客户</a>{% endif %}

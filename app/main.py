@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="oneCRM · 暖通空调客户管理系统",
+    title="HVAccRM · 暖通空调客户管理系统",
     version=__version__,
     lifespan=lifespan,
     docs_url="/api/docs",

@@ -133,7 +133,7 @@ def _make_image(kind: str, label: str, seed: int = 0) -> bytes:
     draw = ImageDraw.Draw(img)
     draw.rectangle([24, 24, 1176, 776], outline=(255, 255, 255), width=3)
     draw.text((60, 70), f"{kind} · {label}", fill=(255, 255, 255) if sum(color) < 600 else (40, 40, 40))
-    draw.text((60, 120), f"oneCRM demo image · {label}", fill=(255, 255, 255) if sum(color) < 600 else (90, 90, 90))
+    draw.text((60, 120), f"HVAccRM demo image · {label}", fill=(255, 255, 255) if sum(color) < 600 else (90, 90, 90))
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=88)
     return buf.getvalue()
