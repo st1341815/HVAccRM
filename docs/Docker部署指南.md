@@ -1,6 +1,6 @@
-# oneCRM · Docker 部署指南
+# HVAccRM · Docker 部署指南
 
-> 本文覆盖 oneCRM 的 Docker 镜像构建、容器编排、配置、数据持久化、备份、升级、反向代理与排障。
+> 本文覆盖 HVAccRM 的 Docker 镜像构建、容器编排、配置、数据持久化、备份、升级、反向代理与排障。
 > 面向有 Docker 基础的使用者；如果是飞牛（fnOS）NAS，可结合仓库根目录的 `DEPLOY_NAS.md` 一起看。
 
 ---
@@ -56,7 +56,7 @@
 
 ## 3. Compose 部署教程
 
-oneCRM 提供开箱即用的 Docker Compose 编排，单机/局域网自托管只需一个 `docker compose up` 即可跑起来。
+HVAccRM 提供开箱即用的 Docker Compose 编排，单机/局域网自托管只需一个 `docker compose up` 即可跑起来。
 
 ### 3.1 完整 compose 文件（可直接复制）
 
@@ -275,7 +275,7 @@ server {
 | 变量 | 默认 |
 | --- | --- |
 | `APP_NAME` | 暖通空调客户管理系统 |
-| `APP_NAME_EN` | oneCRM |
+| `APP_NAME_EN` | HVAccRM |
 
 ### 路径（容器内，一般不用改）
 
