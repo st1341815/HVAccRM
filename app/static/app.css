@@ -13,11 +13,13 @@
   --line: #e5e7eb;
   --brand: #2563eb;
   --brand-dark: #1d4ed8;
+  --brand-50: #eff6ff;
   --red: #dc2626;
   --green: #059669;
   --amber: #b45309;
   --radius: 10px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, .07);
 }
 * { box-sizing: border-box; }
 /* 图片兜底：任何未单独约束的图片都不超过容器宽度（手机端溢出的根因防线） */
@@ -40,18 +42,25 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 /* ---------------------------------------------------------------- 顶栏 */
 .topbar {
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  padding: .6rem 1.2rem; background: #111827; color: #f9fafb;
+  padding: .6rem 1.2rem; color: #f9fafb;
+  background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, .28);
   position: sticky; top: 0; z-index: 30;
   padding-left: max(1.2rem, env(safe-area-inset-left, 0px));
   padding-right: max(1.2rem, env(safe-area-inset-right, 0px));
 }
-.topbar .brand { font-weight: 700; }
+.topbar .brand { font-weight: 800; letter-spacing: .02em; }
 .topbar nav { display: flex; gap: .2rem; flex-wrap: wrap; flex: 1; }
-.topbar nav a { color: #d1d5db; padding: .3rem .7rem; border-radius: 6px; font-size: .92rem; }
-.topbar nav a:hover { background: #1f2937; text-decoration: none; }
-.topbar nav a.active { background: var(--brand); color: #fff; }
+.topbar nav a {
+  color: #d1d5db; padding: .3rem .7rem; border-radius: 8px; font-size: .92rem;
+  transition: background-color .15s ease, color .15s ease;
+}
+.topbar nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; text-decoration: none; }
+.topbar nav a.active { background: var(--brand); color: #fff; font-weight: 600; }
 .topbar .me { display: flex; gap: .6rem; align-items: center; font-size: .85rem; color: #9ca3af; }
-.topbar .me a { color: #e5e7eb; }
+.topbar .me a { color: #e5e7eb; transition: color .15s ease; }
+.topbar .me a:hover { color: #fff; text-decoration: none; }
 
 .wrap { max-width: 1180px; margin: 0 auto; padding: 1rem; }
 .foot { text-align: center; color: var(--muted); font-size: .78rem; padding: 1.5rem 0; }
@@ -59,7 +68,9 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 1rem; margin-bottom: 1rem; overflow-x: auto; box-shadow: var(--shadow);
+  transition: box-shadow .15s ease;
 }
+.card:hover { box-shadow: var(--shadow-md); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
 @media (max-width: 900px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
@@ -386,4 +397,51 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
 @media (min-width: 781px) and (max-width: 1024px) {
   .filterbar input, .filterbar select { min-width: 6.5rem; }
   .card { padding: .85rem; }
+}
+
+/* ================================================================ UI 视觉优化 */
+/* 平滑滚动 + 锚点避让吸顶栏 + 选中文字 + 移动端点击去高亮 */
+html { scroll-behavior: smooth; }
+section, .card, .anchor { scroll-margin-top: 4.6rem; }
+::selection { background: #bfdbfe; color: #1e3a8a; }
+* { -webkit-tap-highlight-color: transparent; }
+
+/* 按钮 / 链接 / chip / tabs 统一过渡与按压反馈 */
+button, .btn, .chip, .tabs a {
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+button:active, .btn:active { transform: translateY(1px); }
+
+/* 统一焦点环 */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+
+/* 指标卡：数字等宽对齐 */
+.kpi-num { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* 卡片标题左侧色条，层次更清晰 */
+.card > h2 { position: relative; padding-left: .6rem; }
+.card > h2::before {
+  content: ""; position: absolute; left: 0; top: .14em; bottom: .14em;
+  width: 3px; border-radius: 999px; background: var(--brand);
+}
+
+/* 登录卡片更醒目 */
+.login-card { box-shadow: 0 10px 32px rgba(15, 23, 42, .1); }
+.login-card h1 { font-size: 1.55rem; margin-bottom: .2rem; }
+
+/* 表格：桌面端行悬浮提示 */
+@media (min-width: 781px) {
+  tbody tr { transition: background-color .12s ease; }
+  tbody tr:hover { --row-bg: #eef4fd; }
+}
+
+/* 移动端：吸顶栏在窄屏也保留分隔感；操作区按钮撑满更好点按 */
+@media (max-width: 780px) {
+  .topbar { box-shadow: 0 2px 8px rgba(15, 23, 42, .18); }
+  .page-head .actions { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
+  .page-head .actions .btn, .page-head .actions button { width: 100%; }
+  .flash { border-radius: 8px; }
 }
