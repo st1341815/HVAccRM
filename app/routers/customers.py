@@ -42,8 +42,6 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 CUSTOMER_TYPES = ["家装业主", "工程客户", "经销商", "老客户转介"]
 SOURCES = ["自然到店", "老客户转介", "楼盘扫楼", "设计师推荐", "装修公司", "线上咨询", "其他"]
-LEVELS = ["A", "B", "C"]
-STATUSES = ["active", "won", "paused", "lost"]
 
 
 @router.get("")
@@ -51,7 +49,6 @@ def list_customers(
     request: Request,
     q: str = "",
     status: str = "",
-    level: str = "",
     source: str = "",
     owner: str = "",
     project_id: str = "",
@@ -62,8 +59,6 @@ def list_customers(
     customers = search_svc.search_customers(db, q, scope_cond=scope, limit=300)
     if status:
         customers = [c for c in customers if (c.status or "") == status]
-    if level:
-        customers = [c for c in customers if (c.level or "") == level]
     if source:
         customers = [c for c in customers if (c.source or "") == source]
     if owner:
@@ -81,7 +76,6 @@ def list_customers(
         customers=customers,
         q=q,
         status=status,
-        level=level,
         source=source,
         owner=owner,
         project_id=project_id,
@@ -90,8 +84,6 @@ def list_customers(
         summaries=summaries,
         show_money=show_money,
         sources=SOURCES,
-        levels=LEVELS,
-        statuses=STATUSES,
     )
 
 
@@ -134,7 +126,6 @@ def new_customer_form(
         owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
         types=CUSTOMER_TYPES,
         sources=SOURCES,
-        levels=LEVELS,
     )
 
 
@@ -147,7 +138,6 @@ def create_customer(
     wechat: str = Form(""),
     products: list[str] = Form([]),
     source: str = Form(""),
-    level: str = Form(""),
     status: str = Form("active"),
     room_id: str = Form(""),
     notes: str = Form(""),
@@ -169,8 +159,7 @@ def create_customer(
             owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
             types=CUSTOMER_TYPES,
             sources=SOURCES,
-            levels=LEVELS,
-        )
+            )
     scope = user.data_scope or DEFAULT_SCOPE.get(user.role, "self")
     owner = parse_int(owner_id) or 0
     if scope != "all" or not owner:
@@ -183,7 +172,6 @@ def create_customer(
         wechat=wechat.strip() or None,
         products=encode_products(products),
         source=source or None,
-        level=level or None,
         status=status or "active",
         room_id=parse_int(room_id),
         notes=notes.strip() or None,
@@ -283,7 +271,6 @@ def edit_customer_form(
         owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
         types=CUSTOMER_TYPES,
         sources=SOURCES,
-        levels=LEVELS,
     )
 
 
@@ -297,7 +284,6 @@ def update_customer(
     wechat: str = Form(""),
     products: list[str] = Form([]),
     source: str = Form(""),
-    level: str = Form(""),
     status: str = Form("active"),
     room_id: str = Form(""),
     notes: str = Form(""),
@@ -315,7 +301,6 @@ def update_customer(
         "wechat": customer.wechat,
         "products": customer.products,
         "source": customer.source,
-        "level": customer.level,
         "status": customer.status,
         "room_id": customer.room_id,
         "owner_id": customer.owner_id,
@@ -327,7 +312,6 @@ def update_customer(
     customer.wechat = wechat.strip() or None
     customer.products = encode_products(products)
     customer.source = source or None
-    customer.level = level or None
     customer.status = status or "active"
     customer.room_id = parse_int(room_id)
     customer.notes = notes.strip() or None

@@ -43,6 +43,7 @@ templates.env.globals["all_permissions"] = permissions.ALL_PERMISSIONS
 templates.env.globals["role_perms"] = permissions.ROLE_PERMS
 templates.env.globals["unit_options"] = models.UNIT_OPTIONS
 templates.env.globals["product_options"] = models.PRODUCT_OPTIONS
+templates.env.globals["customer_status_labels"] = models.CUSTOMER_STATUS_LABELS
 templates.env.globals["city_options"] = regions.CITY_OPTIONS
 templates.env.globals["city_districts"] = regions.CITY_DISTRICTS
 templates.env.globals["districts_of"] = regions.districts_of

@@ -9,7 +9,7 @@
       <td>{{ c.room_label_short or '-' }}</td>
       <td>{{ c.phone or '-' }}</td>
       <td class="small">{% for p in c.product_list %}<span class="badge">{{ p }}</span>{% else %}-{% endfor %}</td>
-      <td>{{ c.status }}</td>
+      <td>{{ customer_status_labels.get(c.status, c.status) }}</td>
       {% if show_money and s %}
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
