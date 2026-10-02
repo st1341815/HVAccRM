@@ -42,7 +42,7 @@
 //   点图片在「适应屏幕」与「2 倍放大」之间切换；Esc 或点空白处关闭。
 //   无 JS 时仍保留原有 <a href> 打开原图的行为（渐进增强）。
 (function () {
-  const ANCHOR_SEL = 'a[href^="/photos/"][href$="/file"]';
+  const ANCHOR_SEL = 'a.photo-link';
   let box = null, imgEl = null, counterEl = null, prevBtn = null, nextBtn = null;
   let items = [], idx = 0, startX = null, startY = null;
 

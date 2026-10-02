@@ -210,6 +210,7 @@ has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || ba
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
 has "filter-collapse" && ok "施工页筛选条可折叠（手机端默认收起）" || bad "施工页筛选条未折叠"
 has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样式）" || bad "任务表缺 tasks class"
+has 'accept="image/*" multiple required' && bad "上传控件仍带 required（另一文件框为空会静默拦截提交）" || ok "上传控件不带 required（拍照/选图都能提交）"
 TT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'name="task_id" value="[0-9]*"' | head -1 | grep -o '[0-9]*')
 echo "  上传到任务 TID=$TT"
 # 复用已上传过的图（物理文件被去重复用），避免影响第 6 节的物理文件净增计数
@@ -294,6 +295,12 @@ echo "  新文件回执：$MSG2"
 echo "$MSG2" | grep -q "新增 1 张" && ok "新文件正常入库（新增 1）" || bad "新文件入库异常: $MSG2"
 
 c=$(code -b $J "$B/photos/album/$CID"); chk "相册页" 200 "$c"
+has 'class="photo-link"' && ok "缩略图链接指向照片查看页（不再直接跳原图）" || bad "缩略图仍直链原图"
+PHLINK=$(curl -s -b $J "$B/photos/album/$CID" | grep -o 'class="photo-link" href="/photos/[0-9]*"' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J "$B/photos/$PHLINK"); chk "照片查看页" 200 "$c"
+has "返回" && ok "查看页有返回控件" || bad "查看页缺返回控件"
+has "查看原图" && ok "查看页可单独打开原图" || bad "查看页缺原图入口"
+has "photo-view" && ok "查看页图片按屏幕缩放" || bad "查看页缺缩放样式"
 PH=$(curl -s -b $J "$B/photos/album/$CID" | grep -o '/photos/[0-9]*/thumb' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J "$B/photos/$PH/thumb"); chk "缩略图(WebP)" 200 "$c"
 c=$(code -b $J "$B/photos/$PH/file"); chk "原图下载" 200 "$c"

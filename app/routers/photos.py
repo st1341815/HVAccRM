@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Photo, Task, User
+from ..models import Customer, Photo, Task, User, today_str
 from ..permissions import has_perm, require, visible_customer_ids
 from ..services import photos as photo_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int, return_path
+from ..utils import client_ip, get_or_404, parse_int, return_path, return_path
 
 router = APIRouter(tags=["photos"])
 
@@ -134,6 +134,49 @@ def delete_photo(
     # 允许调用方指定返回页（合同详情页/施工看板），仅接受站内相对路径
     target = return_path(back, request.headers.get("referer"), f"/photos/album/{cid}")
     return redirect(target, msg)
+
+
+@router.get("/photos/{photo_id}")
+def photo_view(
+    request: Request,
+    photo_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user_or_redirect),
+):
+    """照片查看页：适配屏幕的放大显示 + 返回入口 + 同分类上一张/下一张。
+
+    点缩略图仍优先由灯箱拦截（体验更顺）；中键/新标签打开、或未启用 JS 时
+    落到这个页面，不会再出现「裸图片、无返回」的情况。
+    """
+    photo = get_or_404(db, Photo, photo_id, "照片")
+    customer = db.get(Customer, photo.customer_id)
+    if not customer or not _may_view(db, user, customer):
+        return render(request, "403.html", status_code=403)
+    siblings = list(
+        db.scalars(
+            select(Photo)
+            .where(Photo.customer_id == photo.customer_id)
+            .where(Photo.kind == photo.kind)
+            .order_by(Photo.id)
+        ).all()
+    )
+    ids = [p.id for p in siblings]
+    idx = ids.index(photo.id) if photo.id in ids else 0
+    uploader = db.get(User, photo.uploaded_by) if photo.uploaded_by else None
+    return render(
+        request,
+        "photos/view.html",
+        photo=photo,
+        customer=customer,
+        uploader=uploader,
+        prev_photo=siblings[idx - 1] if idx > 0 else None,
+        next_photo=siblings[idx + 1] if idx + 1 < len(siblings) else None,
+        back_url=return_path(None, request.headers.get("referer"), f"/photos/album/{photo.customer_id}"),
+        can_delete=has_perm(user, "photo:delete"),
+        total=len(siblings),
+        pos=idx + 1,
+        today=today_str(),
+    )
 
 
 @router.get("/photos/{photo_id}/file")
