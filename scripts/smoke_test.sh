@@ -106,6 +106,14 @@ has "测试楼盘A-合肥-包河区" && ok "楼盘下拉带城市/区县（名�
 has "按标准工序模板生成施工节点任务" && ok "文案已去掉「9 个」" || bad "文案未更新"
 has "<details class=\"ms\"" && ok "意向产品为下拉式多选控件" || bad "意向产品未改为下拉多选"
 has 'name="products"' && ok "下拉多选仍提交 products 字段" || bad "下拉多选缺 products 字段"
+# 客户等级已去除；状态展示中文
+has 'name="level"' && bad "客户表单仍有「客户等级」字段" || ok "已去除客户等级字段"
+has "跟进中" && ok "客户状态显示中文（表单选项）" || bad "客户状态仍为英文"
+c=$(code -b $J "$B/customers"); chk "客户列表" 200 "$c"
+has "跟进中" && ok "客户列表状态显示中文" || bad "客户列表状态仍为英文"
+has ">active<" && bad "客户列表仍显示英文 active" || ok "客户列表无英文状态"
+c=$(code -b $J "$B/customers/$CID"); chk "客户详情" 200 "$c"
+has "等级" && bad "客户详情仍有等级徽标" || ok "客户详情已去除等级"
 c=$(code -b $J "$B/customers"); has "测试楼盘A-合肥-包河区" && ok "客户列表楼盘筛选也带城市/区县" || bad "客户列表楼盘筛选未更新"
 c=$(code -b $J --get --data-urlencode "q=测试楼盘A" "$B/projects/rooms/search?project_id=$PID")
 chk "按楼盘名称搜房号" 200 "$c"

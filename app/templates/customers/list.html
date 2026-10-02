@@ -11,11 +11,7 @@
     <input name="q" value="{{ q }}" placeholder="搜索：客户名 / 手机号 / 微信 / 备注（FTS5）">
     <select name="status">
       <option value="">全部状态</option>
-      {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}
-    </select>
-    <select name="level">
-      <option value="">全部等级</option>
-      {% for l in levels %}<option value="{{ l }}" {{ 'selected' if level == l else '' }}>{{ l }}</option>{% endfor %}
+      {% for s, label in customer_status_labels.items() %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ label }}</option>{% endfor %}
     </select>
     <select name="source">
       <option value="">全部来源</option>

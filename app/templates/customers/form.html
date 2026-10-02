@@ -20,16 +20,10 @@
         {% for s in sources %}<option value="{{ s }}" {{ 'selected' if customer and customer.source == s else '' }}>{{ s }}</option>{% endfor %}
       </select>
     </label>
-    <label>客户等级
-      <select name="level">
-        <option value="">未分级</option>
-        {% for l in levels %}<option value="{{ l }}" {{ 'selected' if customer and customer.level == l else '' }}>{{ l }}</option>{% endfor %}
-      </select>
-    </label>
     <label>状态
       <select name="status">
-        {% for s in ['active','won','paused','lost'] %}
-        <option value="{{ s }}" {{ 'selected' if customer and customer.status == s else '' }}>{{ s }}</option>
+        {% for s, label in customer_status_labels.items() %}
+        <option value="{{ s }}" {{ 'selected' if customer and customer.status == s else '' }}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>

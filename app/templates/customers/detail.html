@@ -3,8 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ customer.name }}
-    <span class="badge">{{ customer.status }}</span>
-    {% if customer.level %}<span class="badge">等级 {{ customer.level }}</span>{% endif %}
+    <span class="badge">{{ customer_status_labels.get(customer.status, customer.status) }}</span>
   </h1>
   <div class="actions">
     <a class="btn" href="/photos/album/{{ customer.id }}">相册</a>
