@@ -17,7 +17,7 @@
     <thead><tr><th>房号</th><th>未收金额</th><th></th></tr></thead>
     <tbody>
     {% for c, amount in debtors %}
-      <tr><td>{{ c.room_label or c.name }}</td><td class="red">{{ amount|money }}</td><td><a href="/customers/{{ c.id }}?tab=finance">查看 →</a></td></tr>
+      <tr><td>{{ c.room_label_short or c.name }}</td><td class="red">{{ amount|money }}</td><td><a href="/customers/{{ c.id }}?tab=finance">查看 →</a></td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -32,7 +32,7 @@
     {% for c, s in rows %}
       <tr class="{{ 'row-alert' if s.outstanding > 0 else '' }}">
         <td>{{ c.no or ('#' ~ c.id) }}</td>
-        <td>{{ (c.customer.room_label or c.customer.name) if c.customer else c.customer_id }}</td>
+        <td>{{ (c.customer.room_label_short or c.customer.name) if c.customer else c.customer_id }}</td>
         <td>{{ s.total|money }}</td>
         <td>{{ s.received|money }}</td>
         <td class="red">{{ s.outstanding|money }}</td>

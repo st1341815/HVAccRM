@@ -6,7 +6,7 @@
     {% set s = summaries.get(c.id) %}
     <tr>
       <td><a href="/customers/{{ c.id }}">{{ c.name }}</a></td>
-      <td>{{ c.room_label or '-' }}</td>
+      <td>{{ c.room_label_short or '-' }}</td>
       <td>{{ c.phone or '-' }}</td>
       <td class="small">{% for p in c.product_list %}<span class="badge">{{ p }}</span>{% else %}-{% endfor %}</td>
       <td>{{ c.status }}</td>

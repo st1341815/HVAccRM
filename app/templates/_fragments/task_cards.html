@@ -5,7 +5,7 @@
     <section class="task-card">
       <div class="tc-head">
         {% if c %}<a href="/customers/{{ c.id }}?tab=tasks"><strong>{{ c.name }}</strong></a>
-          <span class="muted small">{{ c.room_label }}</span>
+          <span class="muted small">{{ c.room_label_short }}</span>
         {% else %}<strong>#{{ g.tasks[0].customer_id if g.tasks else '' }}</strong>{% endif %}
         <span class="badge">{{ g.progress }}%</span>
         {% if g.open %}<span class="badge s-doing">未完成 {{ g.open }}</span>{% endif %}

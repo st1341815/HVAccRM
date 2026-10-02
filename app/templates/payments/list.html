@@ -37,7 +37,7 @@
         <td>{{ p.paid_at }}</td>
         <td class="{{ 'red' if p.amount < 0 else '' }}"><strong>{{ p.amount|money }}</strong></td>
         <td>{{ c.no or ('#' ~ p.contract_id) if c else p.contract_id }}</td>
-        <td>{% if c and c.customer %}<a href="/customers/{{ c.customer_id }}?tab=finance">{{ c.customer.room_label or c.customer.name }}</a>{% else %}-{% endif %}</td>
+        <td>{% if c and c.customer %}<a href="/customers/{{ c.customer_id }}?tab=finance">{{ c.customer.room_label_short or c.customer.name }}</a>{% else %}-{% endif %}</td>
         <td>{{ p.method or '-' }}</td>
         <td>{{ p.voucher_no or '-' }}</td>
         <td>{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>

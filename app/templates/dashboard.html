@@ -41,7 +41,7 @@
     <tbody>
     {% for t in open_tasks %}
       <tr>
-        <td>{% if customers_map.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers_map[t.customer_id].room_label or customers_map[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
+        <td>{% if customers_map.get(t.customer_id) %}<a href="/customers/{{ t.customer_id }}?tab=tasks">{{ customers_map[t.customer_id].room_label_short or customers_map[t.customer_id].name }}</a>{% else %}#{{ t.customer_id }}{% endif %}</td>
         <td>{{ t.stage }}</td>
         <td><span class="badge s-{{ t.status }}">{{ t.status }}</span></td>
       </tr>
@@ -67,7 +67,7 @@
     <thead><tr><th>房号</th><th>未收金额</th></tr></thead>
     <tbody>
     {% for c, amount in finance.debtors %}
-      <tr><td><a href="/customers/{{ c.id }}?tab=finance">{{ c.room_label or c.name }}</a></td><td class="red">{{ amount|money }}</td></tr>
+      <tr><td><a href="/customers/{{ c.id }}?tab=finance">{{ c.room_label_short or c.name }}</a></td><td class="red">{{ amount|money }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

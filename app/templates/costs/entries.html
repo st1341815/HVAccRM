@@ -39,7 +39,7 @@
       <tr>
         <td>{{ r.spent_at or '-' }}</td>
         <td>{% if c %}<a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a>{% else %}#{{ r.contract_id }}{% endif %}</td>
-        <td>{% if c and c.customer %}{{ c.customer.room_label or c.customer.name }}{% else %}-{% endif %}</td>
+        <td>{% if c and c.customer %}{{ c.customer.room_label_short or c.customer.name }}{% else %}-{% endif %}</td>
         <td>{{ r.category }}</td>
         <td><strong>{{ r.amount|money }}</strong></td>
         <td>{{ suppliers[r.supplier_id].name if r.supplier_id and suppliers.get(r.supplier_id) else '-' }}</td>

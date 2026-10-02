@@ -33,7 +33,7 @@
     {% for c, s in rows %}
       <tr>
         <td>{{ c.no or ('#' ~ c.id) }}</td>
-        <td><a href="/customers/{{ c.customer_id }}?tab=finance">{{ (c.customer.room_label or c.customer.name) if c.customer else c.customer_id }}</a></td>
+        <td><a href="/customers/{{ c.customer_id }}?tab=finance">{{ (c.customer.room_label_short or c.customer.name) if c.customer else c.customer_id }}</a></td>
         <td>{{ c.sign_date }}</td>
         {% if can_amount %}
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
