@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Photo, StageTemplate, Task, User, now_iso, today_str
+from ..models import Customer, Photo, Project, Room, StageTemplate, Task, User, now_iso, today_str
 from ..permissions import has_perm, require, task_scope_conditions, visible_customer_ids
 from ..services import photos as photo_svc
 from ..services import tasks as task_svc
@@ -60,7 +60,7 @@ def task_board(
     assignee: str = "",
     stage: str = "",
     status: str = "",
-    customer_id: str = "",
+    q: str = "",
     scope: str = "open",
     view: str = "tasks",
     partial: str = "",
@@ -77,8 +77,27 @@ def task_board(
         stmt = stmt.where(Task.stage == stage)
     if status:
         stmt = stmt.where(Task.status == status)
-    if customer_id:
-        stmt = stmt.where(Task.customer_id == parse_int(customer_id))
+    # 关键字筛选：客户姓名 / 手机号 / 房号（楼栋·单元·房号）/ 楼盘名
+    if q and q.strip():
+        kw = f"%{q.strip()}%"
+        cids = list(
+            db.scalars(
+                select(Customer.id)
+                .outerjoin(Room, Customer.room_id == Room.id)
+                .outerjoin(Project, Room.project_id == Project.id)
+                .where(
+                    or_(
+                        Customer.name.like(kw),
+                        Customer.phone.like(kw),
+                        Room.building.like(kw),
+                        Room.unit.like(kw),
+                        Room.room_no.like(kw),
+                        Project.name.like(kw),
+                    )
+                )
+            ).all()
+        )
+        stmt = stmt.where(Task.customer_id.in_(cids or [-1]))
     if scope == "open":
         stmt = stmt.where(Task.status.notin_(["done", "skipped"]))
     tasks = list(db.scalars(stmt.limit(500)).all())
@@ -91,7 +110,7 @@ def task_board(
         "assignee": assignee,
         "stage": stage,
         "status": status,
-        "customer_id": customer_id,
+        "q": q,
         "scope": scope,
         "view": view,
     }
