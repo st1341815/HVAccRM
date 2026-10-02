@@ -97,7 +97,9 @@
     if (!items.length) return;
     idx = (i + items.length) % items.length;
     const a = items[idx];
-    imgEl.src = a.getAttribute('href');
+    // href 指向照片查看页（/photos/{id}），灯箱要显示的是原图文件（/photos/{id}/file）
+    let url = a.getAttribute('href') || '';
+    imgEl.src = /\/file$/.test(url) ? url : (url + '/file');
     imgEl.style.transform = '';
     imgEl.style.transformOrigin = 'center center';
     const thumb = a.querySelector('img');

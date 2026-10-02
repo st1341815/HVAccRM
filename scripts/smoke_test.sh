@@ -466,6 +466,7 @@ has "lightbox" && ok "页面注入图片灯箱（点开放大）" || bad "缺图
 has "lb-prev" && has "lb-next" && ok "灯箱含上一张/下一张控件" || bad "灯箱缺切换控件"
 has "touchstart" && ok "灯箱支持触摸滑动切图" || bad "灯箱缺触摸手势"
 has "ArrowLeft" && ok "灯箱支持键盘左右切换" || bad "灯箱缺键盘支持"
+has "url + '/file'" && ok "灯箱显示原图文件（不把查看页 HTML 当图片）" || bad "灯箱图片源错误"
 c=$(code -b $J "$B/customers"); chk "客户列表页" 200 "$c"
 has "js-stack" && ok "页面注入宽表格卡片化脚本" || bad "页面缺卡片化脚本"
 has "viewport-fit=cover" && ok "viewport 适配刘海屏" || bad "viewport 未适配"
