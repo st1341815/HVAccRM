@@ -43,7 +43,7 @@
       <option value="">全部状态</option>
       {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if filters.status == k else '' }}>{{ v }}</option>{% endfor %}
     </select>
-    <input name="customer_id" value="{{ filters.customer_id }}" placeholder="客户 ID" inputmode="numeric">
+    <input name="q" value="{{ filters.q }}" placeholder="房号 / 楼盘 / 客户姓名">
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/tasks">重置</a>
   </form>

@@ -259,6 +259,11 @@ has "按客户" && has "按任务" && ok "视图切换（按任务 / 按客户�
 has "今日到期" && bad "施工页仍有「今日到期」筛选" || ok "已去掉到期筛选"
 has "只看延期" && bad "施工页仍有「只看延期」筛选" || ok "已去掉延期筛选"
 has "<th>计划</th>" && bad "任务表仍有「计划」列" || ok "任务表已去掉计划列"
+# 筛选：关键字搜房号/楼盘/客户姓名；去除客户 ID 筛选控件
+has 'placeholder="房号 / 楼盘 / 客户姓名"' && ok "施工筛选含房号/楼盘/客户姓名关键字" || bad "缺关键字筛选输入"
+has 'name="customer_id"' && bad "仍有客户 ID 筛选控件" || ok "已去除客户 ID 筛选控件"
+c=$(code -b $J "$B/tasks?scope=all&q=13711112222"); chk "按客户手机号筛选" 200 "$c"
+has "测试客户张三" && ok "关键字筛选命中该客户工序" || bad "关键字筛选未命中"
 PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST --data-urlencode "planned_end=2000-01-01" $B/tasks/$PTID/plan)
 chk "改工期接口已删除（404）" 404 "$c"
