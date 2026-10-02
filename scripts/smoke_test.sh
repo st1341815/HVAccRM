@@ -303,11 +303,12 @@ PY
 JAR=/tmp/crmtest/upjar.txt
 rm -f $JAR
 MFILE=/tmp/crmtest/media_count.txt
-count_media() { # 统计某客户目录下的物理文件数
+MEDIA_DIR="${MEDIA_DIR:-/tmp/crmtest-local/data/media}"   # 本地自检时应用的工作目录（media 在 DATA_DIR 下）
+count_media() { # 统计 media 下物理文件总数（目录按合同编号命名，递归统计更稳）
   if [ -n "$MEDIA_BASE" ]; then
-    curl -s -m 10 "$MEDIA_BASE/crm/data/media/$CID/%E7%8E%B0%E5%9C%BA/" | grep -o 'href="[^"?]*"' | wc -l
+    curl -s -m 10 "$MEDIA_BASE/crm/data/media/" | grep -o 'href="[^"?]*"' | wc -l
   else
-    ls "/tmp/crmtest/media/$CID/现场/" 2>/dev/null | wc -l
+    find "$MEDIA_DIR" -type f 2>/dev/null | wc -l
   fi
 }
 N0=$(count_media)
@@ -338,6 +339,9 @@ if [ -n "$MEDIA_BASE" ]; then
   curl -s -m 10 "$MEDIA_BASE/crm/data/media/$CID/%E7%8E%B0%E5%9C%BA/" | grep -o 'href="[^"]*\.\(jpg\|webp\)"' | head -6
 fi
 [ $((N1 - N0)) -eq 6 ] && ok "物理文件净增 6（3 新图 × [原图 + 缩略图]，重复文件未新增）" || bad "物理文件净增异常: $((N1 - N0))"
+if [ -z "$MEDIA_BASE" ]; then
+  ls "$MEDIA_DIR" 2>/dev/null | grep -qE '^ONE[0-9]+$' && ok "照片目录按合同编号命名" || bad "照片目录未按合同编号命名"
+fi
 
 c=$(code -b $J -X POST $B/photos/$PH/delete); chk "删除照片" 303 "$c"
 

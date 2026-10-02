@@ -74,6 +74,65 @@ def _make_thumb(img: Image.Image, dest: Path) -> None:
     thumb.save(dest, "WEBP", quality=s.thumb_quality, method=4)
 
 
+def _contract_no_for(
+    db: Session,
+    customer_id: int | None,
+    contract_id: int | None = None,
+    payment_id: int | None = None,
+    cost_id: int | None = None,
+    task_id: int | None = None,
+) -> str:
+    """照片目录名：优先取关联合同编号（如 ONE202610020001），取不到返回空串。
+
+    顺序：直接挂合同 → 收款所属合同 → 成本所属合同 → 施工节点所属客户的合同 → 客户最早一份合同。
+    """
+    from ..models import Contract, ContractCost, Payment, Task
+
+    def _no_of(cid: int | None) -> str:
+        if not cid:
+            return ""
+        c = db.get(Contract, cid)
+        return (c.no or "") if c else ""
+
+    if contract_id:
+        no = _no_of(contract_id)
+        if no:
+            return no
+    if payment_id:
+        p = db.get(Payment, payment_id)
+        if p:
+            no = _no_of(p.contract_id)
+            if no:
+                return no
+    if cost_id:
+        cc = db.get(ContractCost, cost_id)
+        if cc:
+            no = _no_of(cc.contract_id)
+            if no:
+                return no
+    cid = customer_id
+    if task_id:
+        t = db.get(Task, task_id)
+        if t:
+            cid = t.customer_id
+    if cid:
+        c = db.scalars(
+            select(Contract).where(Contract.customer_id == cid).order_by(Contract.id).limit(1)
+        ).first()
+        if c and c.no:
+            return c.no
+    return ""
+
+
+def _storage_key(db: Session, customer_id: int, contract_id=None, payment_id=None, cost_id=None, task_id=None) -> str:
+    """媒体目录名：合同编号优先，取不到合同则回落客户 ID；并做文件名安全过滤。"""
+    no = _contract_no_for(
+        db, customer_id, contract_id=contract_id, payment_id=payment_id, cost_id=cost_id, task_id=task_id
+    )
+    safe = "".join(ch for ch in no if ch.isalnum() or ch in "-_")
+    return safe or str(customer_id)
+
+
 def find_by_hash(db: Session, sha: str) -> Photo | None:
     return db.scalars(select(Photo).where(Photo.sha256 == sha).limit(1)).first()
 
@@ -134,8 +193,8 @@ def save_photo(
 ) -> tuple[Photo | None, str]:
     """保存一张照片。返回 (Photo, 状态信息)。
 
-    路径规范：data/media/{customer_id}/{kind}/{uuid}.jpg|png|webp …
-    禁止使用客户名或房号作为文件名/目录名。
+    路径规范：data/media/{合同编号|客户ID}/{kind}/{uuid}.ext
+    目录名优先用合同编号（取不到合同则回落客户 ID）；禁止使用客户名或房号作为文件名/目录名。
     """
     if not raw:
         return None, "空文件"
@@ -179,7 +238,9 @@ def save_photo(
     ext = (Path(orig_name).suffix or ".jpg").lower()
     if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".gif"}:
         ext = ".jpg"
-    rel_dir = Path(str(customer_id)) / kind
+    rel_dir = Path(
+        _storage_key(db, customer_id, contract_id=contract_id, payment_id=payment_id, cost_id=cost_id, task_id=task_id)
+    ) / kind
     fname = f"{uuid.uuid4().hex}{ext}"
     rel_path = rel_dir / fname
     dest = root / rel_path
