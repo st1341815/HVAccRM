@@ -26,6 +26,16 @@ STATUS_LABELS = {
 }
 
 
+def _norm_date(s: str | None) -> str:
+    """把表单日期规整为 YYYY-MM-DD；空值/非法值回落到今天。"""
+    from datetime import date
+
+    try:
+        return date.fromisoformat((s or "").strip()[:10]).isoformat()
+    except (ValueError, TypeError):
+        return today_str()
+
+
 def _can_touch(db: Session, user: User, task: Task) -> bool:
     if user.role == "admin":
         return True
@@ -197,19 +207,20 @@ def done(
     request: Request,
     task_id: int,
     notes: str = Form(""),
+    done_date: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
 ):
     task = get_or_404(db, Task, task_id, "工序任务")
     if not _can_touch(db, user, task):
         return render(request, "403.html", status_code=403)
+    d = _norm_date(done_date)
     if notes.strip():
-        # 追加而非覆盖：保留原有备注（如计划备注/延期原因），带上完工日期便于追溯
-        stamp = today_str()
+        # 追加而非覆盖：保留原有备注，带上实际施工日期便于追溯
         prev = (task.notes or "").strip()
-        entry = f"[{stamp} 完工] {notes.strip()}"
+        entry = f"[{d} 完工] {notes.strip()}"
         task.notes = f"{prev}\n{entry}" if prev else entry
-    ok, msg = task_svc.finish_task(db, task)
+    ok, msg = task_svc.finish_task(db, task, d)
     if ok and task_svc.stage_photo_requirements(db).get(task.stage):
         have = db.scalar(select(func.count(Photo.id)).where(Photo.task_id == task.id)) or 0
         if not have:

@@ -19,7 +19,7 @@
               <span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span>
             </div>
             <div class="tc-step-meta muted small">
-              {% if t.actual_start %}开工 {{ t.actual_start }}{% endif %}{% if t.actual_end %} · 完工 {{ t.actual_end }}{% endif %}
+              {% if t.actual_end %}施工 {{ t.actual_end }}{% elif t.actual_start %}开工 {{ t.actual_start }}{% endif %}
               {% if not t.actual_start and t.assignee_id and users_map.get(t.assignee_id) %}责任人 {{ users_map[t.assignee_id].display_name }}{% elif t.actual_start and t.assignee_id and users_map.get(t.assignee_id) %} · {{ users_map[t.assignee_id].display_name }}{% endif %}
             </div>
             {% if t.skip_reason %}<div class="muted small">跳过：{{ t.skip_reason }}</div>{% endif %}
@@ -33,6 +33,9 @@
               <div class="tc-actions">
                 <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
                   <input name="notes" placeholder="完工备注（可选）">
+                  <label class="inline-label" title="实际施工日期（默认今天，补录时可选之前日期）">施工日期
+                    <input type="date" name="done_date" value="{{ today }}">
+                  </label>
                   <button>完工</button>
                 </form>
                 <details class="tc-skip">

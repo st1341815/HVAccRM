@@ -81,10 +81,17 @@ def start_task(db: Session, task: Task) -> tuple[bool, str]:
     return True, "已开工"
 
 
-def finish_task(db: Session, task: Task) -> tuple[bool, str]:
+def finish_task(db: Session, task: Task, done_date: str | None = None) -> tuple[bool, str]:
+    """完工。done_date 为实际施工日期（每个工序 1 天），缺省今天。
+
+    补录场景下「上传/操作时间」可能≠「实际施工时间」，故由调用方传入施工日期；
+    该日期同时作为 actual_start 与 actual_end（单日工序）。
+    """
     if task.status == "pending":
         return False, "前置节点未完成，不能直接完工"
-    task.actual_end = today_str()
+    d = (done_date or "").strip()[:10] or today_str()
+    task.actual_start = d
+    task.actual_end = d
     task.status = "done"
     activate_next_stage(db, task.customer_id)
     return True, "已完工"
