@@ -55,13 +55,18 @@
       <tr>
         <td>{{ t.sort_order }}</td>
         <td>{{ t.stage }}{% if t.skip_reason %}<div class="muted small">跳过原因：{{ t.skip_reason }}</div>{% endif %}</td>
-        <td>{{ t.actual_start or '-' }} ~ {{ t.actual_end or '-' }}</td>
+        <td>{{ t.actual_end or t.actual_start or '-' }}</td>
         <td>{{ t.assignee.display_name if t.assignee else '-' }}</td>
         <td>{% include "_fragments/task_photos.html" with context %}</td>
         <td><span class="badge">{{ t.status }}</span></td>
         <td>
           {% if t.status in ['doing'] and can('task:view') %}
-          <form method="post" action="/tasks/{{ t.id }}/done" class="inline"><button>完工</button></form>
+          <form method="post" action="/tasks/{{ t.id }}/done" class="inline">
+            <label class="inline-label" title="实际施工日期（默认今天，补录时可选之前日期）">施工日期
+              <input type="date" name="done_date" value="{{ today }}">
+            </label>
+            <button>完工</button>
+          </form>
           {% endif %}
           {% if t.status not in ['done','skipped'] and can('task:view') %}
           <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
