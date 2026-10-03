@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block title %}案例{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>案例 <span class="muted small">共 {{ cases|length }} 条</span></h1>
+  <p class="muted small">前期施工 / 后期施工完工后自动生成。仅展示房号、工序、施工时间、师傅与产品类型，不含客户隐私与商业信息。</p>
+</div>
+
+<section class="card">
+  <form method="get" action="/cases" class="filterbar">
+    <input name="q" value="{{ filters.q }}" placeholder="房号 / 楼盘关键词">
+    <select name="stage">
+      <option value="">全部工序</option>
+      {% for s in stage_options %}<option value="{{ s }}" {{ 'selected' if filters.stage == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="product_type">
+      <option value="">全部产品</option>
+      {% for p in product_options %}<option value="{{ p }}" {{ 'selected' if filters.product_type == p else '' }}>{{ p }}</option>{% endfor %}
+    </select>
+    <select name="installer">
+      <option value="">全部师傅</option>
+      {% for iid, iname in installer_options %}<option value="{{ iid }}" {{ 'selected' if filters.installer == iid|string else '' }}>{{ iname }}</option>{% endfor %}
+    </select>
+    <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/cases">重置</a>
+  </form>
+</section>
+
+<section class="card">
+  <table class="tight">
+    <thead><tr><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>责任人</th><th>产品类型</th><th>分享</th></tr></thead>
+    <tbody>
+    {% for c in cases %}
+      <tr>
+        <td>{{ c.work_date or '-' }}</td>
+        <td class="break">{{ c.room_label }}</td>
+        <td>{{ c.stage }}</td>
+        <td>{{ c.installer_name or '-' }}</td>
+        <td>{{ c.product_type or '-' }}</td>
+        <td>
+          {% set share_url = base_url ~ 'cases/share/' ~ c.share_token %}
+          <a class="btn ghost small" href="/cases/share/{{ c.share_token }}" target="_blank" rel="noopener">预览</a>
+          <button type="button" class="btn ghost small js-copy" data-url="{{ share_url }}">复制链接</button>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not cases %}<p class="muted">还没有案例。完成一个「前期施工」或「后期施工」工序后会自动生成。</p>{% endif %}
+</section>
+
+<script>
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('.js-copy');
+  if (!btn) return;
+  var url = btn.getAttribute('data-url') || '';
+  function done() { btn.textContent = '已复制'; setTimeout(function () { btn.textContent = '复制链接'; }, 1500); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, function () { fallback(); });
+  } else { fallback(); }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (err) {}
+    document.body.removeChild(ta);
+  }
+});
+</script>
+{% endblock %}
