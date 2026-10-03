@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block title %}链接已失效{% endblock %}
+{% block content %}
+<div class="share-wrap">
+  <div class="card share-card">
+    <div class="share-brand">🌡️ {{ settings.app_name_en }}</div>
+    <h1 class="share-title">链接已失效</h1>
+    <p class="muted">{{ reason or '该分享链接已失效' }}</p>
+    <p class="muted small share-foot">如有需要，请联系分享方获取新的链接。</p>
+  </div>
+</div>
+{% endblock %}

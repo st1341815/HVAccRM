@@ -442,12 +442,42 @@ class Case(Base):
     installer_name = Column(String)  # 责任人姓名快照（展示用，用户删除后仍可追溯）
     product_type = Column(String)  # 对应合同中的产品类型
     share_token = Column(String, unique=True, nullable=False)  # 外链分享令牌
+    share_expires_at = Column(String)  # 分享有效期截止（YYYY-MM-DD HH:MM:SS），空 = 不限
+    share_duration = Column(String)  # 时间限制标签（不限/1天/3天/1周/1月），用于表单回显
+    share_max_views = Column(Integer)  # 分享访问次数上限，空 = 不限
+    share_views = Column(Integer, default=0)  # 已访问次数（每次成功打开分享页 +1）
+    share_disabled = Column(Integer, default=0)  # 手动失效开关（1 = 已失效）
     created_at = Column(String, nullable=False, default=now_iso)
+
+    images = relationship(
+        "CaseImage",
+        back_populates="case",
+        cascade="all, delete-orphan",
+        order_by="CaseImage.sort_order",
+    )
 
 
 Index("ix_cases_work_date", Case.work_date)
 Index("ix_cases_installer", Case.installer_id)
 Index("ix_cases_stage", Case.stage)
+
+
+class CaseImage(Base):
+    """案例展示/广告图片：用户自定义上传，用于对外宣传。"""
+
+    __tablename__ = "case_images"
+
+    id = Column(Integer, primary_key=True)
+    case_id = Column(Integer, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    path = Column(String, nullable=False)  # 相对 data/media 的路径
+    thumb_path = Column(String)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(String, nullable=False, default=now_iso)
+
+    case = relationship("Case", back_populates="images")
+
+
+Index("ix_case_images_case", CaseImage.case_id)
 
 
 # ------------------------------------------------------------ 照片
