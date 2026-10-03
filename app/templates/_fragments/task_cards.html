@@ -29,27 +29,19 @@
                 {% include "_fragments/task_photos.html" with context %}
               </div>
             {% endif %}
-            {% if t.status in ['ready','doing'] or t.status == 'pending' %}
+            {% if t.status == 'doing' %}
               <div class="tc-actions">
-                {% if t.status == 'ready' %}
-                  <form method="post" action="/tasks/{{ t.id }}/start" class="inline"><button class="ghost">开工</button></form>
-                {% elif t.status == 'doing' %}
-                  <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
-                    <input name="notes" placeholder="完工备注（可选）">
-                    <button>完工</button>
+                <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
+                  <input name="notes" placeholder="完工备注（可选）">
+                  <button>完工</button>
+                </form>
+                <details class="tc-skip">
+                  <summary>跳过</summary>
+                  <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
+                    <input name="skip_reason" placeholder="跳过原因（必填）" required>
+                    <button class="ghost">确认跳过</button>
                   </form>
-                {% else %}
-                  <span class="muted small">前置未完成</span>
-                {% endif %}
-                {% if t.status != 'pending' %}
-                  <details class="tc-skip">
-                    <summary>跳过</summary>
-                    <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
-                      <input name="skip_reason" placeholder="跳过原因（必填）" required>
-                      <button class="ghost">确认跳过</button>
-                    </form>
-                  </details>
-                {% endif %}
+                </details>
               </div>
             {% endif %}
           </li>

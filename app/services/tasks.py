@@ -1,7 +1,5 @@
-"""施工任务规则：自动建单、前置依赖、跳过原因、延期预警。"""
+"""施工任务规则：逐个生成、逐个推进（默认开工）。"""
 from __future__ import annotations
-
-from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,11 +18,24 @@ def active_stages(db: Session) -> list[StageTemplate]:
     )
 
 
+def _existing_stages(db: Session, customer_id: int) -> set[str]:
+    return {t.stage for t in db.scalars(select(Task).where(Task.customer_id == customer_id)).all()}
+
+
+def _open_task(db: Session, customer_id: int) -> Task | None:
+    return db.scalars(
+        select(Task).where(Task.customer_id == customer_id).where(Task.status.notin_(CLOSED_STATES))
+    ).first()
+
+
 def generate_tasks(db: Session, customer: Customer, assignee_id: int | None = None) -> list[Task]:
-    """客户建单时按模板自动生成标准节点任务（幂等）。"""
-    existing = {t.stage for t in db.scalars(select(Task).where(Task.customer_id == customer.id)).all()}
-    # 不做计划排期（施工计划不通过系统跟踪），只按模板生成节点，开工/完工时记录实际日期
-    created: list[Task] = []
+    """生成「当前」工序节点（逐个生成，默认开工）。
+
+    已有进行中的节点则不再重复生成；否则生成第一个尚未有记录的节点。
+    """
+    if _open_task(db, customer.id):
+        return []
+    existing = _existing_stages(db, customer.id)
     for tpl in active_stages(db):
         if tpl.name in existing:
             continue
@@ -33,52 +44,38 @@ def generate_tasks(db: Session, customer: Customer, assignee_id: int | None = No
             stage=tpl.name,
             sort_order=tpl.sort_order,
             assignee_id=assignee_id or customer.owner_id,
-            status="pending",
+            status="doing",
+            actual_start=today_str(),
         )
         db.add(task)
-        created.append(task)
-    db.flush()
-    refresh_ready(db, customer.id)
-    return created
+        db.flush()
+        return [task]
+    return []
 
 
-def _ordered(db: Session, customer_id: int) -> list[Task]:
-    return list(
-        db.scalars(
-            select(Task).where(Task.customer_id == customer_id).order_by(Task.sort_order, Task.id)
-        ).all()
-    )
-
-
-def refresh_ready(db: Session, customer_id: int) -> None:
-    """前置依赖：上一节点未完成，下一节点只能是 ready（禁止开工）。"""
-    tasks = _ordered(db, customer_id)
-    prev_done = True
-    for t in tasks:
-        if t.status in CLOSED_STATES:
-            prev_done = True
+def activate_next_stage(db: Session, customer_id: int) -> Task | None:
+    """当前节点完工/跳过时，生成下一个节点（默认开工）。"""
+    existing = _existing_stages(db, customer_id)
+    owner_id = db.scalar(select(Customer.owner_id).where(Customer.id == customer_id))
+    for tpl in active_stages(db):
+        if tpl.name in existing:
             continue
-        if prev_done and t.status == "pending":
-            t.status = "ready"
-        elif not prev_done and t.status == "ready":
-            t.status = "pending"
-        prev_done = False
-
-
-def prerequisite_ok(db: Session, task: Task) -> tuple[bool, str]:
-    tasks = _ordered(db, task.customer_id)
-    for t in tasks:
-        if t.sort_order >= task.sort_order:
-            break
-        if t.status not in CLOSED_STATES:
-            return False, f"前置节点「{t.stage}」尚未完成"
-    return True, ""
+        task = Task(
+            customer_id=customer_id,
+            stage=tpl.name,
+            sort_order=tpl.sort_order,
+            assignee_id=owner_id,
+            status="doing",
+            actual_start=today_str(),
+        )
+        db.add(task)
+        db.flush()
+        return task
+    return None
 
 
 def start_task(db: Session, task: Task) -> tuple[bool, str]:
-    ok, msg = prerequisite_ok(db, task)
-    if not ok:
-        return False, msg
+    """兜底：把节点置为开工（新流程节点生成即开工，一般无需手动开工）。"""
     task.actual_start = task.actual_start or today_str()
     task.status = "doing"
     return True, "已开工"
@@ -89,7 +86,7 @@ def finish_task(db: Session, task: Task) -> tuple[bool, str]:
         return False, "前置节点未完成，不能直接完工"
     task.actual_end = today_str()
     task.status = "done"
-    refresh_ready(db, task.customer_id)
+    activate_next_stage(db, task.customer_id)
     return True, "已完工"
 
 
@@ -99,18 +96,17 @@ def skip_task(db: Session, task: Task, reason: str) -> tuple[bool, str]:
     task.status = "skipped"
     task.skip_reason = reason.strip()
     task.actual_end = task.actual_end or today_str()
-    refresh_ready(db, task.customer_id)
+    activate_next_stage(db, task.customer_id)
     return True, "已跳过"
 
 
-
-
-def progress(tasks: list[Task]) -> int:
-    if not tasks:
+def progress(db: Session, tasks: list[Task]) -> int:
+    """完工进度：已完成节点数 / 总工序节点数（按模板总数，而非已生成数）。"""
+    total = len(active_stages(db))
+    if not total:
         return 0
     done = sum(1 for t in tasks if t.status in DONE_STATES)
-    return round(done / len(tasks) * 100)
-
+    return round(done / total * 100)
 
 
 def default_assignee(db: Session, tasks: list[Task]) -> list[User]:
@@ -118,6 +114,7 @@ def default_assignee(db: Session, tasks: list[Task]) -> list[User]:
     if not ids:
         return []
     return list(db.scalars(select(User).where(User.id.in_(ids))).all())
+
 
 # 工序节点 → 相册分类（上传照片时自动归类）
 STAGE_PHOTO_KIND: dict[str, str] = {
