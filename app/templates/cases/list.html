@@ -3,8 +3,12 @@
 {% block content %}
 <div class="page-head">
   <h1>案例 <span class="muted small">共 {{ cases|length }} 条</span></h1>
-  <p class="muted small">前期施工 / 后期施工完工后自动生成。仅展示房号、工序、施工时间、师傅与产品类型，不含客户隐私与商业信息。</p>
+  <nav class="tabs inline-tabs">
+    <a href="/cases" class="active">案例</a>
+    <a href="/cases/links">外链管理</a>
+  </nav>
 </div>
+<p class="muted small">前期施工 / 后期施工完工后自动生成。展示图由你自行上传（用于活动宣传），不含客户隐私与商业信息。</p>
 
 <section class="card">
   <form method="get" action="/cases" class="filterbar">
@@ -30,15 +34,38 @@
 
 <section class="card">
   <table class="tight">
-    <thead><tr><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>责任人</th><th>产品类型</th><th>分享</th></tr></thead>
+    <thead><tr><th>展示图</th><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>责任人</th><th>产品类型</th><th>分享状态</th><th>分享</th></tr></thead>
     <tbody>
     {% for c in cases %}
+      {% set imgs = case_images.get(c.id, []) %}
+      {% set sstate = share_states.get(c.id, (True, '有效')) %}
       <tr>
+        <td>
+          <div class="case-thumbs">
+            {% for img in imgs %}
+              <span class="case-thumb">
+                <a class="photo-link" href="/cases/images/{{ img.id }}/file" target="_blank"><img class="mini" src="/cases/images/{{ img.id }}/thumb" alt="展示图"></a>
+                {% if can_edit %}<form method="post" action="/cases/{{ c.id }}/images/{{ img.id }}/delete" class="inline" onsubmit="return confirm('删除这张展示图？');"><input type="hidden" name="back" value="/cases"><button class="ghost danger thumb-del" title="删除">✕</button></form>{% endif %}
+              </span>
+            {% endfor %}
+            {% if not imgs %}<span class="muted small">—</span>{% endif %}
+          </div>
+          {% if can_edit %}
+          <form method="post" action="/cases/{{ c.id }}/images" enctype="multipart/form-data" class="inline case-upload">
+            <input type="hidden" name="back" value="/cases">
+            <input type="file" name="files" accept="image/*" multiple>
+            <button type="submit">上传展示图</button>
+          </form>
+          {% endif %}
+        </td>
         <td>{{ c.work_date or '-' }}</td>
         <td class="break">{{ c.room_label }}</td>
         <td>{{ c.stage }}</td>
         <td>{{ c.installer_name or '-' }}</td>
         <td>{{ c.product_type or '-' }}</td>
+        <td>
+          {% if sstate[0] %}<span class="badge ok">有效</span>{% else %}<span class="badge warn" title="{{ sstate[1] }}">已失效</span>{% endif %}
+        </td>
         <td>
           {% set share_url = base_url ~ 'cases/share/' ~ c.share_token %}
           <a class="btn ghost small" href="/cases/share/{{ c.share_token }}" target="_blank" rel="noopener">预览</a>

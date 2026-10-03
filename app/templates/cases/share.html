@@ -5,6 +5,13 @@
   <div class="card share-card">
     <div class="share-brand">🌡️ {{ settings.app_name_en }}</div>
     <h1 class="share-title">施工案例</h1>
+    {% if images %}
+    <div class="share-gallery">
+      {% for img in images %}
+      <img src="/cases/share/{{ case.share_token }}/image/{{ img.id }}" alt="案例展示图" loading="lazy">
+      {% endfor %}
+    </div>
+    {% endif %}
     <table class="kv share-kv">
       <tr><th>施工时间</th><td>{{ case.work_date or '-' }}</td></tr>
       <tr><th>施工工序</th><td>{{ case.stage }}</td></tr>
