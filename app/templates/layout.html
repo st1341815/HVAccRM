@@ -207,8 +207,9 @@
   }
   function clampPan() {
     const bs = _baseSize();
-    const halfW = Math.max(0, (bs.w * zscale - box.clientWidth) / 2);
-    const halfH = Math.max(0, (bs.h * zscale - box.clientHeight) / 2);
+    // 允许图片边角拖到屏幕中心（放大后可看全任意边角细节）
+    const halfW = bs.w * zscale / 2;
+    const halfH = bs.h * zscale / 2;
     ztx = Math.max(-halfW, Math.min(halfW, ztx));
     zty = Math.max(-halfH, Math.min(halfH, zty));
   }
