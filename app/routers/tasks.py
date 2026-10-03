@@ -131,7 +131,7 @@ def task_board(
                 {
                     "customer": customers.get(cid),
                     "tasks": rows,
-                    "progress": task_svc.progress(rows),
+                    "progress": task_svc.progress(db, rows),
                     "open": sum(1 for t in rows if t.status not in task_svc.DONE_STATES),
                 }
             )

@@ -83,8 +83,9 @@ echo "== 3. 客户 + 自动建工序 + 联系人 =="
 c=$(code -b $J -X POST --data-urlencode "name=测试客户张三" --data-urlencode "type=家装业主" --data-urlencode "phone=13711112222" --data-urlencode "wechat=zhangsan_wx" --data-urlencode "products=地暖" --data-urlencode "products=新风" --data-urlencode "products=不存在的产品" --data-urlencode "source=自然到店" --data-urlencode "level=A" --data-urlencode "room_id=$ROOMID" --data-urlencode "contact_name=张三" --data-urlencode "contact_phone=13800000000" $B/customers/new)
 chk "新建客户" 303 "$c"; CID=$(last_id); echo "  CID=$CID"
 c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
-has "调试验收" && ok "4 节点工序自动生成（上门勘测/前期施工/后期施工/调试验收）" || bad "工序未生成"
-has "上门勘测" && has "前期施工" && has "后期施工" && ok "4 个节点名称齐全" || bad "节点名称不全"
+has "上门勘测" && ok "首个工序「上门勘测」已自动生成" || bad "首工序未生成"
+has "doing" && ok "首工序默认开工（doing）" || bad "首工序未默认开工"
+has "调试验收" && bad "不该一次性生成全部 4 个工序" || ok "逐个生成（未一次性生成 4 个）"
 c=$(code -b $J "$B/customers/$CID"); chk "客户详情页" 200 "$c"
 has "13711112222" && ok "客户手机号已入库并展示" || bad "客户手机号未入库"
 has "zhangsan_wx" && ok "微信号已入库并展示" || bad "微信号未入库"
@@ -127,9 +128,9 @@ c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && ok "新模板出现
 SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "临时工序$RUN" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST "$B/admin/stages/$SID/delete"); chk "删除未使用的工序" 303 "$c"
 c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && bad "未使用的工序删除无效" || ok "未使用的工序已删除"
-USED_SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "调试验收" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
+USED_SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "上门勘测" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST "$B/admin/stages/$USED_SID/delete"); chk "删除在用工序被拒（重定向）" 303 "$c"
-c=$(code -b $J "$B/admin/stages"); has "调试验收" && ok "在用工序未被误删" || bad "在用工序被删掉了"
+c=$(code -b $J "$B/admin/stages"); has "上门勘测" && ok "在用工序未被误删" || bad "在用工序被删掉了"
 
 echo "== 3c. 楼盘删除 =="
 c=$(code -b $J -X POST "$B/projects/$PID/delete"); chk "删除有客户的楼盘被拒（重定向）" 303 "$c"
@@ -205,19 +206,21 @@ chk "追加收款期次" 303 "$c"
 c=$(code -b $J -X POST --data-urlencode "product_name=橱柜" --data-urlencode "spec=实木" --data-urlencode "unit=延米" -d "qty=2&unit_price=1500" $B/contracts/$CTID/items)
 chk "追加合同明细" 303 "$c"
 
-echo "== 5. 施工任务流程 =="
-c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板" 200 "$c"
-TID=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+echo "== 5. 施工任务流程（逐个生成、逐个推进） =="
+c=$(code -b $J "$B/tasks?scope=open"); chk "施工看板(仅未完成)" 200 "$c"
+has "上门勘测" && ok "看板显示当前工序「上门勘测」" || bad "看板未显示上门勘测"
+TID=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
 echo "  TID=$TID"
-c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID/start); chk "首节点开工" 303 "$c"
-c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID/done); chk "首节点完工" 303 "$c"
-TID3=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/skip' | head -1 | grep -o '[0-9]*')
-c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID3/start)
-chk "第二节点开工(前序已完成)" 303 "$c"
-c=$(code -b $J "$B/tasks?scope=all")
-has "前置未完成" && ok "未就绪节点显示『前置未完成』并禁止开工" || bad "前置依赖提示缺失"
-c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=" $B/tasks/$TID3/skip); chk "跳过(空原因)" 303 "$c"
-c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户硬装未完成" $B/tasks/$TID3/skip); chk "跳过(带原因)" 303 "$c"
+c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID/done); chk "完工上门勘测" 303 "$c"
+c=$(code -b $J "$B/tasks?scope=open")
+has "前期施工" && ok "完工后自动生成「前期施工」" || bad "完工后未推进到前期施工"
+NDONE=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | wc -l)
+[ "$NDONE" -eq 1 ] && ok "未完成列表只显示 1 个进行中节点（有效减少条数）" || bad "未完成节点数异常：$NDONE"
+TID2=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=" $B/tasks/$TID2/skip); chk "跳过(空原因)" 303 "$c"
+c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户暂缓施工" $B/tasks/$TID2/skip); chk "跳过(带原因)" 303 "$c"
+c=$(code -b $J "$B/tasks?scope=open")
+has "后期施工" && ok "跳过前期施工后自动生成「后期施工」" || bad "跳过后未推进到后期施工"
 c=$(code -b $J "$B/ui/tasks"); chk "HTMX 任务片段" 200 "$c"
 
 echo "== 5b. 施工页照片上传 =="
@@ -227,13 +230,7 @@ NFM=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'class="inline task-upload"' 
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
 has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
-# 未开工节点不允许上传：找一个「开工」按钮任务，上传应被拒并提示先开工
-UT=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
-if [ -n "$UT" ]; then
-  code -b $J -c $J -o /dev/null -F "task_id=$UT" -F "kind=现场" -F "back=/tasks?scope=all" -F "files=@/tmp/crmtest/contract1.jpg" "$B/api/customers/$CID/photos" > /dev/null
-  c=$(code -b $J "$B/tasks?scope=all")
-  has "尚未开工" && ok "未开工节点上传被拦截（提示先开工）" || bad "未开工节点上传未被拦截"
-fi
+# 新流程：节点生成即开工，不再有「未开工」状态，上传对当前进行中节点开放
 has "filter-collapse" && ok "施工页筛选条可折叠（手机端默认收起）" || bad "施工页筛选条未折叠"
 has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样式）" || bad "任务表缺 tasks class"
 has 'accept="image/*" multiple required' && bad "上传控件仍带 required（另一文件框为空会静默拦截提交）" || ok "上传控件不带 required（拍照/选图都能提交）"
@@ -252,9 +249,8 @@ has "/photos/" && ok "施工页显示该节点照片缩略图" || bad "施工页
 c=$(code -b $J "$B/customers/$CID?tab=tasks"); chk "客户工序页" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "客户工序页也有上传控件" || bad "客户工序页缺少上传控件"
 # 需照片节点完工且未拍照 → 回执里带上传提示
-TD=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+TD=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
 if [ -n "$TD" ]; then
-  code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TD/start > /dev/null
   code -b $J -c $J -X POST -H "referer: $B/tasks" "$B/tasks/$TD/done" > /dev/null
   c=$(code -b $J "$B/tasks"); chk "完工后回到施工页" 200 "$c"
   has "提示：该节点模板标记为" && ok "需照片节点未拍照即完工 → 给出上传提示" || bad "需照片节点完工未给出提示"
@@ -280,15 +276,14 @@ has 'placeholder="房号 / 楼盘 / 客户姓名"' && ok "施工筛选含房号/
 has 'name="customer_id"' && bad "仍有客户 ID 筛选控件" || ok "已去除客户 ID 筛选控件"
 c=$(code -b $J "$B/tasks?scope=all&q=13711112222"); chk "按客户手机号筛选" 200 "$c"
 has "测试客户张三" && ok "关键字筛选命中该客户工序" || bad "关键字筛选未命中"
-PTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+PTID=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST --data-urlencode "planned_end=2000-01-01" $B/tasks/$PTID/plan)
 chk "改工期接口已删除（404）" 404 "$c"
 c=$(code -b $J "$B/tasks?scope=all&view=customer"); chk "按客户分组视图" 200 "$c"
 has "task-cards" && ok "分组卡片渲染" || bad "分组卡片缺失"
-has "上门勘测" && has "调试验收" && ok "客户卡内展示该客户全部节点" || bad "客户卡节点不完整"
-DTID=$(curl -s -b $J "$B/tasks?scope=all" | grep -o '/tasks/[0-9]*/start' | head -1 | grep -o '[0-9]*')
+has "上门勘测" && ok "客户卡内展示该客户已生成节点" || bad "客户卡节点缺失"
+DTID=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
 if [ -n "$DTID" ]; then
-  code -b $J -X POST "$B/tasks/$DTID/start" > /dev/null
   c=$(code -b $J -X POST --data-urlencode "notes=完工备注测试$RUN" "$B/tasks/$DTID/done")
   chk "完工并登记备注" 303 "$c"
   c=$(code -b $J "$B/tasks?scope=all")
