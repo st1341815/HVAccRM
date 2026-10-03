@@ -151,9 +151,10 @@ img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; bor
 .task-upload { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
 .picked-name { flex: 1 1 100%; word-break: break-all; }
 .task-upload button[type=submit]:disabled { opacity: .6; cursor: not-allowed; }
-.file-label { display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; white-space: nowrap; }
-.file-label input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
-.task-upload input[type=file] { max-width: 11rem; font-size: .72rem; }
+.file-label { position: relative; display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; white-space: nowrap; overflow: hidden; }
+/* PWA（standalone，尤其 iOS WKWebView）下，缩到 1px 的隐藏 file input 经 label 合成点击会被
+   拒绝打开相册；改成让 input 铺满整个 label（opacity:0），用户点击直接命中 input 本身即可。 */
+.file-label input[type=file] { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 0; }
 .checkgrid { row-gap: .3rem; }
 .checkgrid label.checkline { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .3rem .5rem; cursor: pointer; }
 .checkgrid label.checkline:has(input:checked) { border-color: var(--brand); background: #e7ebee; color: var(--brand-dark); font-weight: 600; }
