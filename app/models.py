@@ -424,6 +424,32 @@ class Task(Base):
     assignee = relationship("User")
 
 
+# ------------------------------------------------------------ 案例
+# 完工后自动生成的对外展示案例：只保存可公开字段，绝不落客户隐私/商业信息。
+CASE_STAGES = {"前期施工", "后期施工"}
+
+
+class Case(Base):
+    __tablename__ = "cases"
+
+    id = Column(Integer, primary_key=True)
+    task_id = Column(Integer, unique=True, nullable=False)  # 来源工序（去重）
+    customer_id = Column(Integer, nullable=False)  # 来源客户（仅内部关联，不级联删除）
+    room_label = Column(String, nullable=False)  # 房号信息快照：楼盘名 + 楼栋-单元-房号
+    stage = Column(String, nullable=False)  # 施工工序：前期施工 / 后期施工
+    work_date = Column(String)  # 施工时间（单日）
+    installer_id = Column(Integer)  # 责任人 id（筛选用）
+    installer_name = Column(String)  # 责任人姓名快照（展示用，用户删除后仍可追溯）
+    product_type = Column(String)  # 对应合同中的产品类型
+    share_token = Column(String, unique=True, nullable=False)  # 外链分享令牌
+    created_at = Column(String, nullable=False, default=now_iso)
+
+
+Index("ix_cases_work_date", Case.work_date)
+Index("ix_cases_installer", Case.installer_id)
+Index("ix_cases_stage", Case.stage)
+
+
 # ------------------------------------------------------------ 照片
 class Photo(Base):
     __tablename__ = "photos"

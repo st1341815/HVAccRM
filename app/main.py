@@ -19,6 +19,7 @@ from .config import get_settings, set_timezone
 from .db import healthcheck, session_scope
 from .routers import (
     admin,
+    cases,
     contracts,
     costs,
     customers,
@@ -34,7 +35,7 @@ from .templating import flash_cookie_name, render
 log = logging.getLogger("crm.main")
 settings = get_settings()
 
-EXEMPT_PREFIXES = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/api/docs", "/api/openapi.json", "/redoc")
+EXEMPT_PREFIXES = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/api/docs", "/api/openapi.json", "/redoc", "/cases/share")
 PASSWORD_CHANGE_PATHS = ("/account", "/account/password", "/logout")
 
 
@@ -133,6 +134,7 @@ app.include_router(contracts.router)
 app.include_router(payments.router)
 app.include_router(costs.router)
 app.include_router(tasks.router)
+app.include_router(cases.router)
 app.include_router(photos.router)
 app.include_router(admin.router)
 

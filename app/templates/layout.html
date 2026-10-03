@@ -34,6 +34,7 @@
       {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}"><span class="ico">💰</span>收款</a>{% endif %}
       {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}"><span class="ico">🧾</span>成本</a>{% endif %}
       {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}"><span class="ico">🔧</span>施工</a>{% endif %}
+      {% if can('case:view') %}<a href="/cases" class="{{ 'active' if current_path.startswith('/cases') else '' }}"><span class="ico">🏆</span>案例</a>{% endif %}
       {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico">👤</span>用户</a>{% endif %}
       {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico">⚙️</span>系统</a>{% endif %}
     </nav>

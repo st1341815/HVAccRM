@@ -457,6 +457,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .login-card { box-shadow: 0 10px 32px rgba(15, 23, 42, .1); }
 .login-card h1 { font-size: 1.55rem; margin-bottom: .2rem; }
 
+/* 案例外链分享页：居中卡片，仅展示可公开字段 */
+.share-wrap { display: flex; justify-content: center; padding: 6vh 1rem; }
+.share-card { max-width: 420px; width: 100%; background: #fff; border-radius: 14px; padding: 1.6rem 1.5rem; }
+.share-brand { font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
+.share-title { font-size: 1.5rem; margin: .3rem 0 1rem; }
+.share-kv { width: 100%; }
+.share-foot { margin-top: 1.1rem; text-align: center; font-size: .76rem; }
+@media (max-width: 780px) { .share-wrap { padding: 4vh .8rem; } }
+
 /* 表格：桌面端行悬浮提示 */
 @media (min-width: 781px) {
   tbody tr { transition: background-color .12s ease; }

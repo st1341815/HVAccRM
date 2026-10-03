@@ -94,6 +94,10 @@ def finish_task(db: Session, task: Task, done_date: str | None = None) -> tuple[
     task.actual_end = d
     task.status = "done"
     activate_next_stage(db, task.customer_id)
+    # 前期施工 / 后期施工完工后自动生成对外展示案例（幂等）
+    from . import cases as cases_svc
+
+    cases_svc.create_case_for_task(db, task)
     return True, "已完工"
 
 
