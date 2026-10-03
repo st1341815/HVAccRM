@@ -127,6 +127,18 @@
     counterEl.textContent = (idx + 1) + ' / ' + items.length;
     counterEl.hidden = !multi;
     prevBtn.hidden = nextBtn.hidden = !multi;
+    preload();
+  }
+
+  function preload() {
+    // 预加载相邻两张原图，滑动切图更顺（提前缓存，不阻塞当前图）
+    [idx - 1, idx + 1].forEach(function (j) {
+      if (j < 0 || j >= items.length) return;
+      const a = items[j];
+      let u = a.getAttribute('href') || '';
+      u = /\/file$/.test(u) ? u : (u + '/file');
+      (new Image()).src = u;
+    });
   }
 
   function open(a) {
