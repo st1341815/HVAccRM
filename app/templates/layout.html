@@ -172,7 +172,13 @@
       const done = function () {
         inp.removeAttribute('capture');
         inp.removeEventListener('change', done);
-        form.submit();  // DOM submit 不触发 HTML5 校验
+        // 拍照单图也先压缩再提交
+        const b = form.querySelector('button[type=submit]');
+        if (b) { b.disabled = true; b.textContent = '压缩中…'; }
+        window.compressFiles(form).then(function () {
+          if (b) b.textContent = '上传中…';
+          form.submit();  // DOM submit 不触发 HTML5 校验
+        });
       };
       inp.addEventListener('change', done);
       inp.click();
@@ -206,6 +212,69 @@ window.upPicked = function (inp) {
     ? ('已选 ' + names.length + ' 张：' + names.slice(0, 2).join('、') + (names.length > 2 ? '…' : ''))
     : '';
 };
+// 图片压缩：长边限 MAX、JPEG 质量 QUALITY，保留 EXIF 方向；单张失败/没变小则回退原图。
+window.compressFiles = function (form) {
+  const inp = form.querySelector('input[type=file]');
+  if (!inp || !inp.files || inp.files.length === 0) return Promise.resolve();
+  const MAX = 1920, QUALITY = 0.82;
+  const dt = new DataTransfer();
+  const files = Array.prototype.slice.call(inp.files);
+  // 顺序压缩，保持照片先后顺序
+  return files.reduce(function (chain, f) {
+    return chain.then(function () {
+      if (!/^image\//.test(f.type)) { dt.items.add(f); return; }
+      return _decodeImage(f).then(function (src) {
+        let w = src.width, h = src.height;
+        if (w > MAX || h > MAX) {
+          const r = Math.min(MAX / w, MAX / h);
+          w = Math.max(1, Math.round(w * r));
+          h = Math.max(1, Math.round(h * r));
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(src.draw, 0, 0, w, h);
+        return new Promise(function (resolve) {
+          c.toBlob(function (blob) {
+            if (blob && blob.size && blob.size < f.size) {
+              const name = f.name.replace(/\.[^.]+$/, '') + '.jpg';
+              dt.items.add(new File([blob], name, { type: 'image/jpeg' }));
+            } else {
+              dt.items.add(f); // 没压小就保留原图
+            }
+            resolve();
+          }, 'image/jpeg', QUALITY);
+        });
+      }).catch(function () {
+        dt.items.add(f); // 单张失败回退原图
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    if (dt.files.length) inp.files = dt.files;
+  });
+};
+
+// 解码图片：createImageBitmap 保留 EXIF 方向，老浏览器退回 Image 元素
+function _decodeImage(file) {
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+      return { width: bmp.width, height: bmp.height, draw: bmp };
+    }).catch(function () { return _imgDecode(file); });
+  }
+  return _imgDecode(file);
+}
+function _imgDecode(file) {
+  return new Promise(function (resolve, reject) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height, draw: img });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('无法读取图片')); };
+    img.src = url;
+  });
+}
+
 window.upEnsure = function (form) {
   const inp = form.querySelector('input[type=file]');
   if (inp && (!inp.files || inp.files.length === 0)) {
@@ -213,8 +282,15 @@ window.upEnsure = function (form) {
     return false;
   }
   const b = form.querySelector('button[type=submit]');
-  if (b) { b.disabled = true; b.textContent = '上传中…'; }
-  return true;
+  if (b) { b.disabled = true; b.textContent = '压缩中…'; }
+  window.compressFiles(form).then(function () {
+    if (b) b.textContent = '上传中…';
+    form.submit(); // DOM submit 不触发校验
+  }).catch(function (e) {
+    if (b) { b.disabled = false; b.textContent = '上传'; }
+    alert('图片处理失败：' + (e && e.message ? e.message : e));
+  });
+  return false; // 拦截原生提交，改由压缩后程序化提交
 };
 
 // 手机端宽表格自动转「标签 + 值」卡片：把表头文字写到每个单元格的 data-label 上，

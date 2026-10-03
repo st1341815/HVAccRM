@@ -9,7 +9,7 @@
 {% if may_upload %}
 <section class="card">
   <h2>上传照片（支持多选，手机可直接拍照）</h2>
-  <form method="post" action="/api/customers/{{ customer.id }}/photos" enctype="multipart/form-data" class="stack">
+  <form method="post" action="/api/customers/{{ customer.id }}/photos" enctype="multipart/form-data" class="stack" onsubmit="return upEnsure(this)">
     <div class="grid3">
       <label>照片类型
         <select name="kind">
