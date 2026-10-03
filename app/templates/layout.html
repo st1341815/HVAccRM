@@ -196,10 +196,21 @@
     imgEl.style.transform = '';
     imgEl.style.transition = '';
   }
+  function _baseSize() {
+    // 图片在 scale=1 时的显示尺寸（受 max-width 96vw / max-height 90vh 约束，等比缩放）
+    const vw = box.clientWidth, vh = box.clientHeight;
+    const maxW = vw * 0.96, maxH = vh * 0.90;
+    const nw = imgEl.naturalWidth || 0, nh = imgEl.naturalHeight || 0;
+    if (!nw || !nh) return { w: maxW, h: maxH };
+    const r = Math.min(1, maxW / nw, maxH / nh);
+    return { w: nw * r, h: nh * r };
+  }
   function clampPan() {
-    const mx = box.clientWidth / 2, my = box.clientHeight / 2;
-    ztx = Math.max(-mx, Math.min(mx, ztx));
-    zty = Math.max(-my, Math.min(my, zty));
+    const bs = _baseSize();
+    const halfW = Math.max(0, (bs.w * zscale - box.clientWidth) / 2);
+    const halfH = Math.max(0, (bs.h * zscale - box.clientHeight) / 2);
+    ztx = Math.max(-halfW, Math.min(halfW, ztx));
+    zty = Math.max(-halfH, Math.min(halfH, zty));
   }
   function zoomTo(s, fx, fy) {
     s = Math.max(1, Math.min(6, s));
