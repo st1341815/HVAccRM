@@ -200,7 +200,7 @@ details.ms .ms-panel label.checkline:has(input:checked) { border-color: var(--br
 .lightbox[hidden] { display: none; }
 .lightbox img {
   max-width: 96vw; max-height: 90vh; object-fit: contain; cursor: zoom-in;
-  transition: transform .16s ease-out; touch-action: pinch-zoom; background: #0b1220;
+  transition: transform .16s ease-out; touch-action: none; background: #0b1220;
 }
 .lightbox img:active { cursor: zoom-out; }
 .lightbox .lb-close, .lightbox .lb-prev, .lightbox .lb-next {

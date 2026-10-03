@@ -66,6 +66,8 @@
   const ANCHOR_SEL = 'a.photo-link';
   let box = null, imgEl = null, counterEl = null, prevBtn = null, nextBtn = null;
   let items = [], idx = 0, startX = null, startY = null;
+  let zscale = 1, ztx = 0, zty = 0;   // 缩放比例 + 平移偏移（px）
+  let pinch = null, panStart = null;  // 捏合 / 拖动状态
 
   function collect(a) {
     // 施工节点照片区：包含隐藏的「更多」锚点，保证能翻完该节点的全部照片
@@ -100,16 +102,43 @@
     imgEl.addEventListener('click', function (e) { e.stopPropagation(); toggleZoom(e); });
     box.addEventListener('click', function (e) { if (e.target === box) close(); });
     box.addEventListener('touchstart', function (e) {
-      const t = e.changedTouches[0];
-      startX = t.clientX; startY = t.clientY;
+      if (e.touches.length === 2) {
+        pinch = { dist: _touchDist(e.touches), scale: zscale, mid: _touchMid(e.touches) };
+        panStart = null;
+        startX = startY = null;
+        imgEl.style.transition = 'none';
+      } else if (e.touches.length === 1) {
+        const t = e.touches[0];
+        startX = t.clientX; startY = t.clientY;
+        panStart = (zscale > 1) ? { x: t.clientX, y: t.clientY, tx: ztx, ty: zty } : null;
+      }
+    }, { passive: true });
+    box.addEventListener('touchmove', function (e) {
+      if (pinch && e.touches.length === 2) {
+        const d = _touchDist(e.touches), mid = _touchMid(e.touches);
+        zoomTo(pinch.scale * (d / (pinch.dist || 1)), mid.x, mid.y);
+      } else if (panStart && e.touches.length === 1) {
+        const t = e.touches[0];
+        ztx = panStart.tx + (t.clientX - panStart.x);
+        zty = panStart.ty + (t.clientY - panStart.y);
+        clampPan();
+        applyZoom();
+      }
     }, { passive: true });
     box.addEventListener('touchend', function (e) {
+      if (pinch && e.touches.length < 2) { pinch = null; imgEl.style.transition = ''; startX = null; }
+      if (panStart && e.touches.length === 0) { panStart = null; imgEl.style.transition = ''; startX = null; return; }
       if (startX === null) return;
       const t = e.changedTouches[0], dx = t.clientX - startX, dy = t.clientY - startY;
       startX = null;
-      if (imgEl.style.transform) return;                       // 已放大时滑动用于看细节，不切图
+      if (zscale > 1) return;                                   // 已放大时滑动用于拖动看细节，不切图
       if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) go(dx < 0 ? 1 : -1);
     }, { passive: true });
+    box.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      const f = e.deltaY < 0 ? 1.18 : (1 / 1.18);
+      zoomTo(zscale * f, e.clientX, e.clientY);
+    }, { passive: false });
   }
 
   function show(i) {
@@ -119,8 +148,7 @@
     // href 指向照片查看页（/photos/{id}），灯箱要显示的是原图文件（/photos/{id}/file）
     let url = a.getAttribute('href') || '';
     imgEl.src = /\/file$/.test(url) ? url : (url + '/file');
-    imgEl.style.transform = '';
-    imgEl.style.transformOrigin = 'center center';
+    resetZoom();
     const thumb = a.querySelector('img');
     imgEl.alt = (thumb && thumb.alt) || '图片预览';
     const multi = items.length > 1;
@@ -153,22 +181,47 @@
     if (!box) return;
     box.hidden = true;
     imgEl.src = '';
-    imgEl.style.transform = '';
+    resetZoom();
     document.body.classList.remove('lb-open');
   }
 
   function go(step) { show(idx + step); }
 
+  // —— 缩放 / 平移（点按 2 倍、双指捏合连续缩放、放大后单指拖动看局部、滚轮缩放） ——
+  function applyZoom() {
+    imgEl.style.transform = 'translate(' + ztx + 'px,' + zty + 'px) scale(' + zscale + ')';
+  }
+  function resetZoom() {
+    zscale = 1; ztx = 0; zty = 0; pinch = null; panStart = null;
+    imgEl.style.transform = '';
+    imgEl.style.transition = '';
+  }
+  function clampPan() {
+    const mx = box.clientWidth / 2, my = box.clientHeight / 2;
+    ztx = Math.max(-mx, Math.min(mx, ztx));
+    zty = Math.max(-my, Math.min(my, zty));
+  }
+  function zoomTo(s, fx, fy) {
+    s = Math.max(1, Math.min(4, s));
+    const cx = box.clientWidth / 2, cy = box.clientHeight / 2;
+    const ratio = s / (zscale || 1);
+    ztx = (fx - cx) * (1 - ratio) + ztx * ratio;
+    zty = (fy - cy) * (1 - ratio) + zty * ratio;
+    zscale = s;
+    if (s <= 1.001) { ztx = 0; zty = 0; }
+    clampPan();
+    applyZoom();
+  }
   function toggleZoom(e) {
-    if (imgEl.style.transform) {
-      imgEl.style.transform = '';
-      return;
-    }
-    const r = imgEl.getBoundingClientRect();
-    const x = r.width ? ((e.clientX - r.left) / r.width) * 100 : 50;
-    const y = r.height ? ((e.clientY - r.top) / r.height) * 100 : 50;
-    imgEl.style.transformOrigin = Math.min(100, Math.max(0, x)) + '% ' + Math.min(100, Math.max(0, y)) + '%';
-    imgEl.style.transform = 'scale(2)';
+    if (zscale > 1.001) resetZoom();
+    else zoomTo(2, e.clientX, e.clientY);
+  }
+  function _touchDist(t) {
+    const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function _touchMid(t) {
+    return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
   }
 
   // 📷 拍照上传：点按钮 → 给同表单的文件框临时加 capture → 打开相机 → 选完自动提交。
