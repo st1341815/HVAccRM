@@ -34,7 +34,7 @@ from .templating import flash_cookie_name, render
 log = logging.getLogger("crm.main")
 settings = get_settings()
 
-EXEMPT_PREFIXES = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/api/docs", "/api/openapi.json", "/redoc")
+EXEMPT_PREFIXES = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/api/docs", "/api/openapi.json", "/redoc")
 PASSWORD_CHANGE_PATHS = ("/account", "/account/password", "/logout")
 
 
@@ -68,6 +68,34 @@ app = FastAPI(
 
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def web_manifest() -> Response:
+    """PWA manifest：根路径 + 正确 Content-Type。"""
+    return Response(
+        (static_dir / "manifest.webmanifest").read_text(encoding="utf-8"),
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/service-worker.js", include_in_schema=False)
+def service_worker() -> Response:
+    """PWA Service Worker：根路径 + 全站 scope + 正确 Content-Type。"""
+    return Response(
+        (static_dir / "service-worker.js").read_text(encoding="utf-8"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/offline.html", include_in_schema=False)
+def offline_page() -> Response:
+    return Response(
+        (static_dir / "offline.html").read_text(encoding="utf-8"),
+        media_type="text/html; charset=utf-8",
+    )
 
 
 @app.middleware("http")
