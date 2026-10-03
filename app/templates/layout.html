@@ -202,7 +202,7 @@
     zty = Math.max(-my, Math.min(my, zty));
   }
   function zoomTo(s, fx, fy) {
-    s = Math.max(1, Math.min(4, s));
+    s = Math.max(1, Math.min(6, s));
     const cx = box.clientWidth / 2, cy = box.clientHeight / 2;
     const ratio = s / (zscale || 1);
     ztx = (fx - cx) * (1 - ratio) + ztx * ratio;
