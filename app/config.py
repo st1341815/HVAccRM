@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     session_cookie: str = "crm_session"
     session_max_age: int = 12 * 3600
 
-    thumb_max_edge: int = 1280
+    thumb_max_edge: int = 480
     thumb_quality: int = 80
 
     backup_keep: int = 30
