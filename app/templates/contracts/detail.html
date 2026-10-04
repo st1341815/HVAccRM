@@ -133,11 +133,11 @@
       {% for c in cost_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
     </select>
     <input name="amount" placeholder="金额 *" inputmode="decimal" required>
-    <select name="supplier_id" id="cost_supplier">
+    <select name="supplier_id" id="cost_supplier" style="display:inline-block">
       <option value="">供应商（材料成本必选）</option>
       {% for sp in suppliers %}<option value="{{ sp.id }}">{{ sp.name }}</option>{% endfor %}
     </select>
-    <select name="installer_id" id="cost_installer">
+    <select name="installer_id" id="cost_installer" style="display:none">
       <option value="">安装师傅（施工费用必选）</option>
       {% if installers %}<optgroup label="安装工">
         {% for u in installers %}<option value="{{ u.id }}">{{ u.display_name }}</option>{% endfor %}
@@ -280,12 +280,9 @@
     if (!cat) return;
     const sup = document.getElementById('cost_supplier');
     const ins = document.getElementById('cost_installer');
-    const needSup = cat.value === '材料成本';
-    const needIns = cat.value === '施工费用';
-    sup.style.borderColor = needSup ? 'var(--brand)' : '';
-    ins.style.borderColor = needIns ? 'var(--brand)' : '';
-    sup.title = needSup ? '材料成本必须选择供应商' : '';
-    ins.title = needIns ? '施工费用必须选择安装师傅' : '';
+    const catVal = cat.value;
+    sup.style.display = catVal === '材料成本' ? 'inline-block' : 'none';
+    ins.style.display = catVal === '施工费用' ? 'inline-block' : 'none';
   }
   syncCostFields();
 </script>
