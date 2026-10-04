@@ -410,6 +410,10 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.tasks.js-stack td.actions-cell button { min-height: 2.6rem; font-size: 1rem; }
   table.tasks.js-stack td.actions-cell input { font-size: 16px; }
   table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
+  /* 手机端卡片：取消桌面端给工序/产品类型/状态列的固定宽度（否则卡片单元格被压窄、内容靠不到右） */
+  table.tasks.js-stack td:nth-child(2),
+  table.tasks.js-stack td:nth-child(3),
+  table.tasks.js-stack td:nth-child(6) { width: auto; }
   /* 工序单元格：主文本右对齐、不换行（跳过/备注仍在下方换行显示） */
   table.tasks.js-stack td .stage-info { flex: 1 1 auto; text-align: right; min-width: 0; }
   /* 产品类型 / 状态单元格：值靠右对齐 */
