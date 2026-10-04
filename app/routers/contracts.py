@@ -95,11 +95,17 @@ def new_contract_form(
     allowed = visible_customer_ids(db, user)
     if allowed is not None:
         customers = [c for c in customers if c.id in allowed]
+    # 客户选择改为可搜索下拉：把可见客户序列化供前端本地过滤（含姓名/房号/手机号）
+    customer_options = [
+        {"id": c.id, "name": c.name, "room": c.room_label or "", "phone": c.phone or ""}
+        for c in customers
+    ]
     return render(
         request,
         "contracts/form.html",
         contract=None,
         customers=customers,
+        customer_options=customer_options,
         customer_id=customer_id,
         today=today_str(),
         next_no=numbering_svc.next_contract_no(db),

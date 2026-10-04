@@ -4,11 +4,10 @@
 <h1>新建合同</h1>
 <form method="post" action="/contracts/new" class="card stack" enctype="multipart/form-data">
   <div class="grid3">
-    <label>客户 *
-      <select name="customer_id" required>
-        <option value="">请选择客户</option>
-        {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if customer_id == c.id|string else '' }}>{{ c.name }}{% if c.room_label %}（{{ c.room_label }}）{% endif %}</option>{% endfor %}
-      </select>
+    <label class="search-picker">客户 *
+      <input type="text" id="customer_search" placeholder="输入姓名 / 手机号 / 房号搜索" autocomplete="off">
+      <input type="hidden" name="customer_id" id="customer_id" value="{{ customer_id or '' }}">
+      <ul id="customer_results" class="search-results" hidden></ul>
     </label>
     <label>合同号（自动生成）
       <input value="{{ next_no }}" readonly title="格式：ONE + 8 位年月日 + 4 位顺数，顺数每年重置">
@@ -37,4 +36,72 @@
   </div>
 </form>
 <p class="muted small">收款计划（分期应收）在合同保存后，到合同详情页逐期添加；系统会实时核算「合同总额 / 应收计划 / 已收款」三数差异。</p>
+<script>
+(function () {
+  var data = {{ customer_options | tojson }} || [];
+  var input = document.getElementById('customer_search');
+  var hidden = document.getElementById('customer_id');
+  var list = document.getElementById('customer_results');
+  var form = document.querySelector('form[action="/contracts/new"]');
+  if (!input || !hidden || !list) return;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+    });
+  }
+  function nameOf(c) { return c.name + (c.room ? '（' + c.room + '）' : ''); }
+  function render(items) {
+    if (!items.length) { list.hidden = true; list.innerHTML = ''; return; }
+    list.innerHTML = items.map(function (c) {
+      return '<li data-id="' + c.id + '" data-name="' + esc(nameOf(c)) + '">' +
+        '<div>' + esc(c.name) + (c.room ? ' <span class="muted">' + esc(c.room) + '</span>' : '') + '</div>' +
+        (c.phone ? '<div class="muted">' + esc(c.phone) + '</div>' : '') +
+        '</li>';
+    }).join('');
+    list.hidden = false;
+  }
+  function search() {
+    var q = input.value.trim().toLowerCase();
+    var items = q
+      ? data.filter(function (c) {
+          return (c.name || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.room || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.phone || '').indexOf(q) >= 0;
+        }).slice(0, 50)
+      : data.slice(0, 50);
+    render(items);
+  }
+  input.addEventListener('input', search);
+  input.addEventListener('focus', search);
+  list.addEventListener('mousedown', function (e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    e.preventDefault(); // 防止 input 先失焦导致点击不生效
+    hidden.value = li.getAttribute('data-id');
+    input.value = li.getAttribute('data-name');
+    list.hidden = true; list.innerHTML = '';
+  });
+  // 点击搜索框外关闭下拉
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.search-picker')) { list.hidden = true; }
+  });
+  // 预填：从客户详情页「新建合同」跳转时带 customer_id
+  var pre = hidden.value;
+  if (pre) {
+    var found = data.find(function (c) { return String(c.id) === String(pre); });
+    if (found) input.value = nameOf(found);
+  }
+  // 必填校验：隐藏字段不触发浏览器 required
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      if (!hidden.value) {
+        e.preventDefault();
+        input.focus();
+        alert('请选择客户');
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}
