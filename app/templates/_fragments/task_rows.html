@@ -17,7 +17,7 @@
           {% if t.notes %}<div class="muted small">备注：{{ t.notes }}</div>{% endif %}
         </div>
       </td>
-      <td class="nowrap">{% if t.contract_id and contracts.get(t.contract_id) %}{{ contracts[t.contract_id].product_type or '—' }}{% else %}—{% endif %}</td>
+      <td class="nowrap"><span class="cell-val">{% if t.contract_id and contracts.get(t.contract_id) %}{{ contracts[t.contract_id].product_type or '—' }}{% else %}—{% endif %}</span></td>
       <td>
         {% if can_assign %}
         <form method="post" action="/tasks/{{ t.id }}/assign" class="inline">
@@ -29,7 +29,7 @@
         {% else %}{{ users_map[t.assignee_id].display_name if t.assignee_id and users_map.get(t.assignee_id) else '未指派' }}{% endif %}
       </td>
       <td>{% include "_fragments/task_photos.html" with context %}</td>
-      <td class="nowrap"><span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>
+      <td class="nowrap"><span class="cell-val badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>
       <td class="actions-cell">
         {% if t.status == 'doing' %}
           <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
