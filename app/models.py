@@ -492,6 +492,7 @@ class CaseImage(Base):
     case_id = Column(Integer, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
     path = Column(String, nullable=False)  # 相对 data/media 的路径
     thumb_path = Column(String)
+    source_photo_id = Column(Integer)  # 来源照片 id（施工照片导入时记录；手动上传为 NULL，用于重新同步去重）
     sort_order = Column(Integer, default=0)
     created_at = Column(String, nullable=False, default=now_iso)
 
