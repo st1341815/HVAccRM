@@ -237,6 +237,33 @@
     return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
   }
 
+  // 📷 拍照上传：点按钮 → 给同表单的文件框临时加 capture → 打开相机 → 选完自动提交。
+  // 只保留一个 name=files 文件框，避免「同名空文件部件」触发 FastAPI 的 422/500。
+  document.addEventListener('click', function (e) {
+    const cam = e.target.closest && e.target.closest('.cam-btn');
+    if (cam) {
+      e.preventDefault();
+      const form = cam.closest('form');
+      const inp = form && form.querySelector('input[type=file]');
+      if (!inp) return;
+      inp.setAttribute('capture', 'environment');
+      const done = function () {
+        inp.removeAttribute('capture');
+        inp.removeEventListener('change', done);
+        // 拍照单图也先压缩再提交
+        const b = form.querySelector('button[type=submit]');
+        if (b) { b.disabled = true; b.textContent = '压缩中…'; }
+        window.compressFiles(form).then(function () {
+          if (b) b.textContent = '上传中…';
+          form.submit();  // DOM submit 不触发 HTML5 校验
+        });
+      };
+      inp.addEventListener('change', done);
+      inp.click();
+      return;
+    }
+  });
+
   document.addEventListener('click', function (e) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = e.target.closest && e.target.closest(ANCHOR_SEL);
@@ -264,9 +291,8 @@ window.upPicked = function (inp) {
     : '';
 };
 // 图片压缩：长边限 MAX、JPEG 质量 QUALITY，保留 EXIF 方向；单张失败/没变小则回退原图。
-// 第二个参数指定要压缩的 file input（默认取「🖼 选择图片」的 name=files）。
-window.compressFiles = function (form, inp) {
-  inp = inp || form.querySelector('input[name="files"]');
+window.compressFiles = function (form) {
+  const inp = form.querySelector('input[type=file]');
   if (!inp || !inp.files || inp.files.length === 0) return Promise.resolve();
   const MAX = 1920, QUALITY = 0.82;
   const dt = new DataTransfer();
@@ -328,14 +354,14 @@ function _imgDecode(file) {
 }
 
 window.upEnsure = function (form) {
-  const inp = form.querySelector('input[name="files"]');
+  const inp = form.querySelector('input[type=file]');
   if (inp && (!inp.files || inp.files.length === 0)) {
-    alert('请先点击「选择图片」或「📷 拍照」挑一张图片，再点上传。');
+    alert('请先点击「选择图片」或「📷」挑一张图片，再点上传。');
     return false;
   }
   const b = form.querySelector('button[type=submit]');
   if (b) { b.disabled = true; b.textContent = '压缩中…'; }
-  window.compressFiles(form, inp).then(function () {
+  window.compressFiles(form).then(function () {
     if (b) b.textContent = '上传中…';
     form.submit(); // DOM submit 不触发校验
   }).catch(function (e) {
@@ -343,21 +369,6 @@ window.upEnsure = function (form) {
     alert('图片处理失败：' + (e && e.message ? e.message : e));
   });
   return false; // 拦截原生提交，改由压缩后程序化提交
-};
-
-// 📷 拍照：原生 capture input 拍完即压缩并自动提交（单张）。
-window.cameraShot = function (inp) {
-  const form = inp.closest('form');
-  if (!form || !inp.files || inp.files.length === 0) return;
-  const b = form.querySelector('button[type=submit]');
-  if (b) { b.disabled = true; b.textContent = '压缩中…'; }
-  window.compressFiles(form, inp).then(function () {
-    if (b) b.textContent = '上传中…';
-    form.submit(); // DOM submit 不触发校验
-  }).catch(function (e) {
-    if (b) { b.disabled = false; b.textContent = '上传'; }
-    alert('图片处理失败：' + (e && e.message ? e.message : e));
-  });
 };
 
 // 手机端宽表格自动转「标签 + 值」卡片：把表头文字写到每个单元格的 data-label 上，
