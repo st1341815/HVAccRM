@@ -257,10 +257,6 @@ body.lb-open { overflow: hidden; }
 .tc-actions .tc-skip-form { flex: 1 1 auto; }
 .tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
 
-/* 相机直拍按钮（手机端显示，一键拍照即上传） */
-.cam-btn { display: none; align-items: center; justify-content: center; min-width: 2.4rem; min-height: 2.4rem; border-radius: 8px; background: #e7ebee; color: var(--brand-dark); font-size: 1.15rem; cursor: pointer; }
-.cam-btn:active { background: #d9dfe5; }
-
 /* 折叠式筛选条（施工看板） */
 details.filter-collapse { padding: .4rem .6rem; }
 details.filter-collapse > summary { font-weight: 600; }
@@ -427,7 +423,6 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   .chip { padding: .45rem .75rem; min-height: 2.3rem; display: inline-flex; align-items: center; }
   .task-cards { grid-template-columns: 1fr; gap: .7rem; }
   .task-card { padding: .65rem .7rem; }
-  .cam-btn { display: inline-flex; }
   .tc-actions .tc-done { flex: 1 1 100%; }
   .tc-actions .tc-done input { font-size: 16px; }
   .tc-actions button { min-height: 2.5rem; }
