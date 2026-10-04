@@ -242,6 +242,21 @@ def delete_case_image(db: Session, image: CaseImage) -> str:
     return "图片已删除"
 
 
+def delete_case(db: Session, case: Case) -> None:
+    """删除整个案例：连带删除其全部展示图（含物理文件）。"""
+    root = case_image_root()
+    for img in list(case.images):
+        for rel in (img.path, img.thumb_path):
+            if not rel:
+                continue
+            try:
+                (root / rel).unlink(missing_ok=True)
+            except OSError:  # pragma: no cover
+                pass
+        db.delete(img)
+    db.delete(case)
+
+
 def case_image_file(rel: str) -> Path:
     root = case_image_root().resolve()
     target = (root / rel).resolve()
