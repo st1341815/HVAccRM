@@ -495,6 +495,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .case-sync { display: inline-flex; align-items: center; }
 .share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
 .share-settings select { min-width: 4.5rem; }
+/* 外链管理操作列：保存 / 失效 / 恢复 三个按钮并排、等宽 */
+.share-actions { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.share-actions button { flex: 0 0 auto; }
 
 /* 表格：桌面端行悬浮提示 */
 @media (min-width: 781px) {
