@@ -80,6 +80,10 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
             else product_type_for_customer(db, customer)
         ),
         share_token=_new_token(db),
+        # 外链默认限制：1 天 + 10 次（可在「外链管理」里改）
+        share_duration="1天",
+        share_expires_at=share_expiry_from("1天"),
+        share_max_views=share_view_limit("10次"),
     )
     db.add(case)
     db.flush()
