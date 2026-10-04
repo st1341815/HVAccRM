@@ -257,6 +257,15 @@ body.lb-open { overflow: hidden; }
 .tc-actions .tc-skip-form { flex: 1 1 auto; }
 .tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
 
+/* 完工/跳过按钮与文本框同高（对齐 input 的 .4rem 内边距 + 1px 边框） */
+.tc-done button,
+.tc-skip-form button,
+td.actions-cell form.inline button {
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+  border: 1px solid transparent;
+}
+
 /* 折叠式筛选条（施工看板） */
 details.filter-collapse { padding: .4rem .6rem; }
 details.filter-collapse > summary { font-weight: 600; }
@@ -403,7 +412,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.tasks.js-stack tr.row-alert { border-color: #fca5a5; }
   table.tasks.js-stack td.actions-cell form,
   table.tasks.js-stack td.actions-cell button { width: 100%; }
-  table.tasks.js-stack td.actions-cell button { min-height: 2.6rem; font-size: 1rem; }
+  table.tasks.js-stack td.actions-cell button { min-height: 2.5rem; font-size: 1rem; }
   table.tasks.js-stack td.actions-cell input { font-size: 16px; }
   table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
   /* 手机端卡片：取消桌面端给工序/产品类型/状态列的固定宽度（否则卡片单元格被压窄、内容靠不到右） */
