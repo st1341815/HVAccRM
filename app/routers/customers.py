@@ -44,6 +44,14 @@ CUSTOMER_TYPES = ["家装业主", "工程客户", "经销商", "老客户转介"
 SOURCES = ["自然到店", "老客户转介", "楼盘扫楼", "设计师推荐", "装修公司", "线上咨询", "其他"]
 
 
+def _project_options(db: Session) -> list[dict]:
+    """新建/编辑客户页的楼盘可搜索下拉数据源（id + label）。"""
+    return [
+        {"id": p.id, "label": p.label}
+        for p in db.scalars(select(Project).order_by(Project.name)).all()
+    ]
+
+
 @router.get("")
 def list_customers(
     request: Request,
@@ -123,6 +131,7 @@ def new_customer_form(
         "customers/form.html",
         customer=None,
         projects=list(db.scalars(select(Project).order_by(Project.name)).all()),
+        project_options=_project_options(db),
         owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
         types=CUSTOMER_TYPES,
         sources=SOURCES,
@@ -156,6 +165,7 @@ def create_customer(
             customer=None,
             error="客户姓名必填",
             projects=list(db.scalars(select(Project).order_by(Project.name)).all()),
+            project_options=_project_options(db),
             owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
             types=CUSTOMER_TYPES,
             sources=SOURCES,
@@ -269,6 +279,7 @@ def edit_customer_form(
         "customers/form.html",
         customer=customer,
         projects=list(db.scalars(select(Project).order_by(Project.name)).all()),
+        project_options=_project_options(db),
         owners=list(db.scalars(select(User).where(User.is_active == 1)).all()),
         types=CUSTOMER_TYPES,
         sources=SOURCES,

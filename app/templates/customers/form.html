@@ -49,11 +49,10 @@
   <fieldset class="room-picker">
     <legend>房号（楼盘 → 楼栋 → 房号 级联）</legend>
     <div class="grid3">
-      <label>楼盘
-        <select name="project_sel" id="project_sel" onchange="loadBuildings(this.value)">
-          <option value="">请选择楼盘</option>
-          {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if customer and customer.room and customer.room.project_id == p.id else '' }}>{{ p.label }}</option>{% endfor %}
-        </select>
+      <label class="search-picker">楼盘
+        <input type="text" id="project_search" placeholder="输入楼盘名称搜索" autocomplete="off">
+        <input type="hidden" id="project_sel" value="{{ customer.room.project_id if customer and customer.room else '' }}">
+        <ul id="project_results" class="search-results" hidden></ul>
       </label>
       <label>楼栋
         <select id="building_sel" onchange="loadRooms(document.getElementById('project_sel').value, this.value)">
@@ -134,5 +133,54 @@ function searchRooms() {
     .then(r => r.text()).then(html => { document.getElementById('room_result').innerHTML = html; });
 }
 syncProducts();
+
+// 楼盘可搜索下拉（楼盘多时避免下拉选错）
+(function () {
+  var projects = {{ project_options | tojson }} || [];
+  var input = document.getElementById('project_search');
+  var hidden = document.getElementById('project_sel');
+  var list = document.getElementById('project_results');
+  if (!input || !hidden || !list) return;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+    });
+  }
+  function render(items) {
+    if (!items.length) { list.hidden = true; list.innerHTML = ''; return; }
+    list.innerHTML = items.map(function (p) {
+      return '<li data-id="' + p.id + '" data-label="' + esc(p.label) + '">' + esc(p.label) + '</li>';
+    }).join('');
+    list.hidden = false;
+  }
+  function search() {
+    var q = input.value.trim().toLowerCase();
+    var items = q
+      ? projects.filter(function (p) { return (p.label || '').toLowerCase().indexOf(q) >= 0; }).slice(0, 50)
+      : projects.slice(0, 50);
+    render(items);
+  }
+  input.addEventListener('input', search);
+  input.addEventListener('focus', search);
+  list.addEventListener('mousedown', function (e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    e.preventDefault();
+    hidden.value = li.getAttribute('data-id');
+    input.value = li.getAttribute('data-label');
+    list.hidden = true; list.innerHTML = '';
+    loadBuildings(hidden.value);
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.search-picker')) { list.hidden = true; }
+  });
+  // 预填：编辑客户时回显楼盘名（楼栋/房号由服务端已预填）
+  var pre = hidden.value;
+  if (pre) {
+    var found = projects.find(function (p) { return String(p.id) === String(pre); });
+    if (found) input.value = found.label;
+  }
+})();
 </script>
 {% endblock %}
