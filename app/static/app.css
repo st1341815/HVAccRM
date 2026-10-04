@@ -257,13 +257,11 @@ body.lb-open { overflow: hidden; }
 .tc-actions .tc-skip-form { flex: 1 1 auto; }
 .tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
 
-/* 完工/跳过按钮与文本框同高（对齐 input 的 .4rem 内边距 + 1px 边框） */
-.tc-done button,
-.tc-skip-form button,
-td.actions-cell form.inline button {
-  padding-top: .4rem;
-  padding-bottom: .4rem;
-  border: 1px solid transparent;
+/* 完工/跳过按钮与文本框同高：表单内元素纵向拉伸对齐 */
+form.inline.tc-done,
+form.inline.tc-skip-form,
+td.actions-cell form.inline {
+  align-items: stretch;
 }
 
 /* 折叠式筛选条（施工看板） */
