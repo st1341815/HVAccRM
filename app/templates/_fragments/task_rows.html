@@ -30,8 +30,8 @@
       <td class="actions-cell">
         {% if t.status == 'doing' %}
           <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
-            <input name="notes" placeholder="完工备注（可选）">
-            <label class="inline-label" title="实际施工日期（默认今天，补录时可选之前日期）">施工日期
+            <input name="notes" placeholder="完工备注">
+            <label class="inline-label" title="实际施工日期（默认今天，补录时可选之前日期）"><span class="date-text">施工日期</span>
               <input type="date" name="done_date" value="{{ today }}">
             </label>
             <button>完工</button>
