@@ -290,14 +290,22 @@ def share_case_image_file(request: Request, token: str, image_id: int, db: Sessi
     return _share_image_response(db, token, image_id)
 
 
-def _share_image_response(db: Session, token: str, image_id: int):
+@router.get("/share/{token}/image/{image_id}/thumb")
+def share_case_image_thumb(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
+    return _share_image_response(db, token, image_id, thumb=True)
+
+
+def _share_image_response(db: Session, token: str, image_id: int, thumb: bool = False):
     case = db.scalars(select(Case).where(Case.share_token == token)).first()
     if case is None or case.share_disabled or (case.share_expires_at and now_iso() >= case.share_expires_at):
         return JSONResponse({"detail": "分享已失效"}, status_code=410)
     image = db.scalars(select(CaseImage).where(CaseImage.id == image_id, CaseImage.case_id == case.id)).first()
     if image is None:
         return JSONResponse({"detail": "图片不存在"}, status_code=404)
-    path = cases_svc.case_image_file(image.path)
+    rel = (image.thumb_path or image.path) if thumb else image.path
+    path = cases_svc.case_image_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "文件已丢失"}, status_code=404)
+    if thumb and str(path).endswith(".webp"):
+        return FileResponse(path, media_type="image/webp")
     return FileResponse(path)
