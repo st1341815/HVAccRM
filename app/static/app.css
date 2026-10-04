@@ -127,10 +127,13 @@ th { font-size: .8rem; color: var(--muted); font-weight: 600; background: #f6f3e
 table.tight th, table.tight td { padding: .35rem .45rem; font-size: .88rem; }
 table.kv th { width: 9rem; color: var(--muted); font-weight: 600; background: none; }
 /* 施工看板表格列宽：工序容纳 6 个中文字符，产品类型 / 状态各 4 个。
-   用 rem（相对根字号）而非 em，避免表头（.8rem）与单元格（.88rem）字号不同导致列宽不一致。 */
+   用 rem（相对根字号）而非 em，避免表头（.8rem）与单元格（.88rem）字号不同导致列宽不一致。
+   表头加 nowrap：CJK 文字默认可在任意两字之间折行，auto 布局下 min-content 会塌缩成 1 字，
+   即使给了 width 仍可能被挤窄导致「产品类型」折成两行；nowrap 强制表头不折行。 */
 table.tasks th:nth-child(2), table.tasks td:nth-child(2) { width: 6.2rem; }
 table.tasks th:nth-child(3), table.tasks td:nth-child(3) { width: 4.4rem; }
 table.tasks th:nth-child(6), table.tasks td:nth-child(6) { width: 4.4rem; }
+table.tasks th { white-space: nowrap; }
 tbody tr { background: var(--row-bg, transparent); }
 tbody tr:nth-child(even) { --row-bg: #f7f4ee; }
 tr.row-alert { --row-bg: #f7eded; }
