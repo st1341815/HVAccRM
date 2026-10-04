@@ -475,6 +475,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .case-thumbs { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
 .case-thumb { position: relative; display: inline-flex; align-items: center; }
 .case-thumb .thumb-del { position: absolute; top: -7px; right: -7px; width: 1.15rem; height: 1.15rem; line-height: 1; padding: 0; border-radius: 50%; font-size: .7rem; }
+/* 案例列表：默认只显示前 3 张，其余折叠在「+N 张」后 */
+.case-thumbs-fold .case-thumb:nth-child(n+4) { display: none; }
+.case-thumbs-fold.open .case-thumb:nth-child(n+4) { display: inline-flex; }
+.case-more { align-self: center; }
 .case-upload { display: flex; gap: .45rem; align-items: center; margin-top: .45rem; flex-wrap: wrap; }
 .case-upload input[type=file] { font-size: .78rem; max-width: 12rem; }
 .share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
