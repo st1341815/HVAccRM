@@ -366,6 +366,12 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.js-stack td.actions-cell input { width: auto; flex: 1 1 auto; min-width: 0; font-size: 14px; }
   table.js-stack td:has(img.mini) { align-items: center; }
   table.js-stack td img.mini { margin-left: auto; }
+  /* 案例列表「展示图」单元格：图横向排列，操作控件排在下方 */
+  table.js-stack td.case-cell { flex-direction: column; }
+  table.js-stack td.case-cell::before { margin-bottom: .3rem; align-self: flex-start; }
+  table.js-stack td.case-cell .case-thumbs { width: 100%; align-self: stretch; }
+  table.js-stack td.case-cell img.mini { margin-left: 0; }
+  table.js-stack td.case-cell .case-actions { width: 100%; align-self: stretch; }
   /* 单元格里的上传控件换行显示，避免挤爆一行 */
   table.js-stack td .task-upload { flex-wrap: wrap; justify-content: flex-end; }
   table.js-stack td .task-upload input[type=file] { max-width: none; font-size: 14px; }
@@ -479,8 +485,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .case-thumbs-fold .case-thumb:nth-child(n+4) { display: none; }
 .case-thumbs-fold.open .case-thumb:nth-child(n+4) { display: inline-flex; }
 .case-more { align-self: center; }
-.case-upload { display: flex; gap: .45rem; align-items: center; margin-top: .45rem; flex-wrap: wrap; }
+/* 展示图下方的操作区：选择图片 / 上传展示图 / 重新同步 一行排列 */
+.case-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; margin-top: .45rem; }
+.case-upload { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
 .case-upload input[type=file] { font-size: .78rem; max-width: 12rem; }
+.case-sync { display: inline-flex; align-items: center; }
 .share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
 .share-settings select { min-width: 4.5rem; }
 

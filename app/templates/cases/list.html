@@ -40,7 +40,7 @@
       {% set imgs = case_images.get(c.id, []) %}
       {% set sstate = share_states.get(c.id, (True, '有效')) %}
       <tr>
-        <td>
+        <td class="case-cell">
           <div class="case-thumbs{% if imgs|length > 3 %} case-thumbs-fold{% endif %}" data-total="{{ imgs|length }}">
             {% for img in imgs %}
               <span class="case-thumb">
@@ -54,15 +54,17 @@
             {% endif %}
           </div>
           {% if can_edit %}
-          <form method="post" action="/cases/{{ c.id }}/images" enctype="multipart/form-data" class="inline case-upload">
-            <input type="hidden" name="back" value="/cases">
-            <input type="file" name="files" accept="image/*" multiple>
-            <button type="submit">上传展示图</button>
-          </form>
-          <form method="post" action="/cases/{{ c.id }}/sync-photos" class="inline" title="把施工工序后来补传的照片追加进案例">
-            <input type="hidden" name="back" value="/cases">
-            <button type="submit" class="ghost small">重新同步</button>
-          </form>
+          <div class="case-actions">
+            <form method="post" action="/cases/{{ c.id }}/images" enctype="multipart/form-data" class="case-upload">
+              <input type="hidden" name="back" value="/cases">
+              <input type="file" name="files" accept="image/*" multiple>
+              <button type="submit">上传展示图</button>
+            </form>
+            <form method="post" action="/cases/{{ c.id }}/sync-photos" class="case-sync" title="把施工工序后来补传的照片追加进案例">
+              <input type="hidden" name="back" value="/cases">
+              <button type="submit" class="ghost small">重新同步</button>
+            </form>
+          </div>
           {% endif %}
         </td>
         <td>{{ c.work_date or '-' }}</td>
