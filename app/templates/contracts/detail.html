@@ -8,6 +8,11 @@
   <div class="actions">
     <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
     <a class="btn ghost" href="/contracts">合同列表</a>
+    {% if can_delete_contract %}
+    <form method="post" action="/contracts/{{ contract.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ contract.no or ('#' ~ contract.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');">
+      <button class="btn danger">删除合同</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 

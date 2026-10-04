@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
@@ -11,6 +11,7 @@ from ..db import commit_retry, get_db
 from ..models import (
     COST_CATEGORIES,
     PRODUCT_OPTIONS,
+    Case,
     ChangeOrder,
     Contract,
     ContractItem,
@@ -29,6 +30,7 @@ from ..permissions import (
 )
 from ..services import finance as finance_svc
 from ..services import search as search_svc
+from ..services import cases as cases_svc
 from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
@@ -280,6 +282,7 @@ def contract_detail(
         can_pay=has_perm(user, "payment:edit"),
         can_refund=has_perm(user, "payment:refund"),
         can_delete_photo=has_perm(user, "photo:delete"),
+        can_delete_contract=has_perm(user, "admin:setting"),
         today=today_str(),
     )
 
@@ -476,3 +479,40 @@ def delete_change_order(
     db.delete(co)
     commit_retry(db)
     return redirect(f"/contracts/{cid}", "增项已删除")
+
+
+@router.post("/{contract_id}/delete")
+def delete_contract(
+    request: Request,
+    contract_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    """删除合同（破坏性，仅管理员）：连同其收款、成本、施工工序、对外案例与照片一并清除。"""
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    no = contract.no or f"#{contract.id}"
+
+    payment_ids = [p.id for p in contract.payments]
+    cost_ids = [c.id for c in contract.costs]
+    task_ids = [t.id for t in contract.tasks]
+
+    # 1) 清理所有关联照片（纸质合同 / 收款截图 / 成本凭证 / 施工照片），避免外键约束阻挡删除
+    photo_conds = [Photo.contract_id == contract.id]
+    if payment_ids:
+        photo_conds.append(Photo.payment_id.in_(payment_ids))
+    if cost_ids:
+        photo_conds.append(Photo.cost_id.in_(cost_ids))
+    if task_ids:
+        photo_conds.append(Photo.task_id.in_(task_ids))
+    for ph in db.scalars(select(Photo).where(or_(*photo_conds))).all():
+        photo_svc.delete_photo(db, ph)
+
+    # 2) 删除该合同施工工序对应生成的对外案例（连同展示图与物理文件）
+    if task_ids:
+        for case in db.scalars(select(Case).where(Case.task_id.in_(task_ids))).all():
+            cases_svc.delete_case(db, case)
+
+    log_action(db, user, "delete", "contracts", contract.id, old=contract, ip=client_ip(request))
+    db.delete(contract)  # cascade 删除合同明细/收款计划/成本/收款/增项/施工工序
+    commit_retry(db)
+    return redirect("/contracts", f"合同 {no} 已删除（连同其收款、成本、工序、案例与照片）")
