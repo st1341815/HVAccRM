@@ -39,13 +39,10 @@
                   </label>
                   <button>完工</button>
                 </form>
-                <details class="tc-skip">
-                  <summary>跳过</summary>
-                  <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
-                    <input name="skip_reason" placeholder="跳过原因（必填）" required>
-                    <button class="ghost">确认跳过</button>
-                  </form>
-                </details>
+                <form method="post" action="/tasks/{{ t.id }}/skip" class="inline tc-skip-form">
+                  <input name="skip_reason" placeholder="跳过原因（必填）" required>
+                  <button class="ghost">跳过</button>
+                </form>
               </div>
             {% endif %}
           </li>
