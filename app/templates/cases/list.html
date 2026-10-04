@@ -41,7 +41,7 @@
       {% set sstate = share_states.get(c.id, (True, '有效')) %}
       <tr>
         <td>
-          <div class="case-thumbs">
+          <div class="case-thumbs{% if imgs|length > 3 %} case-thumbs-fold{% endif %}" data-total="{{ imgs|length }}">
             {% for img in imgs %}
               <span class="case-thumb">
                 <a class="photo-link" href="/cases/images/{{ img.id }}/file" target="_blank"><img class="mini" src="/cases/images/{{ img.id }}/thumb" alt="展示图"></a>
@@ -49,6 +49,9 @@
               </span>
             {% endfor %}
             {% if not imgs %}<span class="muted small">—</span>{% endif %}
+            {% if imgs|length > 3 %}
+              <button type="button" class="case-more ghost small">+{{ imgs|length - 3 }} 张</button>
+            {% endif %}
           </div>
           {% if can_edit %}
           <form method="post" action="/cases/{{ c.id }}/images" enctype="multipart/form-data" class="inline case-upload">
@@ -83,6 +86,16 @@
 </section>
 
 <script>
+document.addEventListener('click', function (e) {
+  var more = e.target.closest && e.target.closest('.case-more');
+  if (more) {
+    var box = more.closest('.case-thumbs');
+    var total = parseInt(box.getAttribute('data-total') || '0', 10);
+    var open = box.classList.toggle('open');
+    more.textContent = open ? '收起' : '+' + (total - 3) + ' 张';
+    return;
+  }
+});
 document.addEventListener('click', function (e) {
   var btn = e.target.closest && e.target.closest('.js-copy');
   if (!btn) return;
