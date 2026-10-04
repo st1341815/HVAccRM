@@ -311,12 +311,14 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
 .list li { margin-bottom: .25rem; }
 .actions-cell { display: flex; flex-direction: column; gap: .3rem; }
 
-/* 施工看板操作列（桌面端）：完工备注 4 字、施工日期 2 字/行、跳过原因填满与上排等宽 */
+/* 施工看板操作列（桌面端）：完工备注 4 字、施工日期 2 字/行、跳过原因与上排等宽 */
 @media (min-width: 781px) {
   table.tasks td.actions-cell .tc-done input[name="notes"] { width: 4.6rem; flex: 0 0 auto; }
   table.tasks td.actions-cell .date-text { width: 2em; flex: 0 0 auto; line-height: 1.25; }
-  table.tasks td.actions-cell .tc-done input[type="date"] { width: auto; }
-  table.tasks td.actions-cell input[name="skip_reason"] { flex: 1 1 auto; min-width: 0; }
+  table.tasks td.actions-cell .tc-done input[type="date"] { width: 7.5rem; flex: 0 0 auto; }
+  table.tasks td.actions-cell .tc-done .inline-label { flex: 0 0 auto; }
+  /* 跳过原因 = 完工备注(4.6rem) + 施工日期(2em) + 日期控件(7.5rem) + 两处 gap(0.6rem)，与上排按钮对齐 */
+  table.tasks td.actions-cell input[name="skip_reason"] { width: calc(4.6rem + 2em + 7.5rem + 0.6rem); flex: 0 0 auto; min-width: 0; }
 }
 
 /* ================================================================ 手机端 */
