@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -288,6 +289,7 @@ class Contract(Base):
     )
     payments = relationship("Payment", back_populates="contract", cascade="all, delete-orphan")
     change_orders = relationship("ChangeOrder", back_populates="contract", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="contract", cascade="all, delete-orphan")
 
 
 class ContractItem(Base):
@@ -402,10 +404,28 @@ class StageTemplate(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
-    __table_args__ = (UniqueConstraint("customer_id", "stage", name="uq_task_customer_stage"),)
+    __table_args__ = (
+        # 上门勘测（contract_id 为空）每个客户唯一
+        Index(
+            "uq_task_customer_survey",
+            "customer_id",
+            "stage",
+            unique=True,
+            sqlite_where=text("contract_id IS NULL"),
+        ),
+        # 施工工序（contract_id 非空）每份合同每个节点唯一
+        Index(
+            "uq_task_contract_stage",
+            "contract_id",
+            "stage",
+            unique=True,
+            sqlite_where=text("contract_id IS NOT NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"))  # 空=上门勘测(客户级)；非空=施工工序(合同级)
     stage = Column(String, nullable=False)
     sort_order = Column(Integer, nullable=False)
     planned_start = Column(String)
@@ -421,6 +441,7 @@ class Task(Base):
     updated_at = Column(String, default=now_iso, onupdate=now_iso)
 
     customer = relationship("Customer", back_populates="tasks")
+    contract = relationship("Contract", back_populates="tasks")
     assignee = relationship("User")
 
 

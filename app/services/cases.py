@@ -69,12 +69,46 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
         work_date=(task.actual_end or task.actual_start or today_str())[:10],
         installer_id=task.assignee_id,
         installer_name=(installer.display_name if installer else None),
-        product_type=product_type_for_customer(db, customer),
+        product_type=(
+            task.contract.product_type
+            if task.contract and task.contract.product_type
+            else product_type_for_customer(db, customer)
+        ),
         share_token=_new_token(db),
     )
     db.add(case)
     db.flush()
+    # 完工时把该施工工序已上传的现场照片导入案例展示图（快照复制，自包含）
+    import_task_photos(db, case, task)
     return case
+
+
+def import_task_photos(db: Session, case: Case, task: Task) -> int:
+    """把施工工序已上传的照片导入为案例展示图。
+
+    施工过程中师傅上传的现场照（Photo.task_id == task.id）即案例的对外展示图；
+    复制到 case_images 自包含存储（media/cases/{case_id}/），与客户照片目录隔离。
+    """
+    from ..models import Photo
+    from . import photos as photo_svc
+
+    photos = list(
+        db.scalars(
+            select(Photo).where(Photo.task_id == task.id).order_by(Photo.created_at, Photo.id)
+        ).all()
+    )
+    imported = 0
+    for ph in photos:
+        try:
+            path = photo_svc.photo_file(ph.path)
+        except ValueError:  # pragma: no cover
+            continue
+        if not path.exists():
+            continue
+        img, _msg = save_case_image(db, case, path.read_bytes(), ph.orig_name or path.name)
+        if img is not None:
+            imported += 1
+    return imported
 
 
 # ------------------------------------------------------------ 分享限制
@@ -170,6 +204,7 @@ def save_case_image(db: Session, case: Case, raw: bytes, orig_name: str) -> tupl
         created_at=now_iso(),
     )
     db.add(image)
+    db.flush()
     return image, "已保存"
 
 

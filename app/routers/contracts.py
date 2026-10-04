@@ -32,6 +32,7 @@ from ..services import search as search_svc
 from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
+from ..services import tasks as task_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
@@ -139,6 +140,8 @@ async def create_contract(
     )
     db.add(contract)
     db.flush()
+    # 每份合同独立生成自己的施工工序（前期施工 → 后期施工 → 调试验收）
+    created_tasks = task_svc.generate_contract_tasks(db, contract)
     log_action(db, user, "create", "contracts", contract.id, new=contract, ip=client_ip(request))
 
     saved, dedup, errors = 0, 0, []

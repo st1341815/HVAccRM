@@ -1,13 +1,23 @@
-"""施工任务规则：逐个生成、逐个推进（默认开工）。"""
+"""施工任务规则。
+
+业务关系（需求方定稿）：
+- 「上门勘测」与客户一一对应：创建客户即生成唯一勘测工序，完工后**不**再自动生成后续工序。
+- 「前期施工 / 后期施工 / 调试验收」与合同一一对应：创建合同后逐个生成并推进，
+  每份合同独立记录各自的施工过程；后续工序的推进以合同为依据，与勘测完工无关。
+"""
 from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Customer, StageTemplate, Task, User, today_str
+from ..models import Contract, Customer, StageTemplate, Task, User, today_str
 
 DONE_STATES = {"done", "skipped"}
 CLOSED_STATES = {"done", "skipped"}
+
+# 工序与业务对象的分界
+SURVEY_STAGE = "上门勘测"
+CONSTRUCTION_STAGES = ["前期施工", "后期施工", "调试验收"]
 
 
 def active_stages(db: Session) -> list[StageTemplate]:
@@ -18,32 +28,84 @@ def active_stages(db: Session) -> list[StageTemplate]:
     )
 
 
-def _existing_stages(db: Session, customer_id: int) -> set[str]:
-    return {t.stage for t in db.scalars(select(Task).where(Task.customer_id == customer_id)).all()}
+def construction_templates(db: Session) -> list[StageTemplate]:
+    """启用的施工工序模板（按 sort_order 排序）。"""
+    return [s for s in active_stages(db) if s.name in CONSTRUCTION_STAGES]
 
 
-def _open_task(db: Session, customer_id: int) -> Task | None:
+def _survey_template(db: Session) -> StageTemplate | None:
+    for s in active_stages(db):
+        if s.name == SURVEY_STAGE:
+            return s
+    return None
+
+
+def _existing_survey(db: Session, customer_id: int) -> Task | None:
     return db.scalars(
-        select(Task).where(Task.customer_id == customer_id).where(Task.status.notin_(CLOSED_STATES))
+        select(Task)
+        .where(Task.customer_id == customer_id)
+        .where(Task.stage == SURVEY_STAGE)
+        .where(Task.contract_id.is_(None))
     ).first()
 
 
-def generate_tasks(db: Session, customer: Customer, assignee_id: int | None = None) -> list[Task]:
-    """生成「当前」工序节点（逐个生成，默认开工）。
+def _existing_contract_stages(db: Session, contract_id: int) -> set[str]:
+    return {t.stage for t in db.scalars(select(Task).where(Task.contract_id == contract_id)).all()}
 
-    已有进行中的节点则不再重复生成；否则生成第一个尚未有记录的节点。
+
+def _open_contract_task(db: Session, contract_id: int) -> Task | None:
+    return db.scalars(
+        select(Task).where(Task.contract_id == contract_id).where(Task.status.notin_(CLOSED_STATES))
+    ).first()
+
+
+def generate_survey_task(db: Session, customer: Customer, assignee_id: int | None = None) -> Task | None:
+    """创建客户后生成唯一的「上门勘测」工序（默认开工）。已存在则不重复生成。"""
+    if _existing_survey(db, customer.id):
+        return None
+    tpl = _survey_template(db)
+    task = Task(
+        customer_id=customer.id,
+        contract_id=None,
+        stage=SURVEY_STAGE,
+        sort_order=(tpl.sort_order if tpl else 1),
+        assignee_id=assignee_id or customer.owner_id,
+        status="doing",
+        actual_start=today_str(),
+    )
+    db.add(task)
+    db.flush()
+    return task
+
+
+def generate_contract_tasks(db: Session, contract: Contract) -> list[Task]:
+    """创建合同后生成首个施工工序（前期施工），默认开工。
+
+    已有进行中的节点则不再重复生成；否则生成第一个尚未有记录的施工节点。
     """
-    if _open_task(db, customer.id):
+    if _open_contract_task(db, contract.id):
         return []
-    existing = _existing_stages(db, customer.id)
-    for tpl in active_stages(db):
+    return _generate_next_contract_task(db, contract)
+
+
+def _generate_next_contract_task(db: Session, contract: Contract) -> list[Task]:
+    """按「已有节点记录」生成第一个尚未有记录的施工节点（不按状态判断）。
+
+    注意：会话 autoflush=False，完工/跳过后推进下一节点时，必须按「节点是否有记录」
+    而非「状态」判断——否则刚置为 done 的节点还没刷库，会被误判为仍有进行中节点。
+    """
+    existing = _existing_contract_stages(db, contract.id)
+    customer = db.get(Customer, contract.customer_id)
+    assignee = customer.owner_id if customer else None
+    for tpl in construction_templates(db):
         if tpl.name in existing:
             continue
         task = Task(
-            customer_id=customer.id,
+            customer_id=contract.customer_id,
+            contract_id=contract.id,
             stage=tpl.name,
             sort_order=tpl.sort_order,
-            assignee_id=assignee_id or customer.owner_id,
+            assignee_id=assignee,
             status="doing",
             actual_start=today_str(),
         )
@@ -53,25 +115,23 @@ def generate_tasks(db: Session, customer: Customer, assignee_id: int | None = No
     return []
 
 
-def activate_next_stage(db: Session, customer_id: int) -> Task | None:
-    """当前节点完工/跳过时，生成下一个节点（默认开工）。"""
-    existing = _existing_stages(db, customer_id)
-    owner_id = db.scalar(select(Customer.owner_id).where(Customer.id == customer_id))
-    for tpl in active_stages(db):
-        if tpl.name in existing:
-            continue
-        task = Task(
-            customer_id=customer_id,
-            stage=tpl.name,
-            sort_order=tpl.sort_order,
-            assignee_id=owner_id,
-            status="doing",
-            actual_start=today_str(),
-        )
-        db.add(task)
-        db.flush()
-        return task
-    return None
+def activate_next_contract_stage(db: Session, contract_id: int) -> Task | None:
+    """施工节点完工/跳过时，生成同一合同的下一个施工节点（默认开工）。"""
+    contract = db.get(Contract, contract_id)
+    if not contract:
+        return None
+    rows = _generate_next_contract_task(db, contract)
+    return rows[0] if rows else None
+
+
+def _activate_after(db: Session, task: Task) -> None:
+    """完工/跳过后推进。
+
+    - 施工节点（contract_id 非空）：推进同一合同的下一个施工节点。
+    - 上门勘测（contract_id 为空）：完工后**不**再自动生成后续工序（后续以合同为依据）。
+    """
+    if task.contract_id:
+        activate_next_contract_stage(db, task.contract_id)
 
 
 def start_task(db: Session, task: Task) -> tuple[bool, str]:
@@ -93,7 +153,7 @@ def finish_task(db: Session, task: Task, done_date: str | None = None) -> tuple[
     task.actual_start = d
     task.actual_end = d
     task.status = "done"
-    activate_next_stage(db, task.customer_id)
+    _activate_after(db, task)
     # 前期施工 / 后期施工完工后自动生成对外展示案例（幂等）
     from . import cases as cases_svc
 
@@ -107,17 +167,20 @@ def skip_task(db: Session, task: Task, reason: str) -> tuple[bool, str]:
     task.status = "skipped"
     task.skip_reason = reason.strip()
     task.actual_end = task.actual_end or today_str()
-    activate_next_stage(db, task.customer_id)
+    _activate_after(db, task)
     return True, "已跳过"
 
 
-def progress(db: Session, tasks: list[Task]) -> int:
-    """完工进度：已完成节点数 / 总工序节点数（按模板总数，而非已生成数）。"""
-    total = len(active_stages(db))
-    if not total:
+def progress(tasks: list[Task]) -> int:
+    """完工进度：已完成节点数 / 已生成节点数（而非模板总数）。
+
+    新模型下并非所有节点都会一开始就生成（勘测 1 份/客户，施工按合同逐份生成），
+    故分母取「已生成」的节点数。
+    """
+    if not tasks:
         return 0
     done = sum(1 for t in tasks if t.status in DONE_STATES)
-    return round(done / total * 100)
+    return round(done / len(tasks) * 100)
 
 
 def default_assignee(db: Session, tasks: list[Task]) -> list[User]:

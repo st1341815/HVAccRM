@@ -49,12 +49,16 @@
 <section class="card">
   <h2>施工工序（{{ tasks|length }} 个节点）</h2>
   <table class="tight">
-    <thead><tr><th>#</th><th>工序</th><th>实际</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>#</th><th>工序</th><th>合同 / 产品</th><th>实际</th><th>责任人</th><th>现场照片</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
     {% for t in tasks %}
       <tr>
         <td>{{ t.sort_order }}</td>
         <td>{{ t.stage }}{% if t.skip_reason %}<div class="muted small">跳过原因：{{ t.skip_reason }}</div>{% endif %}</td>
+        <td>
+          {% set ct = contracts_map.get(t.contract_id) if t.contract_id else none %}
+          {% if ct %}<a href="/contracts/{{ ct.id }}">{{ ct.no }}</a>{% if ct.product_type %}<div class="muted small">{{ ct.product_type }}</div>{% endif %}{% elif t.contract_id %}#{{ t.contract_id }}{% else %}—{% endif %}
+        </td>
         <td>{{ t.actual_end or t.actual_start or '-' }}</td>
         <td>{{ t.assignee.display_name if t.assignee else '-' }}</td>
         <td>{% include "_fragments/task_photos.html" with context %}</td>
@@ -79,11 +83,6 @@
     {% endfor %}
     </tbody>
   </table>
-  {% if can_edit %}
-  <form method="post" action="/customers/{{ customer.id }}/regenerate-tasks" class="inline">
-    <button class="ghost">生成下一个工序</button>
-  </form>
-  {% endif %}
 </section>
 
 {% elif tab == 'contacts' %}

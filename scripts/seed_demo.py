@@ -277,9 +277,9 @@ def main(force: bool = False) -> None:
             db.flush()
             stats["customers"] += 1
 
-            # 工序任务（按当前模板自动生成，责任人先给演示安装工）
-            rows = task_svc.generate_tasks(db, customer, assignee_id=installer.id)
-            tasks = sorted(rows if rows else customer.tasks, key=lambda t: t.sort_order or 0)
+            # 上门勘测：创建客户即生成（1:1 客户，责任人先给演示安装工）
+            survey = task_svc.generate_survey_task(db, customer, assignee_id=installer.id)
+            tasks = [survey] if survey else []
             db.flush()
 
             done = item.get("task_done")
@@ -329,6 +329,8 @@ def main(force: bool = False) -> None:
             db.add(contract)
             db.flush()
             stats["contracts"] += 1
+            # 每份合同独立生成施工工序（前期施工 → 后期施工 → 调试验收，逐个生成）
+            task_svc.generate_contract_tasks(db, contract)
 
             for i, (label, amount, day_off) in enumerate(contract_data["plans"], start=1):
                 db.add(PaymentPlan(contract_id=contract.id, label=label, amount=amount,
