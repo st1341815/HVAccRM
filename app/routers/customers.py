@@ -192,13 +192,12 @@ def create_customer(
             )
         )
     assignee = parse_int(default_assignee) or customer.owner_id
-    created_tasks = task_svc.generate_tasks(db, customer, assignee_id=assignee)
+    survey = task_svc.generate_survey_task(db, customer, assignee_id=assignee)
     log_action(db, user, "create", "customers", customer.id, new=customer, ip=client_ip(request))
     commit_retry(db)
-    stage_hint = created_tasks[0].stage if created_tasks else ""
     return redirect(
         f"/customers/{customer.id}",
-        f"客户「{customer.name}」已创建" + (f"，已开工首个工序「{stage_hint}」" if stage_hint else ""),
+        f"客户「{customer.name}」已创建" + ("，已生成「上门勘测」工序" if survey else ""),
     )
 
 
@@ -236,13 +235,14 @@ def customer_detail(
         tasks=tasks,
         contacts=contacts,
         contracts=contracts,
+        contracts_map={c.id: c for c in contracts},
         summary=summary,
         plan_rows=plan_rows,
         show_cost=show_cost,
         assignees=assignees,
         shares=shares,
         share_users=share_users,
-        progress=task_svc.progress(db, tasks),
+        progress=task_svc.progress(tasks),
         task_photos=photo_svc.photos_by_task(db, [t.id for t in tasks]),
         stage_requires_photo=task_svc.stage_photo_requirements(db),
         stage_kind=task_svc.STAGE_PHOTO_KIND,
@@ -340,24 +340,6 @@ def delete_customer(
     commit_retry(db)
     suffix = f"（含 {detached} 张照片）" if detached else ""
     return redirect("/customers", f"客户「{customer.name}」及其关联数据已删除{suffix}")
-
-
-@router.post("/{customer_id}/regenerate-tasks")
-def regenerate_tasks(
-    request: Request,
-    customer_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(require("customer:edit")),
-):
-    customer = get_or_404(db, Customer, customer_id, "客户")
-    created = task_svc.generate_tasks(db, customer)
-    log_action(db, user, "generate_tasks", "tasks", customer.id, new={"count": len(created)}, ip=client_ip(request))
-    commit_retry(db)
-    if created:
-        msg = f"已生成下一个工序「{created[0].stage}」（开工中）"
-    else:
-        msg = "当前已有进行中的工序，无需生成"
-    return redirect(f"/customers/{customer_id}?tab=tasks", msg)
 
 
 # ------------------------------------------------------------------ 联系人

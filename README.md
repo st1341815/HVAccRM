@@ -93,7 +93,8 @@ crm/
 | 逾期自动重算（每日 00:10） | `scheduler.py::refresh_overdue_job` |
 | 超额拦截（已收+本次 ≤ 总额+增项） | `services/finance.py::check_payment` |
 | 增项走 change_orders 并同步追加应收 | `routers/contracts.py::add_change_order` |
-| 客户建单自动生成 9 个工序任务 | `services/tasks.py::generate_tasks` |
+| 客户建单自动生成「上门勘测」工序（1:1 客户） | `services/tasks.py::generate_survey_task` |
+| 合同建单自动生成施工工序（1:1 合同，前期/后期施工/调试验收逐个推进） | `services/tasks.py::generate_contract_tasks` |
 | 前置依赖（上节点未完成不可开工） | `services/tasks.py::start_task` |
 | 跳过节点必须填原因 | `services/tasks.py::skip_task` |
 | 照片路径/命名/缩略图/去重 | `services/photos.py` |

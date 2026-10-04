@@ -16,6 +16,7 @@
           <li class="tc-step">
             <div class="tc-step-head">
               <span class="tc-stage">{{ t.sort_order }}. {{ t.stage }}</span>
+              {% if t.contract_id and contracts.get(t.contract_id) and contracts[t.contract_id].product_type %}<span class="badge">{{ contracts[t.contract_id].product_type }}</span>{% endif %}
               <span class="badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span>
             </div>
             <div class="tc-step-meta muted small">

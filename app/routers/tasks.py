@@ -8,7 +8,19 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
-from ..models import Customer, Photo, Project, Room, StageTemplate, Task, User, now_iso, today_str
+from ..models import (
+    PRODUCT_OPTIONS,
+    Contract,
+    Customer,
+    Photo,
+    Project,
+    Room,
+    StageTemplate,
+    Task,
+    User,
+    now_iso,
+    today_str,
+)
 from ..permissions import has_perm, require, task_scope_conditions, visible_customer_ids
 from ..services import photos as photo_svc
 from ..services import tasks as task_svc
@@ -70,6 +82,7 @@ def task_board(
     assignee: str = "",
     stage: str = "",
     status: str = "",
+    product_type: str = "",
     q: str = "",
     scope: str = "open",
     view: str = "tasks",
@@ -87,6 +100,9 @@ def task_board(
         stmt = stmt.where(Task.stage == stage)
     if status:
         stmt = stmt.where(Task.status == status)
+    if product_type:
+        # 产品类型只存在于施工工序（合同级），上门勘测无产品类型
+        stmt = stmt.join(Contract, Task.contract_id == Contract.id).where(Contract.product_type == product_type)
     # 关键字筛选：客户姓名 / 手机号 / 房号（楼栋·单元·房号）/ 楼盘名
     if q and q.strip():
         kw = f"%{q.strip()}%"
@@ -113,6 +129,7 @@ def task_board(
     tasks = list(db.scalars(stmt.limit(500)).all())
 
     customers = {c.id: c for c in db.scalars(select(Customer)).all()}
+    contracts = {c.id: c for c in db.scalars(select(Contract)).all()}
     users = list(db.scalars(select(User).where(User.is_active == 1)).all())
     users_map = {u.id: u for u in users}
     stages = [s.name for s in task_svc.active_stages(db)]
@@ -120,6 +137,7 @@ def task_board(
         "assignee": assignee,
         "stage": stage,
         "status": status,
+        "product_type": product_type,
         "q": q,
         "scope": scope,
         "view": view,
@@ -141,7 +159,7 @@ def task_board(
                 {
                     "customer": customers.get(cid),
                     "tasks": rows,
-                    "progress": task_svc.progress(db, rows),
+                    "progress": task_svc.progress(rows),
                     "open": sum(1 for t in rows if t.status not in task_svc.DONE_STATES),
                 }
             )
@@ -163,9 +181,11 @@ def task_board(
         tasks=tasks,
         groups=groups,
         customers=customers,
+        contracts=contracts,
         users=users,
         users_map=users_map,
         stages=stages,
+        product_types=PRODUCT_OPTIONS,
         status_labels=STATUS_LABELS,
         filters=filters,
         view=view,

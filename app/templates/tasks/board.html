@@ -39,6 +39,10 @@
       <option value="">全部工序节点</option>
       {% for s in stages %}<option value="{{ s }}" {{ 'selected' if filters.stage == s else '' }}>{{ s }}</option>{% endfor %}
     </select>
+    <select name="product_type">
+      <option value="">全部产品类型</option>
+      {% for p in product_types %}<option value="{{ p }}" {{ 'selected' if filters.product_type == p else '' }}>{{ p }}</option>{% endfor %}
+    </select>
     <select name="status">
       <option value="">全部状态</option>
       {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if filters.status == k else '' }}>{{ v }}</option>{% endfor %}
