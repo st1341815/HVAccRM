@@ -457,6 +457,8 @@ class Case(Base):
     task_id = Column(Integer, unique=True, nullable=False)  # 来源工序（去重）
     customer_id = Column(Integer, nullable=False)  # 来源客户（仅内部关联，不级联删除）
     room_label = Column(String, nullable=False)  # 房号信息快照：楼盘名 + 楼栋-单元-房号
+    project_name = Column(String)  # 楼盘名称（分享页「工地位置」用）
+    building = Column(String)  # 楼栋号（分享页「工地位置」用）
     stage = Column(String, nullable=False)  # 施工工序：前期施工 / 后期施工
     work_date = Column(String)  # 施工时间（单日）
     installer_id = Column(Integer)  # 责任人 id（筛选用）
@@ -476,6 +478,11 @@ class Case(Base):
         cascade="all, delete-orphan",
         order_by="CaseImage.sort_order",
     )
+
+    @property
+    def site_label(self) -> str:
+        """工地位置：楼盘名称 + 楼栋号（缺失段自动省略）。"""
+        return " ".join(p for p in (self.project_name, self.building) if p)
 
 
 Index("ix_cases_work_date", Case.work_date)

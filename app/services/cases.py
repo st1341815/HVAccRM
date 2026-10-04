@@ -60,11 +60,16 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
 
     customer = db.get(Customer, task.customer_id)
     installer = db.get(User, task.assignee_id) if task.assignee_id else None
+    room = customer.room if customer else None
+    project_name = room.project.name if room and room.project else None
+    building = room.building if room else None
 
     case = Case(
         task_id=task.id,
         customer_id=task.customer_id,
         room_label=_room_label(customer) or "-",
+        project_name=project_name,
+        building=building,
         stage=task.stage,
         work_date=(task.actual_end or task.actual_start or today_str())[:10],
         installer_id=task.assignee_id,

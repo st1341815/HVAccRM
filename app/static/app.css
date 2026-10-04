@@ -463,7 +463,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .share-card { max-width: 420px; width: 100%; background: #fff; border-radius: 14px; padding: 1.6rem 1.5rem; }
 .share-brand { font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
 .share-title { font-size: 1.5rem; margin: .3rem 0 1rem; }
-.share-kv { width: 100%; }
+.share-kv { width: 100%; margin-bottom: 1rem; }
 .share-foot { margin-top: 1.1rem; text-align: center; font-size: .76rem; }
 .share-gallery { display: flex; flex-direction: column; gap: .7rem; margin-bottom: 1rem; }
 .share-gallery a { display: block; }

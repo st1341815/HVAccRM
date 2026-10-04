@@ -5,6 +5,12 @@
   <div class="card share-card">
     <div class="share-brand">🌡️ {{ settings.app_name_en }}</div>
     <h1 class="share-title">施工案例</h1>
+    <table class="kv share-kv">
+      <tr><th>工地位置</th><td>{{ case.site_label or '-' }}</td></tr>
+      <tr><th>施工时间</th><td>{{ case.work_date or '-' }}</td></tr>
+      <tr><th>施工工序</th><td>{{ case.stage }}</td></tr>
+      <tr><th>产品类型</th><td>{{ case.product_type or '-' }}</td></tr>
+    </table>
     {% if images %}
     <div class="share-gallery">
       {% for img in images %}
@@ -14,11 +20,6 @@
       {% endfor %}
     </div>
     {% endif %}
-    <table class="kv share-kv">
-      <tr><th>施工时间</th><td>{{ case.work_date or '-' }}</td></tr>
-      <tr><th>施工工序</th><td>{{ case.stage }}</td></tr>
-      <tr><th>产品类型</th><td>{{ case.product_type or '-' }}</td></tr>
-    </table>
     <p class="muted small share-foot">由 {{ settings.app_name_en }} 生成 · 仅作展示参考</p>
   </div>
 </div>
