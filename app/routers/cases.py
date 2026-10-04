@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..db import commit_retry, get_db
-from ..models import PRODUCT_OPTIONS, Case, CaseImage, now_iso
+from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso
 from ..permissions import has_perm, require
 from ..services import cases as cases_svc
 from ..templating import redirect, render
@@ -155,6 +155,26 @@ def delete_image(
     log_action(db, user, "delete", "case_images", image_id, old={"case_id": case.id, "path": image.path}, ip=client_ip(request))
     commit_retry(db)
     return redirect(return_path(back, request.headers.get("referer"), "/cases"), msg)
+
+
+@router.post("/{case_id}/sync-photos")
+def sync_photos(
+    request: Request,
+    case_id: int,
+    back: str = Form(""),
+    db: Session = Depends(get_db),
+    user=Depends(require("case:edit")),
+):
+    """重新同步：把施工工序后来又补传的照片追加进案例（幂等去重，不删既有图）。"""
+    case = get_or_404(db, Case, case_id, "案例")
+    task = db.get(Task, case.task_id) if case.task_id else None
+    if task is None:
+        return redirect(return_path(back, request.headers.get("referer"), "/cases"), "该案例没有关联的施工工序", "err")
+    added = cases_svc.import_task_photos(db, case, task)
+    log_action(db, user, "case_sync_photos", "cases", case.id, new={"added": added}, ip=client_ip(request))
+    commit_retry(db)
+    message = f"重新同步完成：新增 {added} 张" if added else "没有新的施工照片需要同步"
+    return redirect(return_path(back, request.headers.get("referer"), "/cases"), message)
 
 
 # ------------------------------------------------------------ 分享限制与失效

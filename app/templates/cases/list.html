@@ -56,6 +56,10 @@
             <input type="file" name="files" accept="image/*" multiple>
             <button type="submit">上传展示图</button>
           </form>
+          <form method="post" action="/cases/{{ c.id }}/sync-photos" class="inline" title="把施工工序后来补传的照片追加进案例">
+            <input type="hidden" name="back" value="/cases">
+            <button type="submit" class="ghost small">重新同步</button>
+          </form>
           {% endif %}
         </td>
         <td>{{ c.work_date or '-' }}</td>

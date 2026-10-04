@@ -84,10 +84,11 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
 
 
 def import_task_photos(db: Session, case: Case, task: Task) -> int:
-    """把施工工序已上传的照片导入为案例展示图。
+    """把施工工序已上传的照片导入为案例展示图（幂等：已导入的来源照片跳过）。
 
     施工过程中师傅上传的现场照（Photo.task_id == task.id）即案例的对外展示图；
     复制到 case_images 自包含存储（media/cases/{case_id}/），与客户照片目录隔离。
+    通过 source_photo_id 记录来源，重新同步时只补缺、不重复、不动手动上传的图。
     """
     from ..models import Photo
     from . import photos as photo_svc
@@ -97,18 +98,27 @@ def import_task_photos(db: Session, case: Case, task: Task) -> int:
             select(Photo).where(Photo.task_id == task.id).order_by(Photo.created_at, Photo.id)
         ).all()
     )
-    imported = 0
+    imported_ids = set(
+        db.scalars(
+            select(CaseImage.source_photo_id).where(
+                CaseImage.case_id == case.id, CaseImage.source_photo_id.is_not(None)
+            )
+        ).all()
+    )
+    count = 0
     for ph in photos:
+        if ph.id in imported_ids:
+            continue
         try:
             path = photo_svc.photo_file(ph.path)
         except ValueError:  # pragma: no cover
             continue
         if not path.exists():
             continue
-        img, _msg = save_case_image(db, case, path.read_bytes(), ph.orig_name or path.name)
+        img, _msg = save_case_image(db, case, path.read_bytes(), ph.orig_name or path.name, source_photo_id=ph.id)
         if img is not None:
-            imported += 1
-    return imported
+            count += 1
+    return count
 
 
 # ------------------------------------------------------------ 分享限制
@@ -168,8 +178,13 @@ def _make_thumb(img: Image.Image, dest: Path) -> None:
     thumb.save(dest, "WEBP", quality=s.thumb_quality, method=4)
 
 
-def save_case_image(db: Session, case: Case, raw: bytes, orig_name: str) -> tuple[CaseImage | None, str]:
-    """保存一张案例展示图，返回 (CaseImage, 状态信息)。"""
+def save_case_image(
+    db: Session, case: Case, raw: bytes, orig_name: str, source_photo_id: int | None = None
+) -> tuple[CaseImage | None, str]:
+    """保存一张案例展示图，返回 (CaseImage, 状态信息)。
+
+    source_photo_id：来源照片 id（施工照片导入时记录，手动上传为 None），用于重新同步去重。
+    """
     if not raw:
         return None, "空文件"
     try:
@@ -200,6 +215,7 @@ def save_case_image(db: Session, case: Case, raw: bytes, orig_name: str) -> tupl
         case_id=case.id,
         path=str(rel_path),
         thumb_path=str(thumb_rel) if thumb_rel else None,
+        source_photo_id=source_photo_id,
         sort_order=sort_order,
         created_at=now_iso(),
     )
