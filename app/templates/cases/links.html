@@ -34,7 +34,7 @@
         </td>
         {% if can_edit %}
         <td>
-          <form method="post" action="/cases/{{ c.id }}/share/settings" class="inline share-settings">
+          <form method="post" action="/cases/{{ c.id }}/share/settings" class="inline share-settings" id="share-settings-{{ c.id }}">
             <input type="hidden" name="back" value="/cases/links">
             <select name="duration" title="时间限制">
               {% for d in durations %}<option value="{{ d }}" {{ 'selected' if (c.share_duration or '不限') == d else '' }}>{{ d }}</option>{% endfor %}
@@ -45,21 +45,23 @@
               <option value="200次" {{ 'selected' if c.share_max_views == 200 else '' }}>200次</option>
               <option value="不限" {{ 'selected' if not c.share_max_views else '' }}>不限</option>
             </select>
-            <button type="submit" class="ghost">保存</button>
           </form>
         </td>
         <td>
-          {% if r.valid %}
-          <form method="post" action="/cases/{{ c.id }}/share/disable" class="inline" onsubmit="return confirm('手动失效这条分享链接？');">
-            <input type="hidden" name="back" value="/cases/links">
-            <button class="ghost danger">失效</button>
-          </form>
-          {% else %}
-          <form method="post" action="/cases/{{ c.id }}/share/enable" class="inline">
-            <input type="hidden" name="back" value="/cases/links">
-            <button class="ghost">恢复</button>
-          </form>
-          {% endif %}
+          <div class="share-actions">
+            <button type="submit" form="share-settings-{{ c.id }}" class="ghost">保存</button>
+            {% if r.valid %}
+            <form method="post" action="/cases/{{ c.id }}/share/disable" class="inline" onsubmit="return confirm('手动失效这条分享链接？');">
+              <input type="hidden" name="back" value="/cases/links">
+              <button class="ghost danger">失效</button>
+            </form>
+            {% else %}
+            <form method="post" action="/cases/{{ c.id }}/share/enable" class="inline">
+              <input type="hidden" name="back" value="/cases/links">
+              <button class="ghost">恢复</button>
+            </form>
+            {% endif %}
+          </div>
         </td>
         {% endif %}
       </tr>
