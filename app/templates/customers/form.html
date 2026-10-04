@@ -30,7 +30,7 @@
     <label>负责人
       <select name="owner_id">
         {% for u in owners %}
-        <option value="{{ u.id }}" {{ 'selected' if customer and customer.owner_id == u.id else '' }}>{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>
+        <option value="{{ u.id }}" {{ 'selected' if (customer and customer.owner_id == u.id) or (not customer and u.id == user.id) else '' }}>{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>
         {% endfor %}
       </select>
     </label>
