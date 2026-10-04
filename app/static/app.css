@@ -253,10 +253,8 @@ body.lb-open { overflow: hidden; }
 .tc-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
 .tc-actions .tc-done { flex: 1 1 14rem; }
 .tc-actions .tc-done input { flex: 1 1 auto; min-width: 6rem; }
-.tc-skip > summary { cursor: pointer; font-size: .84rem; color: var(--muted); padding: .25rem .5rem; border: 1px solid var(--line); border-radius: 6px; display: inline-block; }
-.tc-skip[open] > summary { margin-bottom: .35rem; }
-.tc-skip form { width: 100%; }
-.tc-skip form input { flex: 1 1 auto; min-width: 8rem; }
+.tc-actions .tc-skip-form { flex: 1 1 auto; }
+.tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
 
 /* 相机直拍按钮（手机端显示，一键拍照即上传） */
 .cam-btn { display: none; align-items: center; justify-content: center; min-width: 2.4rem; min-height: 2.4rem; border-radius: 8px; background: #e7ebee; color: var(--brand-dark); font-size: 1.15rem; cursor: pointer; }
