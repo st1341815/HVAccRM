@@ -126,10 +126,11 @@ th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(-
 th { font-size: .8rem; color: var(--muted); font-weight: 600; background: #f6f3ec; box-shadow: inset 0 -2px 0 var(--brand-50); }
 table.tight th, table.tight td { padding: .35rem .45rem; font-size: .88rem; }
 table.kv th { width: 9rem; color: var(--muted); font-weight: 600; background: none; }
-/* 施工看板表格列宽：工序容纳 6 个中文字符，产品类型 / 状态各 4 个 */
-table.tasks th:nth-child(2), table.tasks td:nth-child(2) { width: 7em; }
-table.tasks th:nth-child(3), table.tasks td:nth-child(3) { width: 5em; }
-table.tasks th:nth-child(6), table.tasks td:nth-child(6) { width: 5em; }
+/* 施工看板表格列宽：工序容纳 6 个中文字符，产品类型 / 状态各 4 个。
+   用 rem（相对根字号）而非 em，避免表头（.8rem）与单元格（.88rem）字号不同导致列宽不一致。 */
+table.tasks th:nth-child(2), table.tasks td:nth-child(2) { width: 6.2rem; }
+table.tasks th:nth-child(3), table.tasks td:nth-child(3) { width: 4.4rem; }
+table.tasks th:nth-child(6), table.tasks td:nth-child(6) { width: 4.4rem; }
 tbody tr { background: var(--row-bg, transparent); }
 tbody tr:nth-child(even) { --row-bg: #f7f4ee; }
 tr.row-alert { --row-bg: #f7eded; }
