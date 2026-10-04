@@ -465,8 +465,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .share-title { font-size: 1.5rem; margin: .3rem 0 1rem; }
 .share-kv { width: 100%; }
 .share-foot { margin-top: 1.1rem; text-align: center; font-size: .76rem; }
-.share-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
-.share-gallery img { width: 100%; border-radius: 8px; object-fit: cover; aspect-ratio: 1/1; background: #f1efe9; }
+.share-gallery { display: flex; flex-direction: column; gap: .7rem; margin-bottom: 1rem; }
+.share-gallery a { display: block; }
+.share-gallery img { display: block; width: 100%; height: auto; border-radius: 10px; background: #f1efe9; }
 @media (max-width: 780px) { .share-wrap { padding: 4vh .8rem; } }
 
 /* 案例列表：展示图缩略图与上传 */

@@ -282,6 +282,15 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
 
 @router.get("/share/{token}/image/{image_id}")
 def share_case_image(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
+    return _share_image_response(db, token, image_id)
+
+
+@router.get("/share/{token}/image/{image_id}/file")
+def share_case_image_file(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
+    return _share_image_response(db, token, image_id)
+
+
+def _share_image_response(db: Session, token: str, image_id: int):
     case = db.scalars(select(Case).where(Case.share_token == token)).first()
     if case is None or case.share_disabled or (case.share_expires_at and now_iso() >= case.share_expires_at):
         return JSONResponse({"detail": "分享已失效"}, status_code=410)
