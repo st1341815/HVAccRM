@@ -57,8 +57,10 @@
           <div class="case-actions">
             <form method="post" action="/cases/{{ c.id }}/images" enctype="multipart/form-data" class="case-upload">
               <input type="hidden" name="back" value="/cases">
-              <input type="file" name="files" accept="image/*" multiple>
-              <button type="submit">上传展示图</button>
+              <label class="btn ghost file-label" title="从相册 / 文件中选择图片">选择图片
+                <input type="file" name="files" accept="image/*" multiple>
+              </label>
+              <button type="submit" class="ghost">上传</button>
             </form>
             <form method="post" action="/cases/{{ c.id }}/sync-photos" class="case-sync" title="把施工工序后来补传的照片追加进案例">
               <input type="hidden" name="back" value="/cases">
