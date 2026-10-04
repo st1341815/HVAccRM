@@ -141,6 +141,7 @@ tr.row-alert td { background: #f7eded; }
 tr.row-muted { --row-bg: transparent; }
 tr.row-muted td { opacity: .55; }
 td.nowrap, th.nowrap { white-space: nowrap; }
+.stage-main { white-space: nowrap; }
 .center { text-align: center; }
 .red { color: var(--danger-ink); }
 .ok-text { color: var(--success-ink); }
@@ -409,6 +410,8 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.tasks.js-stack td.actions-cell button { min-height: 2.6rem; font-size: 1rem; }
   table.tasks.js-stack td.actions-cell input { font-size: 16px; }
   table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
+  /* 工序单元格：主文本右对齐、不换行（跳过/备注仍在下方换行显示） */
+  table.tasks.js-stack td .stage-info { flex: 1 1 auto; text-align: right; min-width: 0; }
 
   /* 施工看板：chips 横向滑动、客户卡单列、相机按钮显形 */
   .quick-row { gap: .4rem; }
