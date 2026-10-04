@@ -15,7 +15,7 @@
     <div class="share-gallery">
       {% for img in images %}
       <a class="photo-link" href="/cases/share/{{ case.share_token }}/image/{{ img.id }}/file" target="_blank" rel="noopener">
-        <img src="/cases/share/{{ case.share_token }}/image/{{ img.id }}" alt="案例展示图" loading="lazy">
+        <img src="/cases/share/{{ case.share_token }}/image/{{ img.id }}/thumb" alt="案例展示图" loading="lazy">
       </a>
       {% endfor %}
     </div>
