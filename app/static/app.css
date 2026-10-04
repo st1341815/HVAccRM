@@ -151,10 +151,10 @@ img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; bor
 .task-upload { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
 .picked-name { flex: 1 1 100%; word-break: break-all; }
 .task-upload button[type=submit]:disabled { opacity: .6; cursor: not-allowed; }
-.file-label { position: relative; display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; white-space: nowrap; overflow: hidden; }
-/* PWA（standalone，尤其 iOS WKWebView）下，缩到 1px 的隐藏 file input 经 label 合成点击会被
-   拒绝打开相册；改成让 input 铺满整个 label（opacity:0），用户点击直接命中 input 本身即可。 */
-.file-label input[type=file] { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 0; }
+/* 上传用 label：内放原生可见的 file input（不再用 opacity:0 覆盖层 / JS 程序化点击——
+   Android 小米 standalone PWA 下这两种方式都打不开相册/相机，原生可见 input 才可靠）。 */
+.file-label { display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; flex-wrap: wrap; }
+.file-label input[type=file] { width: auto; max-width: 11rem; font-size: .76rem; }
 .checkgrid { row-gap: .3rem; }
 .checkgrid label.checkline { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .3rem .5rem; cursor: pointer; }
 .checkgrid label.checkline:has(input:checked) { border-color: var(--brand); background: #e7ebee; color: var(--brand-dark); font-weight: 600; }
@@ -249,10 +249,6 @@ body.lb-open { overflow: hidden; }
 .tc-skip[open] > summary { margin-bottom: .35rem; }
 .tc-skip form { width: 100%; }
 .tc-skip form input { flex: 1 1 auto; min-width: 8rem; }
-
-/* 相机直拍按钮（手机端显示，一键拍照即上传） */
-.cam-btn { display: none; align-items: center; justify-content: center; min-width: 2.4rem; min-height: 2.4rem; border-radius: 8px; background: #e7ebee; color: var(--brand-dark); font-size: 1.15rem; cursor: pointer; }
-.cam-btn:active { background: #d9dfe5; }
 
 /* 折叠式筛选条（施工看板） */
 details.filter-collapse { padding: .4rem .6rem; }
@@ -396,7 +392,6 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   .chip { padding: .45rem .75rem; min-height: 2.3rem; display: inline-flex; align-items: center; }
   .task-cards { grid-template-columns: 1fr; gap: .7rem; }
   .task-card { padding: .65rem .7rem; }
-  .cam-btn { display: inline-flex; }
   .tc-actions .tc-done { flex: 1 1 100%; }
   .tc-actions .tc-done input { font-size: 16px; }
   .tc-actions button { min-height: 2.5rem; }

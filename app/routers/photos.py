@@ -77,6 +77,7 @@ async def upload_photos(
     request: Request,
     customer_id: int,
     files: list[UploadFile] = File(default=[]),
+    camera: list[UploadFile] = File(default=[]),
     kind: str = Form("其他"),
     task_id: str = Form(""),
     back: str = Form(""),
@@ -96,7 +97,9 @@ async def upload_photos(
         if task.status not in ("doing", "done"):
             target = return_path(back, request.headers.get("referer"), f"/photos/album/{customer.id}")
             return redirect(target, "该工序尚未开工，请先点击「开工」再上传照片", "err")
-    for f in files:
+    # 施工页的「📷 拍照」与「🖼 选择图片」是两个独立 file 框（camera / files），
+    # 合并后统一处理；空文件框（filename=""）直接跳过。
+    for f in list(files) + list(camera):
         if not f or not f.filename:
             continue
         raw = await f.read()
