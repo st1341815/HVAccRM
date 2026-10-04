@@ -501,13 +501,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .case-thumbs-fold .case-thumb:nth-child(n+4) { display: none; }
 .case-thumbs-fold.open .case-thumb:nth-child(n+4) { display: inline-flex; }
 .case-more { align-self: center; }
-/* 展示图下方的操作区：选择图片 / 上传展示图 / 重新同步 一行排列 */
+/* 展示图下方的操作区：选择图片 / 上传 / 重新同步 一行排列（样式对齐施工看板） */
 .case-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; margin-top: .45rem; }
 .case-upload { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
-/* file 输入收窄成「只有按钮」：width:auto 抵消全局 width:100%，font-size:0 隐藏「未选择文件」文字 */
-.case-upload input[type=file] { width: auto; max-width: 100%; font-size: 0; }
-.case-upload input[type=file]::file-selector-button,
-.case-upload input[type=file]::-webkit-file-upload-button { font-size: .78rem; padding: .25rem .55rem; cursor: pointer; }
 .case-sync { display: inline-flex; align-items: center; }
 .share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
 .share-settings select { min-width: 4.5rem; }
