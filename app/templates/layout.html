@@ -77,6 +77,9 @@
     // 相册网格：按该网格翻页（全部可见）
     const gallery = a.closest('.gallery');
     if (gallery) return Array.from(gallery.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
+    // 案例列表：每个案例的展示图单独成组，翻页只在该案例（该施工工序）内
+    const ct = a.closest('.case-thumbs');
+    if (ct) return Array.from(ct.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
     // 表格单元格里的单张缩略图（收款截图、成本凭证等）：按整页翻，避免一组只有 1 张
     return Array.from(document.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
   }
