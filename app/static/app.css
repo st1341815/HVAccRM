@@ -170,7 +170,7 @@ img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: 4px; bor
 
 input, select, textarea {
   width: 100%; padding: .4rem .5rem; border: 1px solid var(--line);
-  border-radius: 6px; font: inherit; background: #fff;
+  border-radius: 6px; font: inherit; line-height: 1.6; background: #fff;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #b9c7d4; outline-offset: 0; }
 input[type=file] { padding: .3rem; }
@@ -257,11 +257,12 @@ body.lb-open { overflow: hidden; }
 .tc-actions .tc-skip-form { flex: 1 1 auto; }
 .tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
 
-/* 完工/跳过按钮与文本框同高：表单内元素纵向拉伸对齐 */
-form.inline.tc-done,
-form.inline.tc-skip-form,
-td.actions-cell form.inline {
-  align-items: stretch;
+/* 完工/跳过按钮与文本框同高：对齐 input 的 .4rem 内边距 + 1px 边框 */
+form[action$="/done"] button,
+form[action$="/skip"] button {
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+  border: 1px solid transparent;
 }
 
 /* 折叠式筛选条（施工看板） */
