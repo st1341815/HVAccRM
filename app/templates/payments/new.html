@@ -1,0 +1,107 @@
+{% extends "layout.html" %}
+{% block title %}登记收款{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>登记收款</h1>
+  <a class="btn ghost" href="/payments">← 返回收款流水</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/payments/record" class="stack" enctype="multipart/form-data">
+    <input type="hidden" name="back" value="/payments">
+    <div class="grid3">
+      <label class="search-picker">合同 *
+        <input type="text" id="contract_search" placeholder="输入合同号 / 客户 / 房号搜索" autocomplete="off">
+        <input type="hidden" name="contract_id" id="contract_id" value="">
+        <ul id="contract_results" class="search-results" hidden></ul>
+      </label>
+      <label>产品类型<input id="contract_product" value="" readonly placeholder="选择合同后自动显示"></label>
+      <label>收款日期 *<input name="paid_at" type="date" value="{{ today }}" required></label>
+    </div>
+    <div class="grid3">
+      <label>金额 *<input name="amount" inputmode="decimal" placeholder="退款填负数" required></label>
+      <label>方式
+        <select name="method">
+          <option value="">未填</option>
+          {% for m in methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>凭证号<input name="voucher_no" placeholder="凭证号"></label>
+    </div>
+    <label>备注<input name="remark" placeholder="备注"></label>
+    <label class="inline-label" title="可多张：转账截图 / 收款凭证">付款截图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
+    <div class="actions">
+      <button type="submit">登记收款</button>
+      <a class="btn ghost" href="/payments">取消</a>
+    </div>
+  </form>
+  <p class="muted small">入库前校验：已收 + 本次 ≤ 应收总额（含增项），超收会被拦截；退款请填负数（需退款权限）。</p>
+</section>
+
+<script>
+(function () {
+  var data = {{ contract_options | tojson }} || [];
+  var input = document.getElementById('contract_search');
+  var hidden = document.getElementById('contract_id');
+  var list = document.getElementById('contract_results');
+  var form = document.querySelector('form[action="/payments/record"]');
+  if (!input || !hidden || !list) return;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+    });
+  }
+  function nameOf(c) { return c.no + (c.room ? '（' + c.room + '）' : ''); }
+  function render(items) {
+    if (!items.length) { list.hidden = true; list.innerHTML = ''; return; }
+    list.innerHTML = items.map(function (c) {
+      return '<li data-id="' + c.id + '" data-name="' + esc(nameOf(c)) + '">' +
+        '<div>' + esc(c.no) + (c.room ? ' <span class="muted">' + esc(c.room) + '</span>' : '') + '</div>' +
+        (c.name ? '<div class="muted">' + esc(c.name) + '</div>' : '') +
+        '</li>';
+    }).join('');
+    list.hidden = false;
+  }
+  function search() {
+    var q = input.value.trim().toLowerCase();
+    var items = q
+      ? data.filter(function (c) {
+          return (c.no || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.room || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.name || '').toLowerCase().indexOf(q) >= 0;
+        }).slice(0, 50)
+      : data.slice(0, 50);
+    render(items);
+  }
+  input.addEventListener('input', search);
+  input.addEventListener('focus', search);
+  list.addEventListener('mousedown', function (e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    e.preventDefault(); // 防止 input 先失焦导致点击不生效
+    hidden.value = li.getAttribute('data-id');
+    input.value = li.getAttribute('data-name');
+    var c = data.find(function (x) { return String(x.id) === String(li.getAttribute('data-id')); });
+    var productEl = document.getElementById('contract_product');
+    if (productEl) productEl.value = (c && c.product_type) || '';
+    list.hidden = true; list.innerHTML = '';
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.search-picker')) { list.hidden = true; }
+  });
+  // 隐藏字段不触发浏览器 required，提交前手动校验
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      if (!hidden.value) {
+        e.preventDefault();
+        input.focus();
+        alert('请先选择合同');
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

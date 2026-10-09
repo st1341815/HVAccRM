@@ -165,15 +165,21 @@ def sync_photos(
     db: Session = Depends(get_db),
     user=Depends(require("case:edit")),
 ):
-    """重新同步：把施工工序后来又补传的照片追加进案例（幂等去重，不删既有图）。"""
+    """重新同步：把施工工序后来又补传的照片追加进案例，并把施工时间/工序/责任人/产品类型等字段刷新为最新值。"""
     case = get_or_404(db, Case, case_id, "案例")
     task = db.get(Task, case.task_id) if case.task_id else None
     if task is None:
         return redirect(return_path(back, request.headers.get("referer"), "/cases"), "该案例没有关联的施工工序", "err")
     added = cases_svc.import_task_photos(db, case, task)
-    log_action(db, user, "case_sync_photos", "cases", case.id, new={"added": added}, ip=client_ip(request))
+    changed = cases_svc.sync_case_fields(db, case, task)
+    log_action(db, user, "case_sync_photos", "cases", case.id, new={"added": added, "fields": changed}, ip=client_ip(request))
     commit_retry(db)
-    message = f"重新同步完成：新增 {added} 张" if added else "没有新的施工照片需要同步"
+    parts = []
+    if added:
+        parts.append(f"新增 {added} 张照片")
+    if changed:
+        parts.append("同步字段：" + "、".join(changed))
+    message = "重新同步完成：" + "；".join(parts) if parts else "没有新的照片或字段需要同步"
     return redirect(return_path(back, request.headers.get("referer"), "/cases"), message)
 
 

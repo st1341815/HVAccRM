@@ -91,6 +91,7 @@
   if (pre) {
     var found = data.find(function (c) { return String(c.id) === String(pre); });
     if (found) input.value = nameOf(found);
+    else { hidden.value = ''; input.value = ''; } // 已锁定客户不在可选列表内，清空避免静默提交
   }
   // 必填校验：隐藏字段不触发浏览器 required
   if (form) {

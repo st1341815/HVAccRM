@@ -207,6 +207,7 @@ class Customer(Base):
     decor_stage = Column(String)  # 同上：保留列，表单已移除
     is_showroom = Column(Integer, default=0)
     address = Column(String)
+    locked = Column(Integer, default=0)  # 锁定：任一合同「前期施工」完工后自动置 1，管理员可手动解锁；新客户默认 0
     notes = Column(Text)
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(String, nullable=False, default=now_iso)

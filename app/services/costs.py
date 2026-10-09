@@ -76,6 +76,8 @@ def query_costs(
     category: str = "",
     supplier_name: str = "",
     installer_name: str = "",
+    supplier_id: int | None = None,
+    installer_id: int | None = None,
     date_from: str = "",
     date_to: str = "",
     keyword: str = "",
@@ -88,11 +90,15 @@ def query_costs(
         stmt = stmt.where(ContractCost.contract_id.in_(contract_ids))
     if category:
         stmt = stmt.where(ContractCost.category == category)
-    if supplier_name.strip():
+    if supplier_id is not None:
+        stmt = stmt.where(ContractCost.supplier_id == supplier_id)
+    elif supplier_name.strip():
         kw = f"%{supplier_name.strip()}%"
         sids = list(db.scalars(select(Supplier.id).where(Supplier.name.like(kw))).all())
         stmt = stmt.where(ContractCost.supplier_id.in_(sids or [-1]))
-    if installer_name.strip():
+    if installer_id is not None:
+        stmt = stmt.where(ContractCost.installer_id == installer_id)
+    elif installer_name.strip():
         kw = f"%{installer_name.strip()}%"
         uids = list(
             db.scalars(select(User.id).where(or_(User.full_name.like(kw), User.username.like(kw)))).all()

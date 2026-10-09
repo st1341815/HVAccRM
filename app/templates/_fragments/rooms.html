@@ -1,5 +1,5 @@
 {% if rooms %}<option value="">请选择房号</option>{% endif %}
 {% for room in rooms %}
-<option value="{{ room.id }}">{{ room.label }}{% if room.area %}（{{ room.area }}㎡）{% endif %}</option>
+<option value="{{ room.id }}">{{ room.label }}{% if room.area %}（{{ room.area }}㎡）{% endif %}{% if room.id in used_ids %}（已占用）{% endif %}</option>
 {% endfor %}
-{% if not rooms %}<option value="">（该楼栋下暂无房号）</option>{% endif %}
+{% if not rooms %}<option value="">（该楼栋下暂无空闲房号，可勾选「显示已占用房号」）</option>{% endif %}

@@ -65,6 +65,7 @@
         </select>
       </label>
     </div>
+    <label class="checkline small"><input type="checkbox" id="show_used" onchange="reloadRooms()"> 显示已占用房号</label>
     <p class="muted small">找不到房号？<a href="/projects/new">新建楼盘</a>，或进入楼盘页面快捷添加房号后回来重选。</p>
     <p class="muted small">快捷搜索房号：
       <input id="room_q" placeholder="如 1203" oninput="searchRooms()">
@@ -99,12 +100,13 @@
 </form>
 
 <script>
+const CURRENT_CUSTOMER_ID = {{ customer.id if customer else 0 }};
 function loadBuildings(pid) {
   const sel = document.getElementById('building_sel');
   const roomSel = document.getElementById('room_sel');
   roomSel.innerHTML = '<option value="">请先选楼栋</option>';
   if (!pid) { sel.innerHTML = '<option value="">请先选楼盘</option>'; return; }
-  fetch('/projects/' + pid + '/buildings', {cache: 'no-store'})
+  fetch('/projects/' + pid + '/buildings?exclude_customer_id=' + CURRENT_CUSTOMER_ID, {cache: 'no-store'})
     .then(r => r.text())
     .then(html => {
       sel.innerHTML = html;
@@ -117,8 +119,14 @@ function loadBuildings(pid) {
 function loadRooms(pid, building) {
   const sel = document.getElementById('room_sel');
   if (!pid || !building) { sel.innerHTML = '<option value="">请先选楼栋</option>'; return; }
-  fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building), {cache: 'no-store'})
+  const showUsed = document.getElementById('show_used').checked ? 1 : 0;
+  fetch('/projects/' + pid + '/rooms?building=' + encodeURIComponent(building) + '&exclude_customer_id=' + CURRENT_CUSTOMER_ID + '&show_used=' + showUsed, {cache: 'no-store'})
     .then(r => r.text()).then(html => { sel.innerHTML = html; });
+}
+function reloadRooms() {
+  const pid = document.getElementById('project_sel').value;
+  const building = document.getElementById('building_sel').value;
+  if (pid && building) { loadRooms(pid, building); searchRooms(); }
 }
 function syncProducts() {
   const boxes = document.querySelectorAll('#products_ms input[name=products]');
@@ -129,7 +137,8 @@ function searchRooms() {
   const q = document.getElementById('room_q').value.trim();
   const pid = document.getElementById('project_sel').value;
   if (!q) { document.getElementById('room_result').innerHTML = ''; return; }
-  fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q), {cache: 'no-store'})
+  const showUsed = document.getElementById('show_used').checked ? 1 : 0;
+  fetch('/projects/rooms/search?project_id=' + pid + '&q=' + encodeURIComponent(q) + '&exclude_customer_id=' + CURRENT_CUSTOMER_ID + '&show_used=' + showUsed, {cache: 'no-store'})
     .then(r => r.text()).then(html => { document.getElementById('room_result').innerHTML = html; });
 }
 syncProducts();

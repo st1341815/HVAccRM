@@ -16,7 +16,7 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>楼盘</th><th>城市</th><th>开发商</th><th>房号数</th><th>已成交客户</th><th>交房日期</th><th></th></tr></thead>
+    <thead><tr><th>楼盘</th><th>城市</th><th class="hide-mobile">开发商</th><th>房号数</th><th>已成交客户</th><th>交房日期</th><th></th></tr></thead>
     <tbody>
     {% for p in projects %}
       {% set rc = room_counts.get(p.id, 0) %}
@@ -24,7 +24,7 @@
       <tr>
         <td><a href="/projects/{{ p.id }}"><strong>{{ p.name }}</strong></a></td>
         <td>{{ p.city or '-' }}{% if p.district %} {{ p.district }}{% endif %}</td>
-        <td>{{ p.developer or '-' }}</td>
+        <td class="hide-mobile">{{ p.developer or '-' }}</td>
         <td>{{ rc }}</td>
         <td>{{ cc }}</td>
         <td>{{ p.delivery_date or '-' }}</td>

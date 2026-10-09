@@ -4,11 +4,17 @@
 <div class="page-head">
   <h1>{{ customer.name }}
     <span class="badge">{{ customer_status_labels.get(customer.status, customer.status) }}</span>
+    {% if customer.locked %}<span class="badge lock">🔒 已锁定</span>{% endif %}
   </h1>
   <div class="actions">
     <a class="btn" href="/photos/album/{{ customer.id }}">相册</a>
     {% if can_edit %}<a class="btn ghost" href="/customers/{{ customer.id }}/edit">编辑</a>{% endif %}
     {% if can('contract:edit') %}<a class="btn" href="/contracts/new?customer_id={{ customer.id }}">＋ 新建合同</a>{% endif %}
+    {% if can_lock %}
+    <form method="post" action="/customers/{{ customer.id }}/toggle-lock" class="inline">
+      <button class="ghost" type="submit">{{ '🔓 解锁' if customer.locked else '🔒 锁定' }}</button>
+    </form>
+    {% endif %}
     {% if can_delete %}
     <form method="post" action="/customers/{{ customer.id }}/delete" onsubmit="return confirm('确认删除客户及其合同、任务、照片记录？此操作不可恢复。');">
       <button class="danger" type="submit">删除客户</button>
@@ -160,11 +166,11 @@
   <h2>合同与收款</h2>
   {% if plan_rows %}
   <table class="tight">
-    <thead><tr><th>合同号</th><th>签订日</th><th>总额</th><th>已收</th><th>未收</th>{% if show_cost %}<th>成本</th><th>毛利</th>{% endif %}<th>回款率</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>产品</th><th>签订日</th><th>总额</th><th>已收</th><th>未收</th>{% if show_cost %}<th>成本</th><th>毛利</th>{% endif %}<th>回款率</th><th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s, p in plan_rows %}
       <tr>
-        <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
+        <td>{{ c.product_type or '-' }}</td>
         <td>{{ c.sign_date }}</td>
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>

@@ -210,6 +210,7 @@ def task_board(
 def start(
     request: Request,
     task_id: int,
+    back: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
 ):
@@ -219,7 +220,7 @@ def start(
     ok, msg = task_svc.start_task(db, task)
     log_action(db, user, "task_start" if ok else "task_start_denied", "tasks", task.id, new={"status": task.status, "msg": msg}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
+    return redirect(return_path(back, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/done")
@@ -228,6 +229,7 @@ def done(
     task_id: int,
     notes: str = Form(""),
     done_date: str = Form(""),
+    back: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
 ):
@@ -247,7 +249,7 @@ def done(
             msg += "（提示：该节点模板标记为「需照片」，建议先上传现场照片）"
     log_action(db, user, "task_done" if ok else "task_done_denied", "tasks", task.id, new={"status": task.status, "msg": msg}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
+    return redirect(return_path(back, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/skip")
@@ -255,6 +257,7 @@ def skip(
     request: Request,
     task_id: int,
     skip_reason: str = Form(""),
+    back: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("task:view")),
 ):
@@ -264,7 +267,7 @@ def skip(
     ok, msg = task_svc.skip_task(db, task, skip_reason)
     log_action(db, user, "task_skip" if ok else "task_skip_denied", "tasks", task.id, new={"status": task.status, "reason": skip_reason}, ip=client_ip(request))
     commit_retry(db)
-    return redirect(return_path(None, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
+    return redirect(return_path(back, request.headers.get("referer"), "/tasks"), msg, "ok" if ok else "err")
 
 
 @router.post("/{task_id}/assign")

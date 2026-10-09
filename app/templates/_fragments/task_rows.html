@@ -32,7 +32,9 @@
       <td class="nowrap"><span class="cell-val badge s-{{ t.status }}">{{ status_labels.get(t.status, t.status) }}</span></td>
       <td class="actions-cell">
         {% if t.status == 'doing' %}
-          <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done">
+          <form method="post" action="/tasks/{{ t.id }}/done" class="inline tc-done"
+                hx-post="/tasks/{{ t.id }}/done" hx-target="#task-table" hx-swap="innerHTML" hx-select="#task-table">
+            <input type="hidden" name="back" value="{{ back_path }}">
             <input name="notes" placeholder="完工备注">
             <label class="inline-label" title="实际施工日期（默认今天，补录时可选之前日期）"><span class="date-text">施工日期</span>
               <input type="date" name="done_date" value="{{ today }}">
@@ -41,7 +43,9 @@
           </form>
         {% endif %}
         {% if t.status not in ['done','skipped'] %}
-          <form method="post" action="/tasks/{{ t.id }}/skip" class="inline">
+          <form method="post" action="/tasks/{{ t.id }}/skip" class="inline"
+                hx-post="/tasks/{{ t.id }}/skip" hx-target="#task-table" hx-swap="innerHTML" hx-select="#task-table">
+            <input type="hidden" name="back" value="{{ back_path }}">
             <input name="skip_reason" placeholder="跳过原因（必填）" required>
             <button class="ghost">跳过</button>
           </form>

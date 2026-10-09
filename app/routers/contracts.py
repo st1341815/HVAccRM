@@ -95,6 +95,8 @@ def new_contract_form(
     allowed = visible_customer_ids(db, user)
     if allowed is not None:
         customers = [c for c in customers if c.id in allowed]
+    # 已锁定客户（任一合同「前期施工」已完工）从新建合同下拉中过滤，降低误选概率
+    customers = [c for c in customers if not c.locked]
     # 客户选择改为可搜索下拉：把可见客户序列化供前端本地过滤（含姓名/房号/手机号）
     customer_options = [
         {"id": c.id, "name": c.name, "room": c.room_label or "", "phone": c.phone or ""}

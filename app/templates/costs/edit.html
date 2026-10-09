@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block title %}修改成本{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>修改成本
+    <span class="muted small">{% if contract %}合同 {{ contract.no or ('#' ~ contract.id) }}{% endif %}</span>
+  </h1>
+  <a class="btn ghost" href="/costs">← 返回成本明细</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/costs/{{ cost.id }}/edit" enctype="multipart/form-data" class="filterbar">
+    <label class="inline-label">日期
+      <input type="date" name="spent_at" value="{{ cost.spent_at or '' }}">
+    </label>
+    <select name="category" id="cost_cat" onchange="syncCostFields()">
+      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if cost.category == c else '' }}>{{ c }}</option>{% endfor %}
+    </select>
+    <input name="amount" value="{{ cost.amount }}" inputmode="decimal" placeholder="金额（退款填负数）" required>
+    <select name="supplier_id" id="cost_supplier">
+      <option value="">供应商（材料成本必选）</option>
+      {% for sp in suppliers %}<option value="{{ sp.id }}" {{ 'selected' if cost.supplier_id == sp.id else '' }}>{{ sp.name }}</option>{% endfor %}
+    </select>
+    <select name="installer_id" id="cost_installer">
+      <option value="">安装师傅（施工费用必选）</option>
+      {% if installers %}<optgroup label="安装工">
+        {% for u in installers %}<option value="{{ u.id }}" {{ 'selected' if cost.installer_id == u.id else '' }}>{{ u.display_name }}</option>{% endfor %}
+      </optgroup>{% endif %}
+      {% if other_users %}<optgroup label="其他账号">
+        {% for u in other_users %}<option value="{{ u.id }}" {{ 'selected' if cost.installer_id == u.id else '' }}>{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
+      </optgroup>{% endif %}
+    </select>
+    <input name="remark" value="{{ cost.remark or '' }}" placeholder="备注（材料规格 / 工序 / 结算方式）">
+    <label class="inline-label" title="可多张：发票 / 收据 / 对账单">新增附图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
+    <button type="submit">保存修改</button>
+  </form>
+  <p class="muted small">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）。</p>
+</section>
+
+{% if photos %}
+<section class="card">
+  <h2>已有附图（{{ photos|length }} 张）</h2>
+  <div class="task-photos">
+    {% for ph in photos %}
+      <span class="photo-item">
+        <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}">
+          <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证">
+        </a>
+        {% if can('photo:delete') %}
+        <form method="post" action="/photos/{{ ph.id }}/delete" class="inline" onsubmit="return confirm('删除这张附图？');">
+          <input type="hidden" name="back" value="/costs/{{ cost.id }}/edit">
+          <button class="ghost danger tiny">删除</button>
+        </form>
+        {% endif %}
+      </span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<script>
+  function syncCostFields() {
+    const cat = document.getElementById('cost_cat');
+    if (!cat) return;
+    const sup = document.getElementById('cost_supplier');
+    const ins = document.getElementById('cost_installer');
+    sup.style.display = cat.value === '材料成本' ? 'inline-block' : 'none';
+    ins.style.display = cat.value === '施工费用' ? 'inline-block' : 'none';
+  }
+  syncCostFields();
+</script>
+{% endblock %}

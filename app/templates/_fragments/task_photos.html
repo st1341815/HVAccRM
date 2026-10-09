@@ -13,7 +13,7 @@
   {% if phs %}
     <span class="muted small">{{ phs|length }} 张</span>
   {% endif %}
-  {% if can_upload_photo and t.status in ('doing', 'done') %}
+  {% if can_upload_photo and t.status == 'doing' %}
     <form method="post" action="/api/customers/{{ t.customer_id }}/photos"
           enctype="multipart/form-data" class="inline task-upload"
           onsubmit="return upEnsure(this)">

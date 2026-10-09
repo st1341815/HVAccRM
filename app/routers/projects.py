@@ -18,6 +18,28 @@ from ..utils import client_ip, parse_date, parse_float, parse_int
 router = APIRouter(prefix="/projects", tags=["projects"])
 VIEW_PERMS = ("customer:view", "contract:view", "task:view", "report:view", "admin:setting")
 
+CN_PHASE = {"1": "一", "2": "二", "3": "三", "4": "四", "5": "五", "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"}
+
+
+def normalize_phase(name: str) -> str:
+    """楼盘名称中的阿拉伯数字期数转汉字大写数字：1期→一期 … 10期→十期。"""
+    import re
+
+    name = (name or "").strip()
+    return re.sub(r"(\d+)期", lambda m: CN_PHASE.get(m.group(1), m.group(1)) + "期", name)
+
+
+def used_room_ids(db: Session, exclude_customer_id: int = 0) -> set[int]:
+    """已被客户占用的房号 ID 集合。
+
+    exclude_customer_id：编辑客户时传当前客户 id，让它自己占用的房号不被算作「已占用」，
+    保证回显/不丢当前选择。客户删除/改房号后，该房号自动释放（实时查库，无状态缓存）。
+    """
+    stmt = select(Customer.room_id).where(Customer.room_id.is_not(None))
+    if exclude_customer_id:
+        stmt = stmt.where(Customer.id != exclude_customer_id)
+    return {rid for (rid,) in db.execute(stmt).all()}
+
 
 def _ensure_building(db: Session, project_id: int, name: str) -> Building:
     """楼栋去重登记：不存在则创建并返回（规范化房号填写）。"""
@@ -85,6 +107,7 @@ def create_project(
     db: Session = Depends(get_db),
     user: User = Depends(require_any("customer:edit", "admin:setting")),
 ):
+    name = normalize_phase(name)
     if not name.strip():
         return render(request, "projects/form.html", project=None, error="楼盘名称必填")
     region_error = validate_region(city, district)
@@ -115,7 +138,7 @@ def quick_project(
     user: User = Depends(require_any("customer:edit", "admin:setting")),
 ):
     """客户录入现场快捷新建楼盘（HTMX / JSON 通用）。"""
-    name = name.strip()
+    name = normalize_phase(name).strip()
     if not name:
         return JSONResponse({"ok": False, "error": "楼盘名称必填"}, status_code=400)
     existing = db.scalars(select(Project).where(Project.name == name)).first()
@@ -267,6 +290,7 @@ def delete_room(
 def building_options(
     request: Request,
     project_id: int,
+    exclude_customer_id: int = 0,
     db: Session = Depends(get_db),
     user: User = Depends(require_any(*VIEW_PERMS)),
 ):
@@ -280,7 +304,20 @@ def building_options(
             .group_by(Room.building)
         ).all()
     )
-    response = render(request, "_fragments/buildings.html", project_id=project_id, buildings=buildings, counts=counts)
+    used = used_room_ids(db, exclude_customer_id)
+    used_counts = dict(
+        db.execute(
+            select(Room.building, func.count(Room.id))
+            .where(Room.project_id == project_id)
+            .where(Room.id.in_(used))
+            .group_by(Room.building)
+        ).all()
+    ) if used else {}
+    free_counts = {b: counts[b] - used_counts.get(b, 0) for b in counts}
+    response = render(
+        request, "_fragments/buildings.html",
+        project_id=project_id, buildings=buildings, counts=counts, free_counts=free_counts,
+    )
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -317,6 +354,8 @@ def room_options(
     request: Request,
     project_id: int,
     building: str = "",
+    exclude_customer_id: int = 0,
+    show_used: int = 0,
     db: Session = Depends(get_db),
     user: User = Depends(require_any(*VIEW_PERMS)),
 ):
@@ -324,8 +363,12 @@ def room_options(
     if building.strip():
         stmt = stmt.where(Room.building == building.strip())
     rooms = list(db.scalars(stmt.order_by(Room.unit, Room.room_no)).all())
+    used = used_room_ids(db, exclude_customer_id)
+    if not show_used:
+        rooms = [r for r in rooms if r.id not in used]
     response = render(
-        request, "_fragments/rooms.html", project_id=project_id, building=building, rooms=rooms
+        request, "_fragments/rooms.html",
+        project_id=project_id, building=building, rooms=rooms, used_ids=used,
     )
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -336,12 +379,14 @@ def room_search(
     request: Request,
     project_id: int = 0,
     q: str = "",
+    exclude_customer_id: int = 0,
+    show_used: int = 0,
     db: Session = Depends(get_db),
     user: User = Depends(require_any(*VIEW_PERMS)),
 ):
     """模糊搜索房号：支持按房号（1203）或楼盘名称（华润紫玥台）搜索。
 
-    未指定楼盘时跨楼盘搜；指定楼盘时只搜该楼盘。
+    未指定楼盘时跨楼盘搜；指定楼盘时只搜该楼盘。默认排除已占用房号。
     """
     key = q.strip()
     project_ids = [p.id for p in db.scalars(select(Project)).all() if key and key in (p.name or "")]
@@ -351,7 +396,11 @@ def room_search(
     stmt = select(Room).where(or_(*conds))
     if project_id:
         stmt = stmt.where(Room.project_id == project_id)
-    rooms = list(db.scalars(stmt.order_by(Room.building, Room.room_no).limit(50)).all())
+    rooms = list(db.scalars(stmt.order_by(Room.building, Room.room_no)).all())
+    used = used_room_ids(db, exclude_customer_id)
+    if not show_used:
+        rooms = [r for r in rooms if r.id not in used]
+    rooms = rooms[:50]
     projects = {p.id: p.label for p in db.scalars(select(Project)).all()}
     return render(
         request,
@@ -360,4 +409,5 @@ def room_search(
         projects=projects,
         q=q,
         project_id=project_id,
+        used_ids=used,
     )
