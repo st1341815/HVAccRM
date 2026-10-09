@@ -86,6 +86,24 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 }
 .scrim { display: none; position: fixed; inset: 0; background: rgba(22, 24, 27, .45); z-index: 55; }
 
+/* 桌面端：折叠侧边栏按钮（平板小屏腾出内容区） */
+.collapse-btn {
+  margin-left: auto; flex: 0 0 auto;
+  width: 1.7rem; height: 1.7rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; color: #c9c5bd; border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px; font-size: 1.05rem; line-height: 1; cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, transform .15s ease;
+}
+.collapse-btn:hover { background: rgba(255, 255, 255, .09); color: #fff; }
+/* 折叠态：侧边栏收窄成图标栏（只显示图标与品牌标识） */
+body.sidebar-collapsed .sidebar { flex-basis: 66px; padding-left: .5rem; padding-right: .5rem; }
+body.sidebar-collapsed .sidebar .brand { justify-content: center; }
+body.sidebar-collapsed .sidebar .brand span { display: none; }
+body.sidebar-collapsed .sidebar .collapse-btn { margin-left: 0; transform: scaleX(-1); }
+body.sidebar-collapsed .sidebar nav a { justify-content: center; gap: 0; padding: .58rem 0; font-size: 0; }
+body.sidebar-collapsed .sidebar .me { display: none; }
+
 .wrap { flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto; padding: 1.2rem 1.5rem; }
 .foot { text-align: center; color: var(--muted); font-size: .78rem; padding: 1.5rem 0; }
 
@@ -101,6 +119,8 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 
 .page-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .page-head .actions { display: flex; gap: .5rem; align-items: center; margin-left: auto; flex-wrap: wrap; }
+/* 页头操作区里的 tab 导航：去掉自带的下边距，避免与同排按钮垂直错位 */
+.page-head .actions .tabs { margin-bottom: 0; }
 
 /* 详情页顶部信息条 */
 .meta {
@@ -119,11 +139,21 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 .kpi.alert .kpi-num { color: var(--danger-ink); }
 .kpis.compact .kpi { padding: .3rem .7rem; min-width: 5.5rem; }
 .kpis.compact .kpi-num { font-size: 1rem; }
+/* 施工看板：筛选结果标签与数字合并一行 */
+.kpi-inline { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; }
+.kpi-inline .kpi-num { display: inline; }
 
 /* ---------------------------------------------------------------- 表格 */
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { font-size: .88rem; color: var(--ink); font-weight: 700; background: #f6f3ec; box-shadow: inset 0 -2px 0 var(--brand-50); }
+th { font-size: .88rem; color: var(--ink); font-weight: 700; background: #f6f3ec; box-shadow: inset 0 -2px 0 var(--brand-50); white-space: nowrap; vertical-align: middle; }
+/* 可排序列的表头：点标题切换升降序 */
+th.sortable { padding: 0; }
+th.sortable a { display: block; padding: .45rem .5rem; color: inherit; text-decoration: none; }
+th.sortable a:hover { color: var(--brand); }
+.sort-arrow { font-size: .72rem; margin-left: .2rem; opacity: .85; }
+/* 案例列表表头：CJK 默认会在任意两字间折行，强制不折行避免「4 字变 3+1 两行」 */
+table.cases-table th { white-space: nowrap; }
 table.tight th, table.tight td { padding: .35rem .45rem; font-size: .88rem; }
 table.kv th { width: 9rem; color: var(--muted); font-weight: 600; background: none; }
 /* 施工看板表格列宽：工序容纳 6 个中文字符，产品类型 / 状态各 4 个。
@@ -138,6 +168,8 @@ tbody tr { background: var(--row-bg, transparent); }
 tbody tr:nth-child(even) { --row-bg: #f7f4ee; }
 tr.row-alert { --row-bg: #f7eded; }
 tr.row-alert td { background: #f7eded; }
+/* 成本未录入：整行文字标红提醒 */
+tr.row-no-cost td { color: var(--danger-ink); }
 tr.row-muted { --row-bg: transparent; }
 tr.row-muted td { opacity: .55; }
 td.nowrap, th.nowrap { white-space: nowrap; }
@@ -188,6 +220,14 @@ button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .btn { display: inline-block; padding: .42rem .9rem; border-radius: 6px; background: var(--brand-strong); color: #fff; white-space: nowrap; }
 .btn:hover { background: var(--brand-ink); text-decoration: none; }
 .btn.ghost { background: #e7ebee; color: var(--brand-dark); }
+/* 页头主操作按钮：与选中 tab 同款样式（淡蓝背景 + 胶囊圆角 + 等高，和「成本明细」active 导航一致） */
+.btn-tab {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 999px;
+  padding: .3rem .8rem;
+}
+.btn-tab:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
 
 .filterbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .filterbar input, .filterbar select { width: auto; min-width: 8rem; }
@@ -283,6 +323,7 @@ details.filter-collapse .filterbar { padding-top: .1rem; }
 .badge.s-done { background: #e6ece1; color: var(--success-ink); }
 .badge.s-doing { background: #e5e9ee; color: var(--brand-dark); }
 .badge.s-overdue, .badge.s-skipped { background: #f3e8e8; color: var(--danger-ink); }
+.badge.lock { background: #f3e8e8; color: var(--danger-ink); border: 1px solid #e6c9c9; }
 
 .tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .tabs a { padding: .3rem .8rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
@@ -342,6 +383,13 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   body.nav-open .sidebar { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, .32); }
   body.nav-open .scrim { display: block; }
   .sidebar-toggle { display: flex; }
+  .collapse-btn { display: none; }
+  /* 移动端是抽屉式，折叠态样式一律失效（即便此前在桌面端折叠过） */
+  body.sidebar-collapsed .sidebar { padding-left: .85rem; padding-right: .85rem; }
+  body.sidebar-collapsed .sidebar .brand { justify-content: flex-start; }
+  body.sidebar-collapsed .sidebar .brand span { display: inline; }
+  body.sidebar-collapsed .sidebar nav a { justify-content: flex-start; gap: .6rem; padding: .58rem .7rem; font-size: .95rem; }
+  body.sidebar-collapsed .sidebar .me { display: block; }
   .wrap { padding-top: 3.4rem; }
 
   /* 触控目标不小于 ~40px */
@@ -409,8 +457,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.tasks.js-stack td:first-child { font-weight: 700; font-size: .95rem; }
   table.tasks.js-stack td:first-child .muted { font-weight: 400; }
   table.tasks.js-stack tr.row-alert { border-color: #fca5a5; }
-  table.tasks.js-stack td.actions-cell form,
-  table.tasks.js-stack td.actions-cell button { width: 100%; }
+  table.tasks.js-stack td.actions-cell form { width: 100%; }
   table.tasks.js-stack td.actions-cell button { min-height: 2.5rem; font-size: 1rem; }
   table.tasks.js-stack td.actions-cell input { font-size: 16px; }
   table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
@@ -434,6 +481,11 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   .tc-actions .tc-done { flex: 1 1 100%; }
   .tc-actions .tc-done input { font-size: 16px; }
   .tc-actions button { min-height: 2.5rem; }
+  /* 完工表单：备注伸缩占剩余，日期控件与按钮固定不换行（两个视图通用） */
+  .tc-actions .tc-done input { min-width: 0; }
+  .tc-done .inline-label { flex: 0 0 auto; }
+  .tc-done input[type="date"] { flex: 0 0 auto; }
+  .tc-done button { flex: 0 0 auto; white-space: nowrap; }
   .tc-skip > summary { padding: .45rem .8rem; }
 
   /* 缩略图：手机上放大便于点按 */
@@ -445,6 +497,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   .task-photos { gap: .45rem; }
 
   /* 其它 */
+  .hide-mobile { display: none !important; }
   .meta { padding: .5rem .6rem; font-size: .85rem; gap: .2rem .8rem; }
   .gallery { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: .5rem; }
   .gallery img { height: 104px; }

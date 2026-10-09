@@ -7,7 +7,7 @@
       <td>{{ projects.get(r.project_id, '') }}</td>
       <td>{{ r.building }}</td>
       <td>{{ r.unit or '-' }}</td>
-      <td><strong>{{ r.room_no }}</strong></td>
+      <td><strong>{{ r.room_no }}</strong>{% if r.id in used_ids %} <span class="muted small">（已占用）</span>{% endif %}</td>
       <td>{{ r.area or '-' }}</td>
       <td><a href="/projects/{{ r.project_id }}">进入楼盘</a></td>
     </tr>

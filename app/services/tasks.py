@@ -158,6 +158,11 @@ def finish_task(db: Session, task: Task, done_date: str | None = None) -> tuple[
     from . import cases as cases_svc
 
     cases_svc.create_case_for_task(db, task)
+    # 「前期施工」完工后激活客户锁定：该客户已进入实际施工，从新建合同下拉中过滤
+    if task.stage == "前期施工":
+        customer = db.get(Customer, task.customer_id)
+        if customer is not None and not customer.locked:
+            customer.locked = 1
     return True, "已完工"
 
 

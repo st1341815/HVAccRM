@@ -132,7 +132,7 @@
     <select name="category" id="cost_cat" onchange="syncCostFields()">
       {% for c in cost_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
     </select>
-    <input name="amount" placeholder="金额 *" inputmode="decimal" required>
+    <input name="amount" placeholder="金额（退款填负数）" inputmode="decimal" required>
     <select name="supplier_id" id="cost_supplier" style="display:inline-block">
       <option value="">供应商（材料成本必选）</option>
       {% for sp in suppliers %}<option value="{{ sp.id }}">{{ sp.name }}</option>{% endfor %}

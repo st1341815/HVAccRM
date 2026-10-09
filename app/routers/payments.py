@@ -92,6 +92,35 @@ def list_payments(
     )
 
 
+@router.get("/new")
+def new_payment_form(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("payment:edit")),
+):
+    contracts = list(db.scalars(select(Contract).order_by(Contract.sign_date.desc(), Contract.id.desc())).all())
+    allowed = visible_customer_ids(db, user)
+    if allowed is not None:
+        contracts = [c for c in contracts if c.customer_id in allowed]
+    # 合同选择改为可搜索下拉：序列化供前端本地过滤（合同号/房号/客户名）
+    contract_options = [
+        {
+            "id": c.id,
+            "no": c.no or f"#{c.id}",
+            "room": c.customer.room_label_short if c.customer else "",
+            "name": c.customer.name if c.customer else "",
+            "product_type": c.product_type or "",
+        }
+        for c in contracts
+    ]
+    return render(
+        request,
+        "payments/new.html",
+        contract_options=contract_options,
+        methods=METHODS,
+    )
+
+
 @router.get("/overdue")
 def overdue_view(
     request: Request,
@@ -220,3 +249,115 @@ def delete_payment(
         finance_svc.allocate_plans(db, contract)
     commit_retry(db)
     return redirect(f"/contracts/{payment.contract_id}", "收款记录已删除（已重算应收）")
+
+
+@router.get("/{payment_id}/edit")
+def edit_payment_form(
+    request: Request,
+    payment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("payment:edit")),
+):
+    payment = get_or_404(db, Payment, payment_id, "收款记录")
+    contract = db.get(Contract, payment.contract_id)
+    users = {u.id: u for u in db.scalars(select(User)).all()}
+    photos = photo_svc.photos_by_payment(db, [payment.id]).get(payment.id, [])
+    return render(
+        request,
+        "payments/edit.html",
+        payment=payment,
+        contract=contract,
+        users=users,
+        photos=photos,
+        methods=METHODS,
+    )
+
+
+@router.post("/{payment_id}/edit")
+async def update_payment(
+    request: Request,
+    payment_id: int,
+    amount: str = Form(...),
+    paid_at: str = Form(""),
+    method: str = Form(""),
+    received_by: str = Form(""),
+    voucher_no: str = Form(""),
+    remark: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("payment:edit")),
+):
+    payment = get_or_404(db, Payment, payment_id, "收款记录")
+    contract = db.get(Contract, payment.contract_id)
+    if not contract:
+        return redirect("/payments", "合同不存在", "err")
+    amt = parse_float(amount)
+    is_refund = amt < 0
+    if is_refund and not has_perm(user, "payment:refund"):
+        return render(request, "403.html", status_code=403)
+    # 校验：从已收合计里先扣除旧金额，再按新金额做超收 / 退款越界校验
+    summary = finance_svc.contract_summary(db, contract)
+    summary.received = round(summary.received - (payment.amount or 0), 2)
+    problem = finance_svc.check_payment(contract, summary, amt, is_refund=is_refund)
+    if problem:
+        return redirect(f"/payments/{payment.id}/edit", problem, "err")
+
+    old_vals = {
+        "amount": payment.amount,
+        "paid_at": payment.paid_at,
+        "method": payment.method,
+        "voucher_no": payment.voucher_no,
+        "received_by": payment.received_by,
+        "remark": payment.remark,
+    }
+    payment.amount = amt
+    payment.paid_at = paid_at.strip() or today_str()
+    payment.method = method.strip() or None
+    rid = parse_int(received_by)
+    if rid and db.get(User, rid):
+        payment.received_by = rid
+    payment.voucher_no = voucher_no.strip() or None
+    payment.remark = remark.strip() or None
+
+    # 新增付款截图（已有截图的删除走 /photos/{id}/delete）
+    saved, dedup, errors = 0, 0, []
+    for f in files:
+        if not f or not f.filename:
+            continue
+        raw = await f.read()
+        photo, msg = photo_svc.save_photo(
+            db,
+            customer_id=contract.customer_id,
+            kind=PAYMENT_PHOTO_KIND,
+            raw=raw,
+            orig_name=f.filename,
+            uploaded_by=user.id,
+            contract_id=contract.id,
+            payment_id=payment.id,
+        )
+        if photo is None:
+            errors.append(f"{f.filename}: {msg}")
+        else:
+            if "重复" in msg:
+                dedup += 1
+            else:
+                saved += 1
+
+    finance_svc.allocate_plans(db, contract)
+    log_action(
+        db,
+        user,
+        "update",
+        "payments",
+        payment.id,
+        old=old_vals,
+        new=payment,
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    message = "收款已修改"
+    if saved or dedup:
+        message += f"；付款截图新增 {saved} 张、去重 {dedup} 张"
+    if errors:
+        message += "；截图失败：" + "；".join(errors)
+    return redirect("/payments", message, "err" if errors else "ok")

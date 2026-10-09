@@ -4,8 +4,8 @@
 <div class="page-head">
   <h1>成本与利润 <span class="muted small">以合同为单个项目核算</span></h1>
   <nav class="tabs inline-tabs">
-    <a href="/costs" class="active">利润核算</a>
-    <a href="/costs/entries">成本明细</a>
+    <a href="/costs">成本明细</a>
+    <a href="/costs/overview" class="active">利润核算</a>
     <a href="/costs/suppliers">供应商</a>
   </nav>
 </div>
@@ -33,31 +33,36 @@
 </section>
 
 <section class="card">
-  <form method="get" action="/costs" class="filterbar">
+  <form method="get" action="/costs/overview" class="filterbar">
     <label class="inline-label">签订日从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
     <input name="customer_q" value="{{ filters.customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <label class="checkline"><input type="checkbox" name="only_cost" value="1" {{ 'checked' if filters.only_cost else '' }}> 只看已录成本</label>
     <button type="submit">筛选</button>
-    <a class="btn ghost" href="/costs">重置</a>
+    <a class="btn ghost" href="/costs/overview">重置</a>
   </form>
 </section>
 
 <section class="card">
-  <h2>按合同核算（{{ rows|length }} 份，按毛利升序）</h2>
+  <h2>按合同核算（{{ rows|length }} 份，按{{ dict(sort_options).get(sort, '签订日') }}{{ '升序' if order == 'asc' else '降序' }}）</h2>
   <table class="tight">
     <thead>
-      <tr><th>合同号</th><th>房号</th><th>产品类型</th><th>签订日</th><th>收入</th><th>成本</th><th>毛利</th><th>毛利率</th><th>已收</th><th>未收</th><th></th></tr>
+      <tr>
+        <th>房号</th>
+        {% for key, label in sort_options %}
+        <th class="sortable"><a href="{{ sort_links[key] }}">{{ label }}{% if sort == key %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        {% endfor %}
+        <th></th>
+      </tr>
     </thead>
     <tbody>
     {% for c, fin, p in rows %}
-      <tr class="{{ 'row-alert' if p.is_loss else '' }}">
-        <td><a href="/contracts/{{ c.id }}">{{ c.no or ('#' ~ c.id) }}</a></td>
+      <tr class="{{ 'row-alert' if p.is_loss else '' }}{{ ' row-no-cost' if p.cost <= 0 else '' }}">
         <td>{% if c.customer %}<a href="/customers/{{ c.customer_id }}">{{ c.customer.room_label_short or c.customer.name }}</a>{% else %}#{{ c.customer_id }}{% endif %}</td>
         <td>{{ c.product_type or '-' }}</td>
         <td>{{ c.sign_date }}</td>
         <td>{{ p.income|money }}</td>
-        <td>{{ p.cost|money }}{% if p.cost <= 0 %}<span class="muted small">（未录）</span>{% endif %}</td>
+        <td>{{ p.cost|money }}</td>
         <td class="{{ 'red' if p.is_loss else '' }}"><strong>{{ p.gross_profit|money }}</strong></td>
         <td>{{ p.gross_margin }}%</td>
         <td>{{ p.received|money }}</td>

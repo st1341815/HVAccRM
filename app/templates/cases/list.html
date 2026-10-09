@@ -33,8 +33,8 @@
 </section>
 
 <section class="card">
-  <table class="tight">
-    <thead><tr><th>展示图</th><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>责任人</th><th>产品类型</th><th>分享状态</th><th>分享</th></tr></thead>
+  <table class="tight cases-table">
+    <thead><tr><th>展示图</th><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>安装师傅</th><th>产品类型</th><th>分享状态</th><th>分享</th></tr></thead>
     <tbody>
     {% for c in cases %}
       {% set imgs = case_images.get(c.id, []) %}

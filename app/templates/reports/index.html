@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block title %}报表{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>报表 <span class="muted small">按月 / 按年统计</span></h1>
+</div>
+
+<div class="chips views" style="margin-bottom:.6rem">
+  <a class="chip {{ 'on' if mode == 'month' else '' }}" href="/reports?mode=month&year={{ year }}">按月</a>
+  <a class="chip {{ 'on' if mode == 'year' else '' }}" href="/reports?mode=year">按年</a>
+</div>
+
+{% if show_money %}
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ totals.income|money }}</span><span class="kpi-label">销售额（签订）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.cost|money }}</span><span class="kpi-label">成本</span></div>
+  <div class="kpi {{ 'alert' if totals.gross < 0 else '' }}"><span class="kpi-num">{{ totals.gross|money }}</span><span class="kpi-label">毛利</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.margin }}%</span><span class="kpi-label">毛利率</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.received|money }}</span><span class="kpi-label">已收</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.contracts }}</span><span class="kpi-label">合同数</span></div>
+</div>
+{% endif %}
+
+<section class="card">
+  <form method="get" action="/reports" class="filterbar">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    {% if mode == 'month' %}
+    <label class="inline-label">年份
+      <select name="year" onchange="this.form.submit()">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if year == y else '' }}>{{ y }} 年</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>{{ '按年统计' if mode == 'year' else year ~ ' 年各月统计' }}</h2>
+  <table class="tight">
+    <thead>
+      <tr>
+        <th>{{ '年份' if mode == 'year' else '月份' }}</th>
+        {% if show_money %}<th>销售额</th><th>成本</th><th>毛利</th><th>毛利率</th><th>已收</th>{% endif %}
+        <th>合同数</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{{ 'row-alert' if show_money and r.gross < 0 else '' }}">
+        <td>{{ r.label }}</td>
+        {% if show_money %}
+        <td>{{ r.income|money }}</td>
+        <td>{{ r.cost|money }}</td>
+        <td class="{{ 'red' if r.gross < 0 else '' }}">{{ r.gross|money }}</td>
+        <td>{{ r.margin }}%</td>
+        <td>{{ r.received|money }}</td>
+        {% endif %}
+        <td>{{ r.contracts }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    {% if show_money %}
+    <tfoot>
+      <tr>
+        <td><strong>合计</strong></td>
+        <td><strong>{{ totals.income|money }}</strong></td>
+        <td><strong>{{ totals.cost|money }}</strong></td>
+        <td><strong>{{ totals.gross|money }}</strong></td>
+        <td>{{ totals.margin }}%</td>
+        <td><strong>{{ totals.received|money }}</strong></td>
+        <td>{{ totals.contracts }}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  <p class="muted small">口径：销售额 = 该期签订合同的「合同额（减优惠）+ 增项」；成本 = 该期发生的成本费用；毛利 = 销售额 − 成本；已收 = 该期收到的款项（含退款冲减）。</p>
+</section>
+{% endblock %}

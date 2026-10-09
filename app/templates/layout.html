@@ -20,12 +20,31 @@
       });
     }
   </script>
+  <script>
+    // 修复移动端视口失效：form POST 跳转后部分 WebView 会把视口重置成桌面宽度（~980px），
+    // 导致「手机屏却按桌面宽渲染」；检测到后自动刷新一次恢复（sessionStorage 防死循环）。
+    (function () {
+      try {
+        if (screen.width <= 780) {
+          if (window.innerWidth > 780) {
+            if (sessionStorage.getItem('vp-fix') !== '1') {
+              sessionStorage.setItem('vp-fix', '1');
+              location.reload();
+            }
+          } else {
+            sessionStorage.removeItem('vp-fix'); // 视口正常，重置标志，下次失效仍可修复
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body class="{{ 'has-sidebar' if user else 'login-page' }}">
 {% if user %}
+<script>try{if(localStorage.getItem('hvaccrm-sidebar-collapsed')==='1')document.body.classList.add('sidebar-collapsed');}catch(e){}</script>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">🌡️ <span>HVAccRM</span></div>
+    <div class="brand">🌡️ <span>HVAccRM</span><button type="button" class="collapse-btn" aria-label="折叠侧边栏" title="折叠侧边栏">⟨</button></div>
     <nav>
       <a href="/" class="{{ 'active' if current_path == '/' else '' }}"><span class="ico">📊</span>看板</a>
       {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}"><span class="ico">👥</span>客户</a>{% endif %}
@@ -35,6 +54,7 @@
       {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}"><span class="ico">🧾</span>成本</a>{% endif %}
       {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}"><span class="ico">🔧</span>施工</a>{% endif %}
       {% if can('case:view') %}<a href="/cases" class="{{ 'active' if current_path.startswith('/cases') else '' }}"><span class="ico">🏆</span>案例</a>{% endif %}
+      {% if can('report:view') %}<a href="/reports" class="{{ 'active' if current_path.startswith('/reports') else '' }}"><span class="ico">📈</span>报表</a>{% endif %}
       {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico">👤</span>用户</a>{% endif %}
       {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico">⚙️</span>系统</a>{% endif %}
     </nav>
@@ -339,19 +359,36 @@ window.upEnsure = function (form) {
   if (b) { b.disabled = true; b.textContent = '压缩中…'; }
   window.compressFiles(form).then(function () {
     if (b) b.textContent = '上传中…';
-    form.submit(); // DOM submit 不触发校验
+    // 用 fetch 代替 form.submit()：整页跳转在移动端 WebView 会导致视口/响应式失效
+    return fetch(form.action, { method: 'POST', body: new FormData(form) })
+      .then(function (resp) { return resp.text(); })
+      .then(function (html) {
+        const target = document.getElementById('task-table');
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const box = doc.querySelector('#task-table');
+        if (target && box) {
+          // 施工看板：局部刷新 #task-table，不整页跳转
+          target.innerHTML = box.innerHTML;
+          window.stackTables(target);
+          if (b) { b.disabled = false; b.textContent = '上传'; }
+          inp.value = '';
+        } else {
+          // 相册等无局部刷新区的页面：整页刷新以显示新照片
+          window.location.reload();
+        }
+      });
   }).catch(function (e) {
     if (b) { b.disabled = false; b.textContent = '上传'; }
     alert('图片处理失败：' + (e && e.message ? e.message : e));
   });
-  return false; // 拦截原生提交，改由压缩后程序化提交
+  return false; // 拦截原生提交，改由压缩后 fetch 上传
 };
 
 // 手机端宽表格自动转「标签 + 值」卡片：把表头文字写到每个单元格的 data-label 上，
 // 由 CSS（@media max-width:780px 的 table.js-stack 规则）接管显示。
 // 跳过：键值表(.kv)、含合并单元格的表（表头与列对不上）。
-(function () {
-  document.querySelectorAll('table').forEach(function (t) {
+window.stackTables = function (root) {
+  (root || document).querySelectorAll('table').forEach(function (t) {
     if (t.classList.contains('kv')) return;
     if (t.querySelector('td[colspan], td[rowspan], th[colspan], th[rowspan]')) return;
     const ths = Array.from(t.querySelectorAll('thead th'));
@@ -363,6 +400,28 @@ window.upEnsure = function (form) {
       });
     });
     t.classList.add('js-stack');
+  });
+};
+window.stackTables(document);
+// HTMX 局部刷新（施工看板完工/跳过/上传等）后，重新给表格打上卡片化标记
+document.addEventListener('htmx:afterSwap', function (e) {
+  window.stackTables(e.target);
+});
+</script>
+<script>
+// 侧边栏折叠（桌面端）：点击折叠/展开为窄图标栏，状态持久化到 localStorage
+(function () {
+  var KEY = 'hvaccrm-sidebar-collapsed';
+  var btn = document.querySelector('.collapse-btn');
+  if (!btn) return;
+  function apply(collapsed) {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    btn.setAttribute('aria-label', collapsed ? '展开侧边栏' : '折叠侧边栏');
+    btn.setAttribute('title', collapsed ? '展开侧边栏' : '折叠侧边栏');
+    try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
+  }
+  btn.addEventListener('click', function () {
+    apply(!document.body.classList.contains('sidebar-collapsed'));
   });
 })();
 </script>

@@ -26,6 +26,7 @@ from .routers import (
     payments,
     photos,
     projects,
+    reports,
     tasks,
     ui,
 )
@@ -71,6 +72,20 @@ static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+def _is_exempt(path: str) -> bool:
+    """判断请求路径是否免登录。
+
+    白名单之外，域名所有权验证文件（static 目录下真实存在的单段 .txt）
+    也需要免登录——腾讯云/DNSPod 等会直接 GET 根路径的随机文件名。
+    """
+    if any(path == p or path.startswith(p) for p in EXEMPT_PREFIXES):
+        return True
+    name = path.lstrip("/")
+    if name.endswith(".txt") and "/" not in name and (static_dir / name).is_file():
+        return True
+    return False
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def web_manifest() -> Response:
     """PWA manifest：根路径 + 正确 Content-Type。"""
@@ -103,7 +118,7 @@ def offline_page() -> Response:
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     request.state.user = None
-    if not any(path == p or path.startswith(p) for p in EXEMPT_PREFIXES):
+    if not _is_exempt(path):
         with session_scope() as db:
             user = load_user(request, db)
             if user:
@@ -136,6 +151,7 @@ app.include_router(costs.router)
 app.include_router(tasks.router)
 app.include_router(cases.router)
 app.include_router(photos.router)
+app.include_router(reports.router)
 app.include_router(admin.router)
 
 
@@ -145,6 +161,23 @@ def health():
     return JSONResponse(
         {"status": "ok" if ok else "degraded", "db": ok, "version": __version__},
         status_code=200 if ok else 503,
+    )
+
+
+@app.get("/{verify_file}", include_in_schema=False)
+def serve_verify_file(verify_file: str):
+    """域名所有权验证文件：仅服务 static 目录下真实存在的单段 .txt，免登录。"""
+    if not verify_file.endswith(".txt"):
+        raise HTTPException(status_code=404, detail="未找到")
+    if verify_file != Path(verify_file).name or "/" in verify_file:
+        raise HTTPException(status_code=404, detail="未找到")
+    target = static_dir / verify_file
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="未找到")
+    return Response(
+        target.read_text(encoding="utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Cache-Control": "no-cache"},
     )
 
 

@@ -260,6 +260,7 @@ def customer_detail(
         back_path=str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
         can_edit=can_edit_customer(db, user, customer),
         can_delete=has_perm(user, "customer:delete"),
+        can_lock=has_perm(user, "admin:setting"),
         sources=SOURCES,
     )
 
@@ -333,6 +334,36 @@ def update_customer(
     log_action(db, user, "update", "customers", customer.id, old=before, new=customer, ip=client_ip(request))
     commit_retry(db)
     return redirect(f"/customers/{customer.id}", "客户资料已更新")
+
+
+@router.post("/{customer_id}/toggle-lock")
+def toggle_customer_lock(
+    request: Request,
+    customer_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    """锁定/解锁客户（仅管理员）。
+
+    锁定通常是自动触发的（任一合同「前期施工」完工），这里提供手动开关；
+    解锁后该客户会重新出现在新建合同的下拉中。
+    """
+    customer = get_or_404(db, Customer, customer_id, "客户")
+    before = {"locked": customer.locked}
+    customer.locked = 0 if customer.locked else 1
+    log_action(
+        db,
+        user,
+        "customer_unlock" if before["locked"] else "customer_lock",
+        "customers",
+        customer.id,
+        old=before,
+        new={"locked": customer.locked},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    state = "已解锁" if not customer.locked else "已锁定"
+    return redirect(f"/customers/{customer.id}", f"客户「{customer.name}」{state}")
 
 
 @router.post("/{customer_id}/delete")

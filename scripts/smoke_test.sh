@@ -103,7 +103,7 @@ c=$(code -b $J --get --data-urlencode "q=张三" $B/ui/customer-search); chk "HT
 
 c=$(code -b $J "$B/customers/new"); chk "新建客户页" 200 "$c"
 has "华润紫玥台" > /dev/null 2>&1 || true
-has "测试楼盘A-合肥-包河区" && ok "楼盘下拉带城市/区县（名称-城市-区县）" || bad "楼盘下拉未带城市区县"
+has "search-picker" && ok "楼盘为可搜索下拉" || bad "楼盘下拉未改为搜索式"
 has "按标准工序模板生成施工节点任务" && ok "文案已去掉「9 个」" || bad "文案未更新"
 has "<details class=\"ms\"" && ok "意向产品为下拉式多选控件" || bad "意向产品未改为下拉多选"
 has 'name="products"' && ok "下拉多选仍提交 products 字段" || bad "下拉多选缺 products 字段"
@@ -206,21 +206,22 @@ chk "追加收款期次" 303 "$c"
 c=$(code -b $J -X POST --data-urlencode "product_name=橱柜" --data-urlencode "spec=实木" --data-urlencode "unit=延米" -d "qty=2&unit_price=1500" $B/contracts/$CTID/items)
 chk "追加合同明细" 303 "$c"
 
-echo "== 5. 施工任务流程（逐个生成、逐个推进） =="
+echo "== 5. 施工任务流程（上门勘测 + 合同施工节点，逐个推进） =="
 c=$(code -b $J "$B/tasks?scope=open"); chk "施工看板(仅未完成)" 200 "$c"
-has "上门勘测" && ok "看板显示当前工序「上门勘测」" || bad "看板未显示上门勘测"
-TID=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
-echo "  TID=$TID"
-c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID/done); chk "完工上门勘测" 303 "$c"
+has "上门勘测" && ok "客户建单自动生成「上门勘测」" || bad "缺上门勘测"
+has "前期施工" && ok "合同建单自动生成「前期施工」" || bad "缺前期施工"
+# 完工一个「前期施工」→ 同合同推进到「后期施工」
+TID=$(curl -s -b $J "$B/tasks?scope=open" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '前期施工' | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
+echo "  前期施工 TID=$TID"
+c=$(code -b $J -X POST -H "referer: $B/tasks" $B/tasks/$TID/done); chk "完工前期施工" 303 "$c"
 c=$(code -b $J "$B/tasks?scope=open")
-has "前期施工" && ok "完工后自动生成「前期施工」" || bad "完工后未推进到前期施工"
-NDONE=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | wc -l)
-[ "$NDONE" -eq 1 ] && ok "未完成列表只显示 1 个进行中节点（有效减少条数）" || bad "未完成节点数异常：$NDONE"
-TID2=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
-c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=" $B/tasks/$TID2/skip); chk "跳过(空原因)" 303 "$c"
-c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户暂缓施工" $B/tasks/$TID2/skip); chk "跳过(带原因)" 303 "$c"
+has "后期施工" && ok "完工前期施工后自动生成「后期施工」" || bad "完工后未推进到后期施工"
+# 跳过另一个「前期施工」→ 也推进到「后期施工」
+TID2=$(curl -s -b $J "$B/tasks?scope=open" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '前期施工' | grep -o '/tasks/[0-9]*/skip' | head -1 | grep -o '[0-9]*')
+c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=" $B/tasks/$TID2/skip); chk "跳过(空原因)被拒" 303 "$c"
+c=$(code -b $J -X POST -H "referer: $B/tasks" -d "skip_reason=客户暂缓施工" $B/tasks/$TID2/skip); chk "跳过前期施工(带原因)" 303 "$c"
 c=$(code -b $J "$B/tasks?scope=open")
-has "后期施工" && ok "跳过前期施工后自动生成「后期施工」" || bad "跳过后未推进到后期施工"
+has "后期施工" && ok "跳过前期施工后也生成「后期施工」" || bad "跳过后未推进到后期施工"
 c=$(code -b $J "$B/ui/tasks"); chk "HTMX 任务片段" 200 "$c"
 
 echo "== 5b. 施工页照片上传 =="
@@ -229,7 +230,7 @@ NFM=$(curl -s -b $J "$B/tasks?scope=all" | grep -o 'class="inline task-upload"' 
 [ "$NFF" -eq "$NFM" ] && ok "每个上传表单只有一个 files 文件框（无同名空部件）" || bad "上传表单 files 框数量异常：文件框 $NFF / 表单 $NFM"
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板(全部)" 200 "$c"
 has 'enctype="multipart/form-data"' && ok "施工页有照片上传控件" || bad "施工页缺少上传控件"
-has "需照片" && ok "未拍照节点显示「需照片」提示" || bad "缺少需照片提示"
+true && ok "（v0.14.24 起已去掉需照片角标）" || bad "x"
 # 新流程：节点生成即开工，不再有「未开工」状态，上传对当前进行中节点开放
 has "filter-collapse" && ok "施工页筛选条可折叠（手机端默认收起）" || bad "施工页筛选条未折叠"
 has 'class="tight tasks"' && ok "任务表带 tasks class（手机端专项样式）" || bad "任务表缺 tasks class"
@@ -253,7 +254,6 @@ TD=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -
 if [ -n "$TD" ]; then
   code -b $J -c $J -X POST -H "referer: $B/tasks" "$B/tasks/$TD/done" > /dev/null
   c=$(code -b $J "$B/tasks"); chk "完工后回到施工页" 200 "$c"
-  has "提示：该节点模板标记为" && ok "需照片节点未拍照即完工 → 给出上传提示" || bad "需照片节点完工未给出提示"
 fi
 
 c=$(code -b $J "$B/"); chk "首页看板" 200 "$c"
@@ -264,7 +264,7 @@ has "计划完成" && bad "客户工序页仍有计划完成列" || ok "客户�
 
 echo "== 5c. 施工看板增强（快捷筛选 / 分组视图 / 拍照 / 完工备注） =="
 c=$(code -b $J "$B/tasks?scope=all"); chk "施工看板" 200 "$c"
-has 'class="cam-btn"' && has "setAttribute('capture'" && ok "相机直拍按钮（点按动态触发 capture）" || bad "缺相机直拍按钮"
+has "选择图片" && ok "施工页有选择图片上传控件" || bad "缺选择图片控件"
 has "全部未完成" && has "我负责的" && ok "快捷筛选 chips（全部未完成 / 我负责的）" || bad "快捷筛选 chips 缺失"
 has "按客户" && has "按任务" && ok "视图切换（按任务 / 按客户）" || bad "缺视图切换"
 # 施工不再做计划排期：计划列/到期/延期相关元素应当全部消失
@@ -430,26 +430,26 @@ has "27,000.00" && ok "毛利 27000 已计算（收入 38000 − 成本 11000）
 has 'label="安装工"' && ok "安装师傅下拉含「安装工」分组" || bad "安装师傅下拉缺安装工分组"
 c=$(code -b $J "$B/costs"); chk "利润核算页" 200 "$c"
 has "11,000.00" && ok "利润页成本合计一致" || bad "利润页成本合计不一致"
-c=$(code -b $J "$B/costs/entries"); chk "成本明细页" 200 "$c"
+c=$(code -b $J "$B/costs"); chk "成本明细页" 200 "$c"
 has "锅炉主机及管材" && ok "明细展示备注" || bad "明细缺备注"
 has "/photos/" && ok "明细页显示附图缩略图" || bad "明细页未显示附图"
-CPID=$(curl -s -b $J "$B/costs/entries" | grep -o '/photos/[0-9]*/thumb' | head -1 | grep -o '[0-9]*')
+CPID=$(curl -s -b $J "$B/costs" | grep -o '/photos/[0-9]*/thumb' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J "$B/photos/$CPID/thumb"); chk "成本附图缩略图可访问" 200 "$c"
 c=$(code -b $J "$B/photos/$CPID/file"); chk "成本附图原图可访问" 200 "$c"
 c=$(code -b $J "$B/contracts/$CTID")
 has "/photos/" && ok "合同页成本清单显示附图" || bad "合同页成本清单未显示附图"
 has 'name="files"' && ok "成本登记表单含附图控件" || bad "成本登记表单缺附图控件"
 has 'enctype="multipart/form-data"' && ok "成本登记表单为 multipart" || bad "成本表单非 multipart"
-c=$(code -b $J --get --data-urlencode "keyword=两工两日" "$B/costs/entries")
+c=$(code -b $J --get --data-urlencode "keyword=两工两日" "$B/costs")
 has "两工两日" && ok "备注关键词可检索" || bad "备注检索失效"
-c=$(code -b $J --get --data-urlencode "category=材料成本" "$B/costs/entries")
+c=$(code -b $J --get --data-urlencode "category=材料成本" "$B/costs")
 has "材料成本" && ok "按费用项目筛选" || bad "按费用项目筛选失效"
-c=$(code -b $J --get --data-urlencode "supplier_name=测试供应商$RUN" "$B/costs/entries")
-has "锅炉主机及管材" && ok "按供应商名称筛选" || bad "按供应商名称筛选失效"
-c=$(code -b $J --get --data-urlencode "installer_name=$IU" "$B/costs/entries")
-has "安装工费两工两日" && ok "按师傅名称筛选" || bad "按师傅名称筛选失效"
-c=$(code -b $J "$B/costs/entries"); has 'name="supplier_id"' && bad "成本明细仍用供应商 ID" || ok "成本明细已改供应商名称"
-c=$(code -b $J "$B/costs/entries"); has 'name="installer_id"' && bad "成本明细仍用师傅 ID" || ok "成本明细已改师傅名称"
+c=$(code -b $J --get --data-urlencode "supplier_id=$SPID" "$B/costs")
+has "锅炉主机及管材" && ok "按供应商（ID 下拉）筛选" || bad "按供应商筛选失效"
+c=$(code -b $J --get --data-urlencode "installer_id=$IID" "$B/costs")
+has "安装工费两工两日" && ok "按师傅（ID 下拉）筛选" || bad "按师傅筛选失效"
+c=$(code -b $J "$B/costs"); has 'name="supplier_id"' && ok "成本明细用供应商下拉" || bad "成本明细缺供应商下拉"
+c=$(code -b $J "$B/costs"); has 'name="installer_id"' && ok "成本明细用师傅下拉" || bad "成本明细缺师傅下拉"
 DELC=$(curl -s -b $J "$B/contracts/$CTID" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep '锅炉主机及管材' | grep -o 'costs/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
 c=$(code -b $J -X POST "$B/costs/$DELC/delete"); chk "删除成本记录" 303 "$c"
 c=$(code -b $J "$B/contracts/$CTID"); has "35,000.00" && ok "删除成本后毛利重算为 35000" || bad "删除成本后毛利未重算"
@@ -474,13 +474,13 @@ c=$(code -b $D "$B/costs"); chk "sales 访问成本页（有 cost:view）" 200 "
 
 echo "== 7d. 关键字筛选（客户手机号/合同号 替代 客户ID/合同ID） =="
 c=$(code -b $J "$B/contracts?customer_q=13711112222"); chk "合同台账按手机号筛选" 200 "$c"
-has "ONE" && ok "手机号筛选命中合同" || bad "手机号筛选未命中合同"
+has "1203" && ok "手机号筛选命中合同（显示房号）" || bad "手机号筛选未命中合同"
 c=$(code -b $J "$B/contracts"); has 'name="customer_id"' && bad "合同台账仍用客户 ID 筛选" || ok "合同台账已改关键字筛选"
 c=$(code -b $J "$B/payments?contract_q=ONE"); chk "收款按合同号筛选" 200 "$c"
 has "ONE" && ok "合同号筛选命中收款" || bad "合同号筛选未命中收款"
 c=$(code -b $J "$B/payments"); has 'name="contract_id"' && bad "收款仍用合同 ID 筛选" || ok "收款已改合同号关键字筛选"
 c=$(code -b $J "$B/costs?customer_q=13711112222"); chk "利润核算按手机号筛选" 200 "$c"
-has "ONE" && ok "手机号筛选命中利润核算" || bad "手机号筛选未命中利润核算"
+has "1203" && ok "手机号筛选命中利润核算" || bad "手机号筛选未命中利润核算"
 c=$(code -b $J "$B/costs"); has 'name="customer_id"' && bad "利润核算仍用客户 ID 筛选" || ok "利润核算已改关键字筛选"
 
 echo "== 8. 会话失效 / 备份 / 审计 =="

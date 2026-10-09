@@ -130,6 +130,38 @@ def import_task_photos(db: Session, case: Case, task: Task) -> int:
     return count
 
 
+def sync_case_fields(db: Session, case: Case, task: Task) -> list[str]:
+    """把施工工序的最新字段同步回案例（施工时间/工序/责任人/产品类型）。返回变更的字段名列表。"""
+    changed: list[str] = []
+    customer = db.get(Customer, task.customer_id)
+    installer = db.get(User, task.assignee_id) if task.assignee_id else None
+
+    new_stage = task.stage
+    new_work_date = (task.actual_end or task.actual_start or today_str())[:10]
+    new_installer_id = task.assignee_id
+    new_installer_name = installer.display_name if installer else None
+    new_product_type = (
+        task.contract.product_type
+        if task.contract and task.contract.product_type
+        else product_type_for_customer(db, customer)
+    )
+
+    if case.stage != new_stage:
+        case.stage = new_stage
+        changed.append("施工工序")
+    if case.work_date != new_work_date:
+        case.work_date = new_work_date
+        changed.append("施工时间")
+    if case.installer_id != new_installer_id or case.installer_name != new_installer_name:
+        case.installer_id = new_installer_id
+        case.installer_name = new_installer_name
+        changed.append("责任人")
+    if case.product_type != new_product_type:
+        case.product_type = new_product_type
+        changed.append("产品类型")
+    return changed
+
+
 # ------------------------------------------------------------ 分享限制
 SHARE_DURATIONS: dict[str, int] = {"1天": 1, "3天": 3, "1周": 7, "1月": 30}
 SHARE_VIEW_LIMITS: dict[str, int] = {"10次": 10, "50次": 50, "200次": 200}

@@ -1,0 +1,133 @@
+{% extends "layout.html" %}
+{% block title %}登记费用{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>登记费用</h1>
+  <a class="btn ghost" href="/costs">← 返回成本明细</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/costs/new" class="stack" enctype="multipart/form-data">
+    <input type="hidden" name="back" value="/costs">
+    <div class="grid3">
+      <label class="search-picker">合同 *
+        <input type="text" id="contract_search" placeholder="输入合同号 / 客户 / 房号搜索" autocomplete="off">
+        <input type="hidden" name="contract_id" id="contract_id" value="">
+        <ul id="contract_results" class="search-results" hidden></ul>
+      </label>
+      <label>产品类型<input id="contract_product" value="" readonly placeholder="选择合同后自动显示"></label>
+      <label>费用项目 *
+        <select name="category" id="cost_cat" onchange="syncCostFields()">
+          {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="grid3">
+      <label>金额 *<input name="amount" inputmode="decimal" placeholder="金额（退款填负数）" required></label>
+      <label>供应商（材料成本必选）
+        <select name="supplier_id" id="cost_supplier">
+          <option value="">未选</option>
+          {% for sp in suppliers %}<option value="{{ sp.id }}">{{ sp.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>安装师傅（施工费用必选）
+        <select name="installer_id" id="cost_installer" style="display:none">
+          <option value="">未选</option>
+          {% if installers %}<optgroup label="安装工">
+            {% for u in installers %}<option value="{{ u.id }}">{{ u.display_name }}</option>{% endfor %}
+          </optgroup>{% endif %}
+          {% if other_users %}<optgroup label="其他账号">
+            {% for u in other_users %}<option value="{{ u.id }}">{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）</option>{% endfor %}
+          </optgroup>{% endif %}
+        </select>
+      </label>
+      <label>日期<input name="spent_at" type="date" value="{{ today }}"></label>
+    </div>
+    <label>备注<input name="remark" placeholder="备注（材料规格 / 工序 / 结算方式）"></label>
+    <label class="inline-label" title="可多张：发票 / 收据 / 对账单，便于后续查询核对">附图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
+    <div class="actions">
+      <button type="submit">登记费用</button>
+      <a class="btn ghost" href="/costs">取消</a>
+    </div>
+  </form>
+  <p class="muted small">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）；供应商在 <a href="/costs/suppliers">成本 → 供应商</a> 维护。</p>
+</section>
+
+<script>
+// 可搜索合同下拉（本地过滤，防 XSS）
+(function () {
+  var data = {{ contract_options | tojson }} || [];
+  var input = document.getElementById('contract_search');
+  var hidden = document.getElementById('contract_id');
+  var list = document.getElementById('contract_results');
+  var form = document.querySelector('form[action="/costs/new"]');
+  if (!input || !hidden || !list) return;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+    });
+  }
+  function nameOf(c) { return c.no + (c.room ? '（' + c.room + '）' : ''); }
+  function render(items) {
+    if (!items.length) { list.hidden = true; list.innerHTML = ''; return; }
+    list.innerHTML = items.map(function (c) {
+      return '<li data-id="' + c.id + '" data-name="' + esc(nameOf(c)) + '">' +
+        '<div>' + esc(c.no) + (c.room ? ' <span class="muted">' + esc(c.room) + '</span>' : '') + '</div>' +
+        (c.name ? '<div class="muted">' + esc(c.name) + '</div>' : '') +
+        '</li>';
+    }).join('');
+    list.hidden = false;
+  }
+  function search() {
+    var q = input.value.trim().toLowerCase();
+    var items = q
+      ? data.filter(function (c) {
+          return (c.no || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.room || '').toLowerCase().indexOf(q) >= 0 ||
+                 (c.name || '').toLowerCase().indexOf(q) >= 0;
+        }).slice(0, 50)
+      : data.slice(0, 50);
+    render(items);
+  }
+  input.addEventListener('input', search);
+  input.addEventListener('focus', search);
+  list.addEventListener('mousedown', function (e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    e.preventDefault();
+    hidden.value = li.getAttribute('data-id');
+    input.value = li.getAttribute('data-name');
+    var c = data.find(function (x) { return String(x.id) === String(li.getAttribute('data-id')); });
+    var productEl = document.getElementById('contract_product');
+    if (productEl) productEl.value = (c && c.product_type) || '';
+    list.hidden = true; list.innerHTML = '';
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.search-picker')) { list.hidden = true; }
+  });
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      if (!hidden.value) {
+        e.preventDefault();
+        input.focus();
+        alert('请先选择合同');
+      }
+    });
+  }
+})();
+
+// 费用项目联动：材料成本显示供应商、施工费用显示安装师傅
+function syncCostFields() {
+  var cat = document.getElementById('cost_cat');
+  if (!cat) return;
+  var sup = document.getElementById('cost_supplier');
+  var ins = document.getElementById('cost_installer');
+  sup.style.display = cat.value === '材料成本' ? '' : 'none';
+  ins.style.display = cat.value === '施工费用' ? '' : 'none';
+}
+syncCostFields();
+</script>
+{% endblock %}

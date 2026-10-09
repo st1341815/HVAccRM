@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block title %}修改收款{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>修改收款
+    <span class="muted small">{% if contract %}合同 {{ contract.no or ('#' ~ contract.id) }}{% endif %}</span>
+  </h1>
+  <a class="btn ghost" href="/payments">← 返回收款流水</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/payments/{{ payment.id }}/edit" enctype="multipart/form-data" class="filterbar">
+    <label class="inline-label">收款日期
+      <input type="date" name="paid_at" value="{{ payment.paid_at }}">
+    </label>
+    <input name="amount" value="{{ payment.amount }}" inputmode="decimal" placeholder="金额（退款填负数）" required>
+    <select name="method">
+      <option value="" {{ 'selected' if not payment.method else '' }}>（未填）</option>
+      {% for m in methods %}<option value="{{ m }}" {{ 'selected' if payment.method == m else '' }}>{{ m }}</option>{% endfor %}
+    </select>
+    <select name="received_by">
+      {% for u in users.values() %}<option value="{{ u.id }}" {{ 'selected' if payment.received_by == u.id else '' }}>{{ u.display_name }}</option>{% endfor %}
+    </select>
+    <input name="voucher_no" value="{{ payment.voucher_no or '' }}" placeholder="凭证号">
+    <input name="remark" value="{{ payment.remark or '' }}" placeholder="备注">
+    <label class="inline-label" title="可多张：转账截图 / 收款凭证">新增付款截图
+      <input type="file" name="files" accept="image/*" multiple>
+    </label>
+    <button type="submit">保存修改</button>
+  </form>
+  <p class="muted small">修改金额会重新校验是否超收，并重算合同未收金额。</p>
+</section>
+
+{% if photos %}
+<section class="card">
+  <h2>已有付款截图（{{ photos|length }} 张）</h2>
+  <div class="task-photos">
+    {% for ph in photos %}
+      <span class="photo-item">
+        <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}">
+          <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图">
+        </a>
+        {% if can('photo:delete') %}
+        <form method="post" action="/photos/{{ ph.id }}/delete" class="inline" onsubmit="return confirm('删除这张付款截图？');">
+          <input type="hidden" name="back" value="/payments/{{ payment.id }}/edit">
+          <button class="ghost danger tiny">删除</button>
+        </form>
+        {% endif %}
+      </span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

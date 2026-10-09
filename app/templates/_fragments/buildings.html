@@ -1,3 +1,3 @@
 {% if buildings %}<option value="">请选择楼栋</option>{% endif %}
-{% for b in buildings %}<option value="{{ b.name }}">{{ b.name }}{% if counts.get(b.name) %}（{{ counts[b.name] }} 套）{% endif %}</option>{% endfor %}
+{% for b in buildings %}<option value="{{ b.name }}">{{ b.name }}{% if counts.get(b.name) %}（空闲 {{ free_counts.get(b.name, 0) }} / 总 {{ counts[b.name] }} 套）{% endif %}</option>{% endfor %}
 {% if not buildings %}<option value="">（暂无楼栋，请先添加楼栋）</option>{% endif %}
