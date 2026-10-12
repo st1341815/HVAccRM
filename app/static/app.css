@@ -441,6 +441,8 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.js-stack td.case-cell .case-thumbs { width: 100%; align-self: stretch; }
   table.js-stack td.case-cell img.mini { margin-left: 0; }
   table.js-stack td.case-cell .case-actions { width: 100%; align-self: stretch; }
+  /* 手机端缩略图上的删除按钮：缩小尺寸，与图片比例协调 */
+  .case-thumb .thumb-del { width: .9rem; height: .9rem; font-size: .55rem; top: -5px; right: -5px; }
   /* 单元格里的上传控件换行显示，避免挤爆一行 */
   table.js-stack td .task-upload { flex-wrap: wrap; justify-content: flex-end; }
   table.js-stack td .task-upload input[type=file] { max-width: none; font-size: 14px; }
