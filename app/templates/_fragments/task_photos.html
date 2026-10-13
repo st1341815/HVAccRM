@@ -1,9 +1,17 @@
 <div class="task-photos">
   {% set phs = task_photos.get(t.id, []) %}
   {% for ph in phs[:3] %}
-    <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }} · {{ ph.created_at[:16] }}">
-      <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="现场照">
-    </a>
+    <span class="thumb-wrap">
+      <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }} · {{ ph.created_at[:16] }}">
+        <img class="mini" src="/photos/{{ ph.id }}/thumb" alt="现场照">
+      </a>
+      {% if can_delete_photo and t.status != 'done' %}
+      <form method="post" action="/photos/{{ ph.id }}/delete" class="inline" onsubmit="return confirm('删除这张照片？此操作不可恢复。');">
+        <input type="hidden" name="back" value="{{ back_path }}">
+        <button type="submit" class="ghost danger thumb-del" title="删除这张照片">✕</button>
+      </form>
+      {% endif %}
+    </span>
   {% endfor %}
   {# 超出 3 张的用隐藏锚点保留在 DOM 里，灯箱据此可翻完该节点全部照片 #}
   {% for ph in phs[3:] %}

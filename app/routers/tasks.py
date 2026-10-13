@@ -72,6 +72,7 @@ def _photo_ctx(db: Session, tasks: list[Task], user: User, request: Request) -> 
         "stage_requires_photo": task_svc.stage_photo_requirements(db),
         "stage_kind": task_svc.STAGE_PHOTO_KIND,
         "can_upload_photo": has_perm(user, "photo:upload"),
+        "can_delete_photo": has_perm(user, "photo:delete"),
         "back_path": back_path,
     }
 

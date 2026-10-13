@@ -257,6 +257,7 @@ def customer_detail(
         stage_requires_photo=task_svc.stage_photo_requirements(db),
         stage_kind=task_svc.STAGE_PHOTO_KIND,
         can_upload_photo=has_perm(user, "photo:upload"),
+        can_delete_photo=has_perm(user, "photo:delete"),
         back_path=str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
         can_edit=can_edit_customer(db, user, customer),
         can_delete=has_perm(user, "customer:delete"),
