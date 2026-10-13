@@ -132,3 +132,15 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 - 媒体：`data/media/{customer_id}/{kind}/{uuid}.jpg` + `_thumb.webp`，DB 只存相对路径，文件名不含客户名/房号。
 - 日志：stdout + `data/logs/crm.log`（2MB × 3 轮转）；级别由 `LOG_LEVEL` 控制。
 - 首次启动自动建库建表并创建 admin（`ADMIN_USER` / `ADMIN_PASS`，仅首次生效）。
+
+## 8. v1.0.0 正式版说明
+
+HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
+
+- 新增自动化测试套件（`tests/`，pytest，19 个用例），覆盖财务口径 / 权限 / 报表聚合 / 工序锁客
+- 修复 installer 白名单权限 `&=`（交集）应为 `|=`（并集）——installer 此前看不到自己被指派任务的客户
+- `pyproject.toml` 与 `app/__init__.py` 版本号已同步（1.0.0），并新增 `scripts/bump_version.py` 防再漂移
+- `admin_force_password_change` 默认 True（部署漏配 `.env` 也强制首登改密）
+- 新增 `DEVELOPING.md` 开发指南
+
+开发者请先读 [`DEVELOPING.md`](DEVELOPING.md)；完整变更见 [`docs/版本更新记录.md`](docs/版本更新记录.md)。

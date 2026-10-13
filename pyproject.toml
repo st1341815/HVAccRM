@@ -1,6 +1,6 @@
 [project]
 name = "onecrm"
-version = "0.11.27"
+version = "1.0.0"
 description = "HVAccRM — 暖通空调客户管理系统，NAS 自托管版"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,7 +13,22 @@ dependencies = [
     "apscheduler==3.11.0",
     "pydantic-settings==2.7.0",
     "pillow==11.1.0",
+    "pytest==9.1.1",
 ]
 
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+# pytest 发现 / 运行配置
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-ra", "--strict-markers"]
+# 沙箱全局 PYTHONPATH 污染（pydantic_core 是坏的）：在 venv 里开发可正常 import，
+# CI / 开发机若撞同一问题，临时方案：
+#   PYTHONPATH=.venv/bin/python .venv/bin/python -m pytest tests/
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
