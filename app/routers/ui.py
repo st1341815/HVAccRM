@@ -4,12 +4,12 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import current_user_or_redirect
 from ..db import get_db
-from ..models import Contract, Customer, Photo, Project, Room, Task, User, today_str
+from ..models import Contract, Customer, Photo, Task, User, today_str
 from ..permissions import can_see_amount, customer_scope_conditions, has_perm, task_scope_conditions
 from ..services import finance as finance_svc
 from ..services import search as search_svc
@@ -81,30 +81,6 @@ def dashboard(
     for c in new_customers:
         source_dist[c.source or "未填写"] = source_dist.get(c.source or "未填写", 0) + 1
 
-    project_rows = []
-    if has_perm(user, "customer:view"):
-        proj_counts = dict(
-            db.execute(
-                select(Room.project_id, func.count(Customer.id))
-                .join(Customer, Customer.room_id == Room.id)
-                .group_by(Room.project_id)
-            ).all()
-        )
-        names = {p.id: p.name for p in db.scalars(select(Project)).all()}
-        total_units = dict(db.execute(select(Room.project_id, func.count(Room.id)).group_by(Room.project_id)).all())
-        for pid, cnt in sorted(proj_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]:
-            if c_scope is not None:
-                cnt = sum(1 for c in customers if c.room and c.room.project_id == pid)
-            units = total_units.get(pid) or 0
-            project_rows.append(
-                {
-                    "name": names.get(pid, f"#{pid}"),
-                    "customers": cnt,
-                    "units": units,
-                    "rate": round(cnt / units * 100, 1) if units else 0.0,
-                }
-            )
-
     recent_photos = []
     if customers:
         ids = [c.id for c in customers]
@@ -124,7 +100,6 @@ def dashboard(
         customer_total=len(customers),
         new_customers=len(new_customers),
         source_dist=sorted(source_dist.items(), key=lambda kv: kv[1], reverse=True),
-        project_rows=project_rows,
         recent_photos=recent_photos,
         customers_map={c.id: c for c in customers},
         show_task_widgets=has_perm(user, "task:view"),

@@ -77,28 +77,12 @@
 {% endif %}
 
 {% if can('customer:view') %}
-<div class="grid2">
-  <section class="card">
-    <h2>客户来源分布（近 30 天）</h2>
-    {% if source_dist %}
-      <ul class="list">{% for name, cnt in source_dist %}<li>{{ name }} <span class="badge">{{ cnt }}</span></li>{% endfor %}</ul>
-    {% else %}<p class="muted">近 30 天没有新增客户。</p>{% endif %}
-  </section>
-
-  <section class="card">
-    <h2>楼盘渗透率排行</h2>
-    {% if project_rows %}
-    <table class="tight">
-      <thead><tr><th>楼盘</th><th>已成交客户</th><th>总房号</th><th>渗透率</th></tr></thead>
-      <tbody>
-      {% for row in project_rows %}
-        <tr><td>{{ row.name }}</td><td>{{ row.customers }}</td><td>{{ row.units }}</td><td>{{ row.rate }}%</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}<p class="muted">暂无楼盘数据。</p>{% endif %}
-  </section>
-</div>
+<section class="card">
+  <h2>客户来源分布（近 30 天）</h2>
+  {% if source_dist %}
+    <ul class="list">{% for name, cnt in source_dist %}<li>{{ name }} <span class="badge">{{ cnt }}</span></li>{% endfor %}</ul>
+  {% else %}<p class="muted">近 30 天没有新增客户。</p>{% endif %}
+</section>
 {% endif %}
 
 {% if recent_photos %}
