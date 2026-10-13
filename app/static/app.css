@@ -133,6 +133,8 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 
 /* ---------------------------------------------------------------- 指标卡 */
 .kpis { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+/* KPI 行内的操作按钮：推到最右、底部对齐（手机端 grid 下自然落在右下角） */
+.kpis .kpi-actions { margin-left: auto; align-self: flex-end; display: flex; }
 .kpi { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: .6rem 1rem; min-width: 8.5rem; box-shadow: var(--shadow); }
 .kpi-num { display: block; font-size: 1.25rem; font-weight: 700; }
 .kpi-label { font-size: .78rem; color: var(--muted); }

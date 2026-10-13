@@ -14,7 +14,7 @@ cd /vol1/1000/Docker/Hvaccrm || exit 1
 exec > /vol1/1000/Docker/Hvaccrm/build_result.log 2>&1
 
 echo "===== START BUILD $(date -Iseconds) ====="
-docker image tag hvaccrm:local hvaccrm:pre-1.1.1
+docker image tag hvaccrm:local hvaccrm:pre-1.1.2
 
 echo "===== docker compose build ====="
 docker compose -f docker-compose.yml -p hvaccrm build 2>&1
