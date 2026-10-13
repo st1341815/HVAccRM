@@ -560,6 +560,21 @@ FTS_DDL = [
            VALUES (new.id, new.name, new.industry, new.notes); END""",
 ]
 
+# ------------------------------------------------------------ 运行时设置
+class AppSetting(Base):
+    """运行时配置（备份路径 / 频率 / 保留份数等）。
+
+    key-value 存库、后台可改、重启即读；避免为了改一个设置去动 .env 并重建容器。
+    仅存「非框架级」可变配置，密钥等仍走环境变量。
+    """
+
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
+    updated_at = Column(String, default=now_iso, onupdate=now_iso)
+
+
 # 标准 9 个施工工序（文档 6.5）
 DEFAULT_STAGES = [
     ("上门勘测", 1, 1, 1, "勘测记录 + 现场照"),

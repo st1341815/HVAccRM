@@ -124,12 +124,27 @@ def configure_logging() -> None:
     configure_logging._done = True
 
 
+def _apply_pending_restore_if_any() -> None:
+    """启动最早期检查「待恢复」标记：若有则先替换 db/media/config，再走正常迁移。
+
+    放在 run_migrations() 之前是刻意的——替换必须在数据库文件被打开/迁移之前完成。
+    """
+    from .services import backup as backup_svc
+
+    if not backup_svc.has_pending_restore():
+        return
+    log.warning("检测到待恢复备份，开始执行数据恢复（替换数据库 / 媒体 / 设置）…")
+    result = backup_svc.apply_pending_restore()
+    log.warning("数据恢复完成：%s", result)
+
+
 def main() -> None:
     configure_logging()
     s = get_settings()
     s.ensure_dirs()
     if s.is_secret_default:
         log.warning("APP_SECRET_KEY 仍为默认值，请在生产环境更换（否则会话可被伪造）")
+    _apply_pending_restore_if_any()
     backend = run_migrations()
     # Alembic 会按 alembic.ini 重设 root logger 级别，这里恢复应用日志级别
     logging.getLogger().setLevel(getattr(logging, s.log_level.upper(), logging.INFO))

@@ -1,18 +1,23 @@
 """后台管理：用户/角色/权限、审计日志、工序模板、备份、系统信息。"""
 from __future__ import annotations
 
+import os
 import platform
+import shutil
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..config import get_settings
 from ..db import commit_retry, engine, get_db
-from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso
+from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso, today_str
 from ..permissions import (
     DEFAULT_SCOPE,
     ROLE_LABELS,
@@ -20,10 +25,12 @@ from ..permissions import (
     ALL_PERMISSIONS,
     require,
 )
+from ..scheduler import reload_backup_jobs
 from ..security import generate_totp_secret, hash_password, password_problem
 from ..services import backup as backup_svc
 from ..services import photos as photo_svc
 from ..services import search as search_svc
+from ..services import settings as settings_svc
 from ..templating import redirect, render
 from ..utils import client_ip, parse_int
 
@@ -307,17 +314,45 @@ def delete_stage(
     return redirect("/admin/stages", f"工序「{stage.name}」已删除")
 
 
+# ------------------------------------------------------------- 备份与导入
+def _fmt_size(n: float) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+def _safe_backup_file(db: Session, name: str) -> Path | None:
+    """把「备份文件名」解析为备份目录下的真实文件，拒绝路径穿越。"""
+    if not name or name.startswith(".") or "/" in name or "\\" in name:
+        return None
+    base = Path(settings_svc.get_backup_config(db)["dir"])
+    p = base / name
+    if not p.is_file():
+        return None
+    try:
+        p.resolve().relative_to(base.resolve())
+    except ValueError:
+        return None
+    return p
+
+
 @router.get("/backups")
 def backups_page(
-    request: Request,    db: Session = Depends(get_db),
+    request: Request,
+    db: Session = Depends(get_db),
     user: User = Depends(require("admin:setting")),
 ):
     return render(
         request,
         "admin/backups.html",
-        backups=backup_svc.list_backups(),
-        keep=get_settings().backup_keep,
+        backups=backup_svc.list_backups(db),
+        cfg=settings_svc.get_backup_config(db),
         media=photo_svc.total_usage(),
+        pending=backup_svc.has_pending_restore(),
+        default_dir=str(get_settings().backup_dir),
+        dows=[("0", "周一"), ("1", "周二"), ("2", "周三"), ("3", "周四"), ("4", "周五"), ("5", "周六"), ("6", "周日")],
     )
 
 
@@ -328,12 +363,149 @@ def run_backup(
     user: User = Depends(require("admin:setting")),
 ):
     try:
-        result = backup_svc.run_backup_job()
+        result = backup_svc.run_backup_job(db)
     except Exception as exc:
         return redirect("/admin/backups", f"备份失败：{exc}", "err")
-    log_action(db, user, "backup", "database", None, new=result, ip=client_ip(request))
+    log_action(db, user, "backup", "backup", None, new={"file": result["file"]}, ip=client_ip(request))
     commit_retry(db)
-    return redirect("/admin/backups", f"备份完成：{result['file']}（清理旧备份 {result['pruned']} 份）")
+    return redirect(
+        "/admin/backups",
+        f"备份完成：{result['file']}（{_fmt_size(result['size'])}，清理旧备份 {result['pruned']} 份）",
+    )
+
+
+@router.get("/backups/download")
+def download_backup(
+    request: Request,
+    name: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    path = _safe_backup_file(db, name)
+    if path is None:
+        return redirect("/admin/backups", "备份文件不存在", "err")
+    log_action(db, user, "download", "backup", None, new={"file": name}, ip=client_ip(request))
+    commit_retry(db)
+    return FileResponse(path, filename=path.name, media_type="application/zip")
+
+
+@router.post("/backups/delete")
+def delete_backup(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    path = _safe_backup_file(db, name)
+    if path is None:
+        return redirect("/admin/backups", "备份文件不存在", "err")
+    try:
+        path.unlink()
+    except OSError as exc:
+        return redirect("/admin/backups", f"删除失败：{exc}", "err")
+    log_action(db, user, "delete", "backup", None, old={"file": name}, ip=client_ip(request))
+    commit_retry(db)
+    return redirect("/admin/backups", f"已删除备份 {name}")
+
+
+def _restart_after_import() -> None:
+    """后台任务：给响应一点时间后主动退出进程，由容器 restart 策略拉起并执行恢复。"""
+    time.sleep(3)
+    try:
+        import logging as _logging
+
+        _logging.shutdown()
+    except Exception:  # pragma: no cover
+        pass
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:  # pragma: no cover
+        pass
+    os._exit(0)
+
+
+@router.post("/backups/import")
+def import_backup(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    restore_config: str = Form("1"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    if not file.filename:
+        return redirect("/admin/backups", "请选择要导入的备份文件（.zip）", "err")
+    upload_dir = Path(get_settings().backup_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = upload_dir / f"import-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+    try:
+        with dest.open("wb") as fh:
+            shutil.copyfileobj(file.file, fh)
+    except OSError as exc:
+        return redirect("/admin/backups", f"保存上传文件失败：{exc}", "err")
+    try:
+        manifest = backup_svc.validate_archive(dest)
+    except ValueError as exc:
+        dest.unlink(missing_ok=True)
+        return redirect("/admin/backups", f"导入失败：{exc}", "err")
+    backup_svc.schedule_restore(dest, restore_config=(restore_config == "1"))
+    log_action(
+        db, user, "import", "backup", None,
+        new={"file": file.filename, "manifest": manifest}, ip=client_ip(request),
+    )
+    commit_retry(db)
+    background_tasks.add_task(_restart_after_import)
+    return redirect(
+        "/admin/backups",
+        "导入已提交：系统将在数秒后自动重启并恢复数据，约 30 秒后刷新页面即可。",
+    )
+
+
+@router.post("/backups/settings")
+def save_backup_settings(
+    request: Request,
+    dir: str = Form(...),
+    keep: str = Form("30"),
+    daily_enabled: str = Form(""),
+    daily_hour: str = Form("3"),
+    weekly_enabled: str = Form(""),
+    weekly_dow: str = Form("0"),
+    weekly_hour: str = Form("4"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    target = (dir or "").strip()
+    if not target or not Path(target).is_absolute():
+        return redirect("/admin/backups", "备份路径必须是非空的绝对路径（如 /data/backups）", "err")
+    try:
+        tp = Path(target)
+        tp.mkdir(parents=True, exist_ok=True)
+        probe = tp / ".hvaccrm-write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as exc:
+        return redirect("/admin/backups", f"备份路径不可写：{exc}", "err")
+
+    settings_svc.save_backup_config(
+        db,
+        {
+            "backup.dir": target,
+            "backup.keep": keep,
+            "backup.daily.enabled": "1" if daily_enabled else "0",
+            "backup.daily.hour": daily_hour,
+            "backup.weekly.enabled": "1" if weekly_enabled else "0",
+            "backup.weekly.dow": weekly_dow,
+            "backup.weekly.hour": weekly_hour,
+        },
+    )
+    log_action(
+        db, user, "update", "backup_settings", None,
+        new={"dir": target, "keep": keep}, ip=client_ip(request),
+    )
+    commit_retry(db)
+    reload_backup_jobs()
+    return redirect("/admin/backups", "备份设置已保存，定时任务已按新设置重排")
 
 
 @router.get("/permissions")
