@@ -88,15 +88,42 @@ def list_cases(
 @router.get("/links")
 def manage_links(
     request: Request,
+    q: str = "",
+    stage: str = "",
+    product_type: str = "",
+    installer: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    status: str = "",
     db: Session = Depends(get_db),
     user=Depends(require("case:view")),
 ):
-    """外链管理：查询所有分享外链的状态，支持手动失效/恢复与限制设置。"""
-    cases = list(db.scalars(select(Case).order_by(Case.work_date.desc(), Case.id.desc())).all())
+    """外链管理：查询所有分享外链的状态，支持筛选 + 手动失效/恢复与限制设置。"""
+    stmt = select(Case).order_by(Case.work_date.desc(), Case.id.desc())
+    if q and q.strip():
+        stmt = stmt.where(Case.room_label.like(f"%{q.strip()}%"))
+    if stage:
+        stmt = stmt.where(Case.stage == stage)
+    if product_type:
+        stmt = stmt.where(Case.product_type == product_type)
+    if installer:
+        stmt = stmt.where(Case.installer_id == parse_int(installer))
+    if date_from:
+        stmt = stmt.where(Case.work_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Case.work_date <= date_to)
+    cases = list(db.scalars(stmt.limit(1000)).all())
+
     rows = []
     for c in cases:
         valid, reason = cases_svc.share_state(c)
         rows.append({"case": c, "valid": valid, "reason": reason})
+    # 外链状态是计算属性（时间 / 次数判定），只能在 Python 层过滤
+    if status == "valid":
+        rows = [r for r in rows if r["valid"]]
+    elif status == "invalid":
+        rows = [r for r in rows if not r["valid"]]
+
     return render(
         request,
         "cases/links.html",
@@ -105,6 +132,18 @@ def manage_links(
         can_edit=has_perm(user, "case:edit"),
         durations=list(cases_svc.SHARE_DURATIONS.keys()) + [cases_svc.SHARE_UNLIMITED],
         view_limits=list(cases_svc.SHARE_VIEW_LIMITS.keys()) + [cases_svc.SHARE_UNLIMITED],
+        installer_options=_installer_options(db),
+        stage_options=CASE_STAGE_OPTIONS,
+        product_options=PRODUCT_OPTIONS,
+        filters={
+            "q": q,
+            "stage": stage,
+            "product_type": product_type,
+            "installer": installer,
+            "date_from": date_from,
+            "date_to": date_to,
+            "status": status,
+        },
         now=now_iso(),
     )
 
