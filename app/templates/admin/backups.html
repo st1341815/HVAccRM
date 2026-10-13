@@ -16,22 +16,87 @@
   </form>
 </div>
 
+{% if pending %}
+<div class="card" style="border-color:#f59e0b">
+  <strong>⚠️ 有待恢复的备份任务正在排队</strong>
+  <p class="muted small">系统将在重启后替换数据库与媒体。若长时间未生效，请手动重启容器。</p>
+</div>
+{% endif %}
+
 <div class="kpis">
-  <div class="kpi"><span class="kpi-num">{{ backups|length }}</span><span class="kpi-label">现有备份份数（保留最近 {{ keep }} 份）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ backups|length }}</span><span class="kpi-label">现有备份（保留最近 {{ cfg.keep }} 份）</span></div>
   <div class="kpi"><span class="kpi-num">{{ media.files }}</span><span class="kpi-label">媒体文件数</span></div>
   <div class="kpi"><span class="kpi-num">{{ (media.bytes / 1024 / 1024)|number(2) }} MB</span><span class="kpi-label">媒体占用</span></div>
 </div>
 
 <section class="card">
+  <h2>备份文件</h2>
   <table class="tight">
-    <thead><tr><th>文件</th><th>大小</th><th>生成时间</th></tr></thead>
+    <thead><tr><th>文件</th><th>大小</th><th>生成时间</th><th>操作</th></tr></thead>
     <tbody>
     {% for b in backups %}
-      <tr><td>{{ b.name }}</td><td>{{ (b.size / 1024)|number(0) }} KB</td><td>{{ b.mtime }}</td></tr>
+      <tr>
+        <td>{{ b.name }}{% if not b.is_zip %} <span class="badge">旧格式</span>{% endif %}</td>
+        <td>{{ (b.size / 1024)|number(0) }} KB</td>
+        <td>{{ b.mtime }}</td>
+        <td>
+          {% if b.is_zip %}
+          <a class="btn ghost" href="/admin/backups/download?name={{ b.name }}">下载</a>
+          <form method="post" action="/admin/backups/delete" class="inline" onsubmit="return confirm('删除备份 {{ b.name }}？此操作不可恢复。');">
+            <input type="hidden" name="name" value="{{ b.name }}">
+            <button class="btn danger">删除</button>
+          </form>
+          {% else %}<span class="muted small">仅数据库（旧版）</span>{% endif %}
+        </td>
+      </tr>
     {% endfor %}
     </tbody>
   </table>
-  {% if not backups %}<p class="muted">还没有备份。系统每天 03:00 自动备份一份。</p>{% endif %}
-  <p class="muted small">备份使用 SQLite 在线备份 API（等价 .backup），兼容 WAL，无需停机。媒体照片在 data/media，请连同 data/ 目录一起纳入 NAS 快照或 rsync 策略。</p>
+  {% if not backups %}<p class="muted">还没有备份。点击右上「立即备份」生成一份，或等待自动备份。</p>{% endif %}
+  <p class="muted small">每份备份是一个完整 zip（数据库 + 媒体 + 设置），可下载保存到别处；在任意环境导入该 zip 即可恢复。</p>
+</section>
+
+<section class="card">
+  <h2>导入备份（恢复数据）</h2>
+  <form method="post" action="/admin/backups/import" enctype="multipart/form-data"
+        onsubmit="return confirm('导入将【覆盖】当前全部数据（数据库 + 媒体 + 设置），导入后系统会自动重启。确定继续？');">
+    <input type="file" name="file" accept=".zip" required>
+    <label class="checkline"><input type="checkbox" name="restore_config" value="1" checked> 同时恢复设置（config/deploy.env）</label>
+    <button class="btn danger" type="submit">导入并恢复</button>
+  </form>
+  <p class="muted small">流程：上传 → 校验 → 登记待恢复 → 进程退出 → 容器自动重启 → 启动时替换数据。替换前会把现有数据库 / 媒体留底（<code>pre-restore-*</code>），失败可人工回退。约 30 秒后刷新页面生效。</p>
+</section>
+
+<section class="card">
+  <h2>备份设置</h2>
+  <form method="post" action="/admin/backups/settings">
+    <label class="inline-label">保存路径
+      <input name="dir" value="{{ cfg.dir }}" placeholder="{{ default_dir }}">
+    </label>
+    <label class="inline-label">保留份数
+      <input name="keep" type="number" min="1" max="999" value="{{ cfg.keep }}">
+    </label>
+    <div class="checkline">
+      <label><input type="checkbox" name="daily_enabled" value="1" {{ 'checked' if cfg.daily_enabled else '' }}> 每日自动备份</label>
+      <label class="inline-label">时间
+        <select name="daily_hour">
+          {% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if cfg.daily_hour == h else '' }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="checkline">
+      <label><input type="checkbox" name="weekly_enabled" value="1" {{ 'checked' if cfg.weekly_enabled else '' }}> 每周自动备份</label>
+      <select name="weekly_dow">
+        {% for v, label in dows %}<option value="{{ v }}" {{ 'selected' if cfg.weekly_dow|string == v else '' }}>{{ label }}</option>{% endfor %}
+      </select>
+      <label class="inline-label">时间
+        <select name="weekly_hour">
+          {% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if cfg.weekly_hour == h else '' }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <button type="submit">保存设置</button>
+  </form>
+  <p class="muted small">保存路径为容器内路径（NAS 上 = 宿主机挂载点，如 <code>/data/backups</code> → <code>/vol1/1000/Docker/Hvaccrm/data/backups</code>）。修改后定时任务立即按新设置重排。</p>
 </section>
 {% endblock %}
