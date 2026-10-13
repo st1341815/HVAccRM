@@ -136,11 +136,16 @@ def delete_photo(
 ):
     photo = get_or_404(db, Photo, photo_id, "照片")
     cid = photo.customer_id
+    # 允许调用方指定返回页（合同详情页/施工看板），仅接受站内相对路径
+    target = return_path(back, request.headers.get("referer"), f"/photos/album/{cid}")
+    # 工序照片：所在工序已完工后不允许删除（完工即固化施工凭证）—— 后端兜底，防绕过 UI
+    if photo.task_id:
+        task = db.get(Task, photo.task_id)
+        if task is not None and task.status == "done":
+            return redirect(target, "该工序已完工，照片不可再删除", "err")
     msg = photo_svc.delete_photo(db, photo)
     log_action(db, user, "delete", "photos", photo_id, old={"path": photo.path}, ip=client_ip(request))
     commit_retry(db)
-    # 允许调用方指定返回页（合同详情页/施工看板），仅接受站内相对路径
-    target = return_path(back, request.headers.get("referer"), f"/photos/album/{cid}")
     return redirect(target, msg)
 
 

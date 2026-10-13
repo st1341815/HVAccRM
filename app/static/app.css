@@ -447,7 +447,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.js-stack td.case-cell img.mini { margin-left: 0; }
   table.js-stack td.case-cell .case-actions { width: 100%; align-self: stretch; }
   /* 手机端缩略图上的删除按钮：缩小尺寸，与图片比例协调 */
-  .case-thumb .thumb-del { width: .9rem; height: .9rem; font-size: .55rem; top: -5px; right: -5px; }
+  .case-thumb .thumb-del, .task-photos .thumb-wrap .thumb-del { width: .9rem; height: .9rem; font-size: .55rem; top: -5px; right: -5px; }
   /* 单元格里的上传控件换行显示，避免挤爆一行 */
   table.js-stack td .task-upload { flex-wrap: wrap; justify-content: flex-end; }
   table.js-stack td .task-upload input[type=file] { max-width: none; font-size: 14px; }
@@ -575,6 +575,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .case-more { align-self: center; }
 /* 展示图下方的操作区：选择图片 / 上传 / 重新同步 一行排列（样式对齐施工看板） */
 .case-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; margin-top: .45rem; }
+/* 施工页：照片缩略图右上角的删除按钮（工序未完工时可删除） */
+.task-photos .thumb-wrap { position: relative; display: inline-flex; align-items: center; }
+.task-photos .thumb-wrap .thumb-del { position: absolute; top: -7px; right: -7px; width: 1.15rem; height: 1.15rem; line-height: 1; padding: 0; border-radius: 50%; font-size: .7rem; }
 .case-upload { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
 .case-sync { display: inline-flex; align-items: center; }
 .share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
