@@ -88,14 +88,16 @@
     </div>
     <div class="checkline">
       <label><input type="checkbox" name="weekly_enabled" value="1" {{ 'checked' if cfg.weekly_enabled else '' }}> 每周自动备份</label>
-      <select name="weekly_dow">
-        {% for v, label in dows %}<option value="{{ v }}" {{ 'selected' if cfg.weekly_dow|string == v else '' }}>{{ label }}</option>{% endfor %}
-      </select>
-      <label class="inline-label">时间
-        <select name="weekly_hour">
-          {% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if cfg.weekly_hour == h else '' }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+      <span class="inline-group">
+        <select name="weekly_dow">
+          {% for v, label in dows %}<option value="{{ v }}" {{ 'selected' if cfg.weekly_dow|string == v else '' }}>{{ label }}</option>{% endfor %}
         </select>
-      </label>
+        <label class="inline-label">时间
+          <select name="weekly_hour">
+            {% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if cfg.weekly_hour == h else '' }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+          </select>
+        </label>
+      </span>
     </div>
     <button type="submit">保存设置</button>
   </form>
