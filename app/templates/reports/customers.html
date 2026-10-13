@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% block title %}报表 · 按客户{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>报表 <span class="muted small">按客户查询利润</span></h1>
+</div>
+
+<div class="chips views" style="margin-bottom:.6rem">
+  <a class="chip" href="/reports?mode=month">按月</a>
+  <a class="chip" href="/reports?mode=year">按年</a>
+  <a class="chip on" href="/reports/customers">按客户</a>
+</div>
+
+{% if show_money %}
+<div class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ totals.customers }}</span><span class="kpi-label">客户数</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.income|money }}</span><span class="kpi-label">销售额</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.cost|money }}</span><span class="kpi-label">成本</span></div>
+  <div class="kpi {{ 'alert' if totals.gross < 0 else '' }}"><span class="kpi-num">{{ totals.gross|money }}</span><span class="kpi-label">毛利</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.margin }}%</span><span class="kpi-label">毛利率</span></div>
+  <div class="kpi"><span class="kpi-num">{{ totals.received|money }}</span><span class="kpi-label">已收</span></div>
+  <div class="kpi {{ 'alert' if totals.outstanding > 0 else '' }}"><span class="kpi-num">{{ totals.outstanding|money }}</span><span class="kpi-label">未收</span></div>
+</div>
+{% endif %}
+
+<section class="card">
+  <form method="get" action="/reports/customers" class="filterbar">
+    <input name="q" value="{{ q }}" placeholder="客户姓名 / 手机号 / 房号 / 楼盘">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
+    <button type="submit">查询</button>
+    {% if q %}<a class="btn ghost" href="/reports/customers">重置</a>{% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>按客户利润（{{ rows|length }} 个客户，按{{ dict(sort_options).get(sort, '毛利') }}{{ '升序' if order == 'asc' else '降序' }}）</h2>
+  <table class="tight">
+    <thead>
+      <tr>
+        <th class="sortable"><a href="{{ sort_links['customer'] }}">客户{% if sort == 'customer' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th>房号</th>
+        <th>负责人</th>
+        <th class="sortable"><a href="{{ sort_links['contracts'] }}">合同数{% if sort == 'contracts' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        {% if show_money %}
+        <th class="sortable"><a href="{{ sort_links['income'] }}">销售额{% if sort == 'income' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['cost'] }}">成本{% if sort == 'cost' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['gross'] }}">毛利{% if sort == 'gross' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['margin'] }}">毛利率{% if sort == 'margin' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['received'] }}">已收{% if sort == 'received' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['outstanding'] }}">未收{% if sort == 'outstanding' %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{{ 'row-alert' if show_money and r.gross < 0 else '' }}">
+        <td><a href="/customers/{{ r.customer_id }}?tab=finance">{{ r.customer_name }}</a></td>
+        <td>{{ r.room_label or '-' }}</td>
+        <td>{{ r.owner_name or '-' }}</td>
+        <td>{{ r.contracts }}</td>
+        {% if show_money %}
+        <td>{{ r.income|money }}</td>
+        <td>{{ r.cost|money }}</td>
+        <td class="{{ 'red' if r.gross < 0 else '' }}"><strong>{{ r.gross|money }}</strong></td>
+        <td>{{ r.margin }}%</td>
+        <td>{{ r.received|money }}</td>
+        <td class="{{ 'red' if r.outstanding > 0 else '' }}">{{ r.outstanding|money }}</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    {% if show_money and rows %}
+      <tr class="total-row">
+        <td><strong>合计</strong></td>
+        <td></td>
+        <td></td>
+        <td><strong>{{ totals.contracts }}</strong></td>
+        <td><strong>{{ totals.income|money }}</strong></td>
+        <td><strong>{{ totals.cost|money }}</strong></td>
+        <td {{ 'class=red' if totals.gross < 0 else '' }}><strong>{{ totals.gross|money }}</strong></td>
+        <td>{{ totals.margin }}%</td>
+        <td><strong>{{ totals.received|money }}</strong></td>
+        <td><strong>{{ totals.outstanding|money }}</strong></td>
+      </tr>
+    {% endif %}
+    </tbody>
+  </table>
+  {% if not rows %}<p class="muted">没有符合条件的客户。</p>{% endif %}
+  {% if not show_money %}<p class="muted small">当前账号无金额查看权限，仅显示客户与合同数。</p>{% endif %}
+  <p class="muted small">口径：本表把每个客户名下的<strong>全部合同作为一个整体</strong>聚合——销售额 = Σ(合同额 − 优惠 + 增项)；成本 = Σ(该客户全部成本登记)；毛利 = 销售额 − 成本；已收 = Σ(该客户全部收款，含退款冲减)；未收 = 销售额 − 已收。与「按月 / 按年」按日期拆分的流水口径不同，本表不按时间拆分。点击「客户」可查看其合同与收款明细。</p>
+</section>
+{% endblock %}

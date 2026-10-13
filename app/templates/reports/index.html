@@ -8,6 +8,7 @@
 <div class="chips views" style="margin-bottom:.6rem">
   <a class="chip {{ 'on' if mode == 'month' else '' }}" href="/reports?mode=month&year={{ year }}">按月</a>
   <a class="chip {{ 'on' if mode == 'year' else '' }}" href="/reports?mode=year">按年</a>
+  <a class="chip" href="/reports/customers">按客户</a>
 </div>
 
 {% if show_money %}
