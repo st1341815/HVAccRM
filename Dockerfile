@@ -43,7 +43,7 @@ USER 1000:1000
 EXPOSE 8000
 
 HEALTHCHECK --interval=60s --timeout=5s --start-period=40s --retries=3 \
-    CMD python -c "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4).status==200 else 1)"
+    CMD python3 -c "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4).status==200 else 1)"
 
 # entrypoint：迁移数据库 + 初始化 admin/工序模板，然后启动 HTTP 服务
 CMD ["sh", "/app/scripts/entrypoint.sh"]

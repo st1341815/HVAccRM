@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     admin_user: str = "admin"
     admin_pass: str = "admin123"
-    admin_force_password_change: bool = False
+    admin_force_password_change: bool = True
 
     tz: str = "Asia/Shanghai"
     log_level: str = "INFO"

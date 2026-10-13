@@ -115,3 +115,10 @@ NAS 侧无法读取容器 stdout 时，本次的做法是临时起一个 `python
 
 - `data/` 是唯一数据源：`crm.db`(+WAL) + `media/` + `backups/` + `logs/`。
 - 重建镜像、重命名容器都不影响数据；只有删除 `data/` 才会丢数据，操作前先 `data/backups/` 里手动备份一次。
+
+## 6. v1.0.0 正式版（2026-10-13）
+
+- 首个正式版，功能与 v0.14.77 一致，主要变化是质量收口（测试套件、权限 bug 修复、版本号同步、安全默认值），详见 `docs/版本更新记录.md` 的 v1.0.0 段。
+- 回滚点：镜像 `hvaccrm:pre-1.0.0`（= v0.14.77 镜像）。回退一条命令：
+  `docker image tag hvaccrm:pre-1.0.0 hvaccrm:local && docker compose -f docker-compose.yml -p hvaccrm up -d`
+- 部署前建议跑一次回归：`PYTHONPATH= .venv/bin/python -m pytest tests/` 与 `python scripts/bump_version.py`（版本一致性检查）。
