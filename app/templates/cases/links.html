@@ -11,6 +11,33 @@
 <p class="muted small">查询所有分享外链的状态。时间限制与次数限制满足任意一条即自动失效；也可手动让有效链接失效。</p>
 
 <section class="card">
+  <form method="get" action="/cases/links" class="filterbar">
+    <input name="q" value="{{ filters.q }}" placeholder="房号 / 楼盘关键词">
+    <select name="stage">
+      <option value="">全部工序</option>
+      {% for s in stage_options %}<option value="{{ s }}" {{ 'selected' if filters.stage == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="product_type">
+      <option value="">全部产品</option>
+      {% for p in product_options %}<option value="{{ p }}" {{ 'selected' if filters.product_type == p else '' }}>{{ p }}</option>{% endfor %}
+    </select>
+    <select name="installer">
+      <option value="">全部师傅</option>
+      {% for iid, iname in installer_options %}<option value="{{ iid }}" {{ 'selected' if filters.installer == iid|string else '' }}>{{ iname }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">全部状态</option>
+      <option value="valid" {{ 'selected' if filters.status == 'valid' else '' }}>有效</option>
+      <option value="invalid" {{ 'selected' if filters.status == 'invalid' else '' }}>已失效</option>
+    </select>
+    <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/cases/links">重置</a>
+  </form>
+</section>
+
+<section class="card">
   <table class="tight">
     <thead>
       <tr><th>房号信息</th><th>工序</th><th>施工时间</th><th>状态</th><th>有效期</th><th>访问次数</th><th>分享链接</th>{% if can_edit %}<th>限制设置</th><th>操作</th>{% endif %}</tr>
