@@ -41,7 +41,7 @@
         <td>{{ s.recovery_rate }}%</td>
         {% endif %}
         <td>{{ c.status }}</td>
-        <td><a href="/contracts/{{ c.id }}">详情 →</a></td>
+        <td><a href="/contracts/{{ c.id }}">详情 →</a>{% if can_delete_contract %}<form method="post" action="/contracts/{{ c.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ c.no or ('#' ~ c.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');"><button class="btn danger">删除</button></form>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

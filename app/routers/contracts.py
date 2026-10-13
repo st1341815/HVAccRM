@@ -78,6 +78,7 @@ def list_contracts(
         customer_q=customer_q,
         status=status,
         can_amount=can_see_amount(user),
+        can_delete_contract=has_perm(user, "admin:setting"),
     )
 
 
