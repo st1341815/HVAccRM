@@ -133,8 +133,11 @@ def visible_customer_ids(db: Session, user: User) -> set[int] | None:
                 db.scalars(select(Task.customer_id).where(Task.assignee_id == user.id)).all()
             )
     if user.role == "installer":
-        # installer 白名单：仅能看到自己被指派任务的客户
-        ids &= set(db.scalars(select(Task.customer_id).where(Task.assignee_id == user.id)).all())
+        # installer 白名单：以「被指派任务的客户」为主要可见性来源（与 owner 取并集）；
+        # 之前用 &= 在 installer 不 own 任何客户时结果永远空集，这是 v1.0.0 测试发现的 bug
+        ids |= set(
+            db.scalars(select(Task.customer_id).where(Task.assignee_id == user.id)).all()
+        )
     return ids
 
 
