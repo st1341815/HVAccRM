@@ -231,7 +231,7 @@ button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 
 .filterbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .filterbar input, .filterbar select { width: auto; min-width: 8rem; }
-.inline-label { display: flex; align-items: center; gap: .3rem; }
+.inline-label { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
 
 /* 下拉式多选（<details> 实现，无 JS 也能展开选择） */
 details.ms { border: 1px solid var(--line); border-radius: 8px; padding: .45rem .6rem; background: #fff; }

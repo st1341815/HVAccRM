@@ -3,7 +3,7 @@
 //   - 静态资源（/static/*）→ cache-first（应用壳：CSS / HTMX / 图标）
 //   - 页面 / HTMX 片段 / 图片 → network-first（业务数据实时、多角色权限，绝不缓存整页 HTML）
 //   - 离线时导航请求回退到离线提示页
-const CACHE = "hvaccrm-shell-v35";
+const CACHE = "hvaccrm-shell-v36";
 const SHELL = [
   "/static/app.css",
   "/static/htmx.min.js",
