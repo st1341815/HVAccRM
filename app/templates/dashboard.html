@@ -6,22 +6,26 @@
 <div class="kpis">
   {% if show_task_widgets %}
   <div class="kpi">
-    <span class="kpi-num">{{ open_count }}</span>
-    <span class="kpi-label">未完成工序</span>
-  </div>
-  <div class="kpi">
     <span class="kpi-num">{{ in_progress }}</span>
     <span class="kpi-label">在施工地</span>
   </div>
   {% endif %}
-  {% if can('customer:view') %}
+  {% if year_stats %}
   <div class="kpi">
-    <span class="kpi-num">{{ customer_total }}</span>
-    <span class="kpi-label">可见客户总数</span>
+    <span class="kpi-num">{{ year_stats.sales|money }}</span>
+    <span class="kpi-label">{{ year }} 年销售额</span>
   </div>
   <div class="kpi">
-    <span class="kpi-num">{{ new_customers }}</span>
-    <span class="kpi-label">近 30 天新增客户</span>
+    <span class="kpi-num">{{ year_stats.received|money }}</span>
+    <span class="kpi-label">{{ year }} 年收款</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-num">{{ year_stats.cost|money }}</span>
+    <span class="kpi-label">{{ year }} 年成本</span>
+  </div>
+  <div class="kpi {{ 'alert' if year_stats.profit < 0 else '' }}">
+    <span class="kpi-num">{{ year_stats.profit|money }}</span>
+    <span class="kpi-label">{{ year }} 年利润</span>
   </div>
   {% endif %}
   {% if finance %}

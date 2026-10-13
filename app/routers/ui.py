@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import current_user_or_redirect
 from ..db import get_db
-from ..models import Contract, Customer, Photo, Task, User, today_str
+from ..models import ChangeOrder, Contract, ContractCost, Customer, Payment, Photo, Task, User, today_str
 from ..permissions import can_see_amount, customer_scope_conditions, has_perm, task_scope_conditions
 from ..services import finance as finance_svc
 from ..services import search as search_svc
@@ -49,7 +49,9 @@ def dashboard(
     customers = list(db.scalars(cust_stmt).all())
 
     month = today[:7]
+    year = today[:4]
     finance = None
+    year_stats = None
     if show_money:
         contracts = list(db.scalars(select(Contract)).all())
         ids = {c.id for c in customers}
@@ -69,6 +71,43 @@ def dashboard(
             "rate": round(received / signed * 100, 1) if signed else 0.0,
             "outstanding_total": round(outstanding, 2),
             "debtors": finance_svc.top_debtors(db, 5),
+        }
+
+        # 当年经营数据（口径与 /reports 一致：销售额 = 合同额 − 优惠 + 增项；
+        # 成本按费用发生日、收款按收款日归集）
+        cids = [c.id for c in contracts]
+        change_by_contract: dict[int, float] = {}
+        if cids:
+            for co in db.scalars(
+                select(ChangeOrder).where(ChangeOrder.contract_id.in_(cids))
+            ).all():
+                change_by_contract[co.contract_id] = change_by_contract.get(co.contract_id, 0) + (
+                    co.amount or 0
+                )
+        year_sales = round(
+            sum(
+                (c.total_amount or 0) - (c.discount or 0) + change_by_contract.get(c.id, 0)
+                for c in contracts
+                if (c.sign_date or "").startswith(year)
+            ),
+            2,
+        )
+        year_received = 0.0
+        year_cost = 0.0
+        if cids:
+            for p in db.scalars(select(Payment).where(Payment.contract_id.in_(cids))).all():
+                if (p.paid_at or "").startswith(year):
+                    year_received += p.amount or 0
+            for cost in db.scalars(
+                select(ContractCost).where(ContractCost.contract_id.in_(cids))
+            ).all():
+                if (cost.spent_at or "").startswith(year):
+                    year_cost += cost.amount or 0
+        year_stats = {
+            "sales": year_sales,
+            "received": round(year_received, 2),
+            "cost": round(year_cost, 2),
+            "profit": round(year_sales - year_cost, 2),
         }
 
     # 施工概况：有未完工工序的客户数
@@ -92,13 +131,13 @@ def dashboard(
         request,
         "dashboard.html",
         today=today,
+        year=year,
         open_count=open_count,
         open_tasks=open_tasks[:10],
         finance=finance,
+        year_stats=year_stats,
         show_money=show_money,
         in_progress=in_progress,
-        customer_total=len(customers),
-        new_customers=len(new_customers),
         source_dist=sorted(source_dist.items(), key=lambda kv: kv[1], reverse=True),
         recent_photos=recent_photos,
         customers_map={c.id: c for c in customers},
