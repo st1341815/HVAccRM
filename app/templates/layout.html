@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#353a41">
+  <meta name="theme-color" content="#3a3f47">
   <title>{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}</title>
   <link rel="stylesheet" href="/static/app.css?v={{ version }}">
   <script src="/static/htmx.min.js" defer></script>
@@ -44,25 +44,25 @@
 <script>try{if(localStorage.getItem('hvaccrm-sidebar-collapsed')==='1')document.body.classList.add('sidebar-collapsed');}catch(e){}</script>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">🌡️ <span>HVAccRM</span><button type="button" class="collapse-btn" aria-label="折叠侧边栏" title="折叠侧边栏">⟨</button></div>
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4a2 2 0 0 1 4 0v9.3a4.5 4.5 0 1 1-4 0z"/><circle cx="12" cy="17.5" r="1.7"/></svg><span>HVAccRM</span><button type="button" class="collapse-btn" aria-label="折叠侧边栏" title="折叠侧边栏">⟨</button></div>
     <nav>
-      <a href="/" class="{{ 'active' if current_path == '/' else '' }}"><span class="ico">📊</span>看板</a>
-      {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}"><span class="ico">👥</span>客户</a>{% endif %}
-      <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}"><span class="ico">🏢</span>楼盘/房号</a>
-      {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}"><span class="ico">📄</span>合同</a>{% endif %}
-      {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}"><span class="ico">💰</span>收款</a>{% endif %}
-      {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}"><span class="ico">🧾</span>成本</a>{% endif %}
-      {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}"><span class="ico">🔧</span>施工</a>{% endif %}
-      {% if can('case:view') %}<a href="/cases" class="{{ 'active' if current_path.startswith('/cases') else '' }}"><span class="ico">🏆</span>案例</a>{% endif %}
-      {% if can('report:view') %}<a href="/reports" class="{{ 'active' if current_path.startswith('/reports') else '' }}"><span class="ico">📈</span>报表</a>{% endif %}
-      {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico">👤</span>用户</a>{% endif %}
-      {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico">⚙️</span>系统</a>{% endif %}
+      <a href="/" class="{{ 'active' if current_path == '/' else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="8" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.5"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.5"/><rect x="3" y="14" width="7.5" height="7" rx="1.5"/></svg></span>看板</a>
+      {% if can('customer:view') %}<a href="/customers" class="{{ 'active' if current_path.startswith('/customers') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.7-3.1 2.9-4.7 5.5-4.7s4.8 1.6 5.5 4.7"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.8c2.4.3 4 1.7 4.4 4.2"/></svg></span>客户</a>{% endif %}
+      <a href="/projects" class="{{ 'active' if current_path.startswith('/projects') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/></svg></span>楼盘/房号</a>
+      {% if can('contract:view') %}<a href="/contracts" class="{{ 'active' if current_path.startswith('/contracts') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19"/><path d="M9 12h6M9 15.5h6"/></svg></span>合同</a>{% endif %}
+      {% if can('payment:view') %}<a href="/payments" class="{{ 'active' if current_path.startswith('/payments') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l3.5 4 3.5-4"/><path d="M12 12.5V17M9.8 14.5h4.4"/></svg></span>收款</a>{% endif %}
+      {% if can('cost:view') %}<a href="/costs" class="{{ 'active' if current_path.startswith('/costs') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M9 7h6"/><path d="M9.5 12h.01M12 12h.01M14.5 12h.01M9.5 15.5h.01M12 15.5h.01M14.5 15.5h.01"/></svg></span>成本</a>{% endif %}
+      {% if can('task:view') %}<a href="/tasks" class="{{ 'active' if current_path.startswith('/tasks') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>施工</a>{% endif %}
+      {% if can('case:view') %}<a href="/cases" class="{{ 'active' if current_path.startswith('/cases') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg></span>案例</a>{% endif %}
+      {% if can('report:view') %}<a href="/reports" class="{{ 'active' if current_path.startswith('/reports') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><rect x="6" y="12" width="3.2" height="5" rx="0.6"/><rect x="10.4" y="8" width="3.2" height="9" rx="0.6"/><rect x="14.8" y="4" width="3.2" height="13" rx="0.6"/></svg></span>报表</a>{% endif %}
+      {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.8-3.4 3.3-5 6.5-5s5.7 1.6 6.5 5"/></svg></span>用户</a>{% endif %}
+      {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>系统</a>{% endif %}
     </nav>
     <div class="me">
       <div class="who">{{ user.display_name }}<div class="role">{{ role_label }}</div></div>
       <div class="me-links">
-        <a href="/account">⚙️ 账户</a>
-        <a href="/logout">↪ 退出</a>
+        <a href="/account">账户</a>
+        <a href="/logout">退出</a>
       </div>
     </div>
   </aside>
