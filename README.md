@@ -23,11 +23,10 @@ APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose · PWA（Serv
 ```bash
 cd crm
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env            # 至少修改 APP_SECRET_KEY / ADMIN_PASS
+# 可选：cp .env.example .env 自定义密钥/密码；不复制也能用默认值启动
 
-export APP_SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
 export DB_PATH=$PWD/data/crm.db DATA_DIR=$PWD/data CONFIG_DIR=$PWD/config
-export ADMIN_USER=admin ADMIN_PASS='你的初始密码'
+# 默认管理员：admin / admin888（可用 ADMIN_PASS 覆盖）
 
 .venv/bin/python -m app.bootstrap                 # 建目录 + 迁移 + 工序模板 + admin
 .venv/bin/python -m uvicorn app.main:app --port 8000
@@ -49,7 +48,7 @@ export ADMIN_USER=admin ADMIN_PASS='你的初始密码'
 | 标签 | 说明 |
 | --- | --- |
 | `ghcr.io/st1341815/hvaccrm:latest` | 最新正式版 |
-| `ghcr.io/st1341815/hvaccrm:1.4.0` | 固定版本（可复现部署） |
+| `ghcr.io/st1341815/hvaccrm:1.4.1` | 固定版本（可复现部署） |
 
 ```bash
 docker pull ghcr.io/st1341815/hvaccrm:latest
@@ -63,20 +62,15 @@ docker pull ghcr.io/st1341815/hvaccrm:latest
 >
 > `GHCR_TOKEN` 为具备 `read:packages` 权限的 GitHub PAT。
 
-**docker run 最小示例：**
+**docker run 最小示例（默认值即可启动）：**
 
 ```bash
 mkdir -p /srv/hvaccrm/{data,config}
 
-export APP_SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
-export ADMIN_USER=admin
-export ADMIN_PASS='你的初始密码'
-
 docker run -d --name hvaccrm --restart unless-stopped \
   --user 1000:1000 -p 8090:8000 \
   -e TZ=Asia/Shanghai \
-  -e APP_SECRET_KEY="$APP_SECRET_KEY" \
-  -e ADMIN_USER="$ADMIN_USER" -e ADMIN_PASS="$ADMIN_PASS" \
+  -e ADMIN_USER=admin -e ADMIN_PASS=admin888 \
   -e DB_PATH=/data/crm.db -e DATA_DIR=/data -e CONFIG_DIR=/config \
   -v /srv/hvaccrm/data:/data \
   -v /srv/hvaccrm/config:/config:ro \
@@ -85,13 +79,7 @@ docker run -d --name hvaccrm --restart unless-stopped \
 curl -s http://127.0.0.1:8090/health      # {"status":"ok","db":true,...}
 ```
 
-**docker compose 示例（需先准备 `.env`，否则会报 `required variable APP_SECRET_KEY is missing a value`）：**
-
-```bash
-cp .env.example .env        # 然后修改 APP_SECRET_KEY / ADMIN_PASS
-# 或一键生成随机密钥与初始密码（推荐）：
-bash scripts/gen_env.sh
-```
+**docker compose 示例（默认值即可启动，无需先建 `.env`）：**
 
 ```yaml
 services:
@@ -104,9 +92,10 @@ services:
       - "8090:8000"
     environment:
       - TZ=Asia/Shanghai
-      - APP_SECRET_KEY=${APP_SECRET_KEY:?required}
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-dev-insecure-change-me}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:?required}
+      - ADMIN_PASS=${ADMIN_PASS:-admin888}
+      - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
       - DB_PATH=/data/crm.db
       - DATA_DIR=/data
       - CONFIG_DIR=/config
@@ -115,9 +104,11 @@ services:
       - ./config:/config:ro
 ```
 
+- **默认账号：`admin` / `admin888`**（首次登录后建议在「账户」页修改）。
 - 首次启动自动执行 Alembic 迁移、创建 admin 与默认工序模板；业务数据全部落在挂载的 `data/`。
 - 镜像基于 `python:3.12-slim` 多阶段构建，非 root（uid/gid 1000）运行，暴露 8000，健康检查 `/health`。
 - 版本与源码 Release 对齐：<https://github.com/st1341815/HVAccRM/releases>。
+- **公网 / 生产环境**：请通过 `.env` 覆盖 `APP_SECRET_KEY`（随机串）与 `ADMIN_PASS`，并建议 `ADMIN_FORCE_PASSWORD_CHANGE=true`；默认值仅适合内网可信环境。
 
 ### 2.2 从源码构建（NAS / docker compose）
 
@@ -132,7 +123,7 @@ curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
 - 容器内固定 `UID/GID 1000`，非 root 运行；仅监听 HTTP，HTTPS 由 NAS 反代。
 - `data/`（DB + 媒体 + 备份 + 日志）与 `config/`（部署变量）由 NAS 卷挂载，重建镜像不丢数据。
 - 内存上限 `mem_limit: 512m`；日志 `max-size 5m / max-file 3`。
-- 若报 `required variable APP_SECRET_KEY is missing a value`：先 `bash scripts/gen_env.sh` 生成 `.env`，或按上面方式加载 `config/deploy.env`。
+- 默认值即可直接启动；如需自定义密钥/密码，按上面方式加载 `config/deploy.env`（或在同目录建 `.env`）。
 
 ## 3. 目录结构
 
@@ -145,7 +136,6 @@ crm/
 ├── alembic.ini + migrations/   # Alembic 迁移（0001 ~ 0015）
 ├── scripts/
 │   ├── entrypoint.sh           # 容器入口：bootstrap → uvicorn
-│   ├── gen_env.sh              # 生成 .env（随机 APP_SECRET_KEY / ADMIN_PASS）
 │   ├── bump_version.py         # 同步 app/__init__.py 与 pyproject.toml 版本号
 │   ├── seed_demo.py            # 演示数据
 │   ├── smoke_test.sh           # 端到端自检（核心链路 + 权限）
@@ -232,7 +222,7 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 
 ## 8. 版本说明
 
-当前版本 **v1.4.0**（2026-10-15，全站 UI 视觉改版）；预构建镜像 `ghcr.io/st1341815/hvaccrm:1.4.0` 与源码 Release 保持同版本。
+当前版本 **v1.4.1**（2026-10-20，简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填）；预构建镜像 `ghcr.io/st1341815/hvaccrm:1.4.1` 与源码 Release 保持同版本。
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
 

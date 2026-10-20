@@ -8,7 +8,7 @@
 cd crm
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt   # 含 pytest
-cp .env.example .env                        # 至少改 APP_SECRET_KEY / ADMIN_PASS
+cp .env.example .env                        # 可选：默认值即可启动（admin / admin888）
 ```
 
 > ⚠️ 沙箱环境有全局 `PYTHONPATH` 污染（`pydantic_core` 是坏的）。跑任何 Python 一律

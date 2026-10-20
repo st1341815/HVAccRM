@@ -12,10 +12,10 @@ services:
       - "8090:8000"
     environment:
       - TZ=Asia/Shanghai
-      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY 未设置，请先运行 bash scripts/gen_env.sh 生成 .env，或先加载 config/deploy.env}
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-dev-insecure-change-me}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:-admin123}
-      - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-true}
+      - ADMIN_PASS=${ADMIN_PASS:-admin888}
+      - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
       - DB_PATH=/data/crm.db
       - DATA_DIR=/data
       - CONFIG_DIR=/config

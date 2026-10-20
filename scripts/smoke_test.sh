@@ -1,7 +1,7 @@
 #!/bin/bash
 # 本地 smoke test：核心链路 + 权限拦截 + 数据范围
 B=${BASE_URL:-http://127.0.0.1:8012}
-APW=${ADMIN_PW:-admin12345}
+APW=${ADMIN_PW:-admin888}
 RUN=${RUN_ID:-$(date +%s)}   # 测试账号带运行后缀，保证同一库可重复执行
 HDR=/tmp/crmtest/hdr
 OUT=/tmp/crmtest/out.html
