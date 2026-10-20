@@ -76,9 +76,9 @@ services:
 
     environment:
       - TZ=Asia/Shanghai
-      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY is required}  # 必填，缺了会报错
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-dev-insecure-change-me}  # 默认值即可启动；公网建议改随机串
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - ADMIN_PASS=${ADMIN_PASS:-admin888}
       - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
       - DB_PATH=/data/crm.db       # 容器内路径，一般不动
       - DATA_DIR=/data
@@ -107,11 +107,12 @@ services:
 配套的 `.env`（放在 `docker-compose.yml` 同级目录，compose 自动读取）：
 
 ```bash
+# 默认值即可直接启动；生产/公网建议改随机串与强密码。
 # 生成随机密钥：python3 -c "import secrets;print(secrets.token_urlsafe(48))"
-APP_SECRET_KEY=改成随机长串
+APP_SECRET_KEY=dev-insecure-change-me
 ADMIN_USER=admin
-ADMIN_PASS=改成强密码
-ADMIN_FORCE_PASSWORD_CHANGE=true     # 生产建议 true：admin 首登强制改密
+ADMIN_PASS=admin888
+ADMIN_FORCE_PASSWORD_CHANGE=false    # 公网部署建议改 true：admin 首登强制改密
 LOG_LEVEL=INFO
 ```
 
@@ -122,9 +123,9 @@ LOG_LEVEL=INFO
 git clone https://github.com/st1341815/HVAccRM.git && cd HVAccRM
 #    （或解压发布包 zip/tar.gz）
 
-# ② 生成配置文件
+# ② 生成配置文件（可选：不建 .env 也能用默认值启动）
 cp .env.example .env
-#    编辑 .env：填 APP_SECRET_KEY（随机串）、ADMIN_PASS（强密码）
+#    编辑 .env：可选改 APP_SECRET_KEY（随机串）、ADMIN_PASS（强密码）
 
 # ③ 构建镜像（首次会 pip 安装依赖，稍慢）
 docker compose build
@@ -192,9 +193,9 @@ services:
     # 不再对外暴露端口，只在内网 docker 网络里让 nginx 访问
     environment:
       - TZ=Asia/Shanghai
-      - APP_SECRET_KEY=${APP_SECRET_KEY:?APP_SECRET_KEY is required}
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-dev-insecure-change-me}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - ADMIN_PASS=${ADMIN_PASS:-admin888}
       - DB_PATH=/data/crm.db
       - DATA_DIR=/data
       - CONFIG_DIR=/config
@@ -254,12 +255,12 @@ server {
 
 所有配置通过环境变量注入，推荐在项目根目录的 `.env` 里维护（compose 会自动读取）。
 
-### 必填
+### 可选（均有默认值，开箱即用）
 
-| 变量 | 说明 | 示例 |
+| 变量 | 说明 | 示例 / 默认 |
 | --- | --- | --- |
-| `APP_SECRET_KEY` | 会话签名密钥，**必须**改成随机串 | `python3 -c "import secrets;print(secrets.token_urlsafe(48))"` |
-| `ADMIN_PASS` | admin 初始密码（仅首次创建生效） | 强密码 |
+| `APP_SECRET_KEY` | 会话签名密钥；默认值可直接启动，**公网部署必须**改成随机串 | 默认 `dev-insecure-change-me`；`python3 -c "import secrets;print(secrets.token_urlsafe(48))"` |
+| `ADMIN_PASS` | admin 初始密码（仅首次创建生效）；默认 `admin888`，公网请改强密码 | `admin888` |
 
 ### 账号与会话
 
@@ -435,7 +436,7 @@ server {
 
 | 现象 | 可能原因 / 处理 |
 | --- | --- |
-| 启动即退出 | `.env` 缺 `APP_SECRET_KEY`（compose 用 `:?` 强校验）；`docker compose logs crm` 看报错 |
+| 启动即退出 | 数据库迁移失败 / 端口占用 / 镜像架构不匹配；`docker compose logs crm` 看报错 |
 | 无法访问 8090 | 端口被占用 / 防火墙；`docker compose ps` + `curl 127.0.0.1:8090/health` |
 | 数据权限异常 | 挂载目录属主不是 UID 1000；`chown -R 1000:1000 data` |
 | 数据库锁 / busy | 单实例设计，勿多副本共写同一 `crm.db`；写锁已内置重试 |
@@ -446,8 +447,8 @@ server {
 
 ## 12. 安全清单
 
-- [ ] `APP_SECRET_KEY` 改为随机强串，勿用默认值
-- [ ] `ADMIN_PASS` 用强密码，`ADMIN_FORCE_PASSWORD_CHANGE=true`
+- [ ] 公网部署时 `APP_SECRET_KEY` 改为随机强串，勿用默认值
+- [ ] 公网部署时 `ADMIN_PASS` 用强密码，`ADMIN_FORCE_PASSWORD_CHANGE=true`
 - [ ] 对外走 HTTPS（反代 + 证书）
 - [ ] 定期备份 `data/`（库 + 照片一起）
 - [ ] 不要暴露 8000 直连；只映射 8090（或反代内网端口）

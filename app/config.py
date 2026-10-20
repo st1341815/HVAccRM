@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     config_dir: str = "/config"
 
     admin_user: str = "admin"
-    admin_pass: str = "admin123"
-    admin_force_password_change: bool = True
+    admin_pass: str = "admin888"
+    admin_force_password_change: bool = False
 
     tz: str = "Asia/Shanghai"
     log_level: str = "INFO"
