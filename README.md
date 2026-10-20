@@ -13,7 +13,7 @@ APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose · PWA（Serv
 > 见 [`docs/使用手册.md`](docs/使用手册.md) —— 日常使用请从这里开始。
 > 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
 > 见 [`docs/Docker部署指南.md`](docs/Docker部署指南.md)。
-> 📦 **预构建镜像**（GHCR，免构建）：`ghcr.io/st1341815/hvaccrm`，用法见下文 §2.1。
+> 📦 **预构建镜像**（Docker Hub `13uncle/hvaccrm` / GHCR `ghcr.io/st1341815/hvaccrm`，免构建），用法见下文 §2.1。
 > 本文档面向开发者，讲的是环境搭建、部署与实现细节。
 
 ---
@@ -43,15 +43,17 @@ export DB_PATH=$PWD/data/crm.db DATA_DIR=$PWD/data CONFIG_DIR=$PWD/config
 
 ### 2.1 使用预构建镜像（docker pull，推荐）
 
-镜像已发布到 GitHub Container Registry（GHCR），无需 clone 源码或本地构建：
+镜像已发布到 **GitHub Container Registry（GHCR）** 与 **Docker Hub**，无需 clone 源码或本地构建：
 
-| 标签 | 说明 |
-| --- | --- |
-| `ghcr.io/st1341815/hvaccrm:latest` | 最新正式版 |
-| `ghcr.io/st1341815/hvaccrm:1.4.1` | 固定版本（可复现部署） |
+| 镜像源 | 标签 | 说明 |
+| --- | --- | --- |
+| **Docker Hub** | `13uncle/hvaccrm:latest` / `13uncle/hvaccrm:1.4.1` | 推荐（公开仓库，匿名可拉） |
+| GHCR | `ghcr.io/st1341815/hvaccrm:latest` / `:1.4.1` | GitHub 容器仓库 |
 
 ```bash
-docker pull ghcr.io/st1341815/hvaccrm:latest
+docker pull 13uncle/hvaccrm:latest            # Docker Hub
+# 或
+docker pull ghcr.io/st1341815/hvaccrm:latest  # GHCR
 ```
 
 > 若 GHCR 包未设为 Public（GitHub → Packages → Package settings → Danger Zone → Change visibility），拉取前需登录：
@@ -74,7 +76,7 @@ docker run -d --name hvaccrm --restart unless-stopped \
   -e DB_PATH=/data/crm.db -e DATA_DIR=/data -e CONFIG_DIR=/config \
   -v /srv/hvaccrm/data:/data \
   -v /srv/hvaccrm/config:/config:ro \
-  ghcr.io/st1341815/hvaccrm:latest
+  13uncle/hvaccrm:latest
 
 curl -s http://127.0.0.1:8090/health      # {"status":"ok","db":true,...}
 ```
@@ -84,7 +86,7 @@ curl -s http://127.0.0.1:8090/health      # {"status":"ok","db":true,...}
 ```yaml
 services:
   hvaccrm:
-    image: ghcr.io/st1341815/hvaccrm:latest
+    image: 13uncle/hvaccrm:latest
     container_name: hvaccrm
     restart: unless-stopped
     user: "1000:1000"
@@ -222,7 +224,7 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 
 ## 8. 版本说明
 
-当前版本 **v1.4.1**（2026-10-20，简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填）；预构建镜像 `ghcr.io/st1341815/hvaccrm:1.4.1` 与源码 Release 保持同版本。
+当前版本 **v1.4.1**（2026-10-20，简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填）；预构建镜像同步发布于 **Docker Hub** `13uncle/hvaccrm:1.4.1` 与 **GHCR** `ghcr.io/st1341815/hvaccrm:1.4.1`，与源码 Release 保持同版本。
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
 
