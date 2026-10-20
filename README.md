@@ -82,7 +82,13 @@ docker run -d --name hvaccrm --restart unless-stopped \
 curl -s http://127.0.0.1:8090/health      # {"status":"ok","db":true,...}
 ```
 
-**docker compose 示例：**
+**docker compose 示例（需先准备 `.env`，否则会报 `required variable APP_SECRET_KEY is missing a value`）：**
+
+```bash
+cp .env.example .env        # 然后修改 APP_SECRET_KEY / ADMIN_PASS
+# 或一键生成随机密钥与初始密码（推荐）：
+bash scripts/gen_env.sh
+```
 
 ```yaml
 services:
@@ -123,6 +129,7 @@ curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
 - 容器内固定 `UID/GID 1000`，非 root 运行；仅监听 HTTP，HTTPS 由 NAS 反代。
 - `data/`（DB + 媒体 + 备份 + 日志）与 `config/`（部署变量）由 NAS 卷挂载，重建镜像不丢数据。
 - 内存上限 `mem_limit: 512m`；日志 `max-size 5m / max-file 3`。
+- 若报 `required variable APP_SECRET_KEY is missing a value`：先 `bash scripts/gen_env.sh` 生成 `.env`，或按上面方式加载 `config/deploy.env`。
 
 ## 3. 目录结构
 
@@ -135,6 +142,7 @@ crm/
 ├── alembic.ini + migrations/   # Alembic 迁移（0001_initial）
 ├── scripts/
 │   ├── entrypoint.sh           # 容器入口：bootstrap → uvicorn
+│   ├── gen_env.sh              # 生成 .env（随机 APP_SECRET_KEY / ADMIN_PASS）
 │   ├── seed_demo.py            # 演示数据
 │   ├── smoke_test.sh           # 92 项端到端自检（核心链路 + 权限）
 │   ├── nas_build.sh            # 在 NAS 上构建镜像（docker.sock 方式）
