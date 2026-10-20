@@ -39,3 +39,22 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/hvaccrm:${{ steps.ver.outputs.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/hvaccrm:latest
+
+      - name: Check repository visibility
+        run: |
+          curl -fsSL "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/hvaccrm/" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('is_private =', d.get('is_private'), '| pull_count =', d.get('pull_count'))"
+
+      - name: Verify anonymous pull
+        id: anon
+        continue-on-error: true
+        run: |
+          docker logout
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hvaccrm:${{ steps.ver.outputs.version }}
+
+      - name: Report
+        run: |
+          echo "anonymous_pull=${{ steps.anon.outcome }}"
+          if [ "${{ steps.anon.outcome }}" != "success" ]; then
+            echo "::warning::匿名拉取失败——仓库可能是私有；如需公开拉取，请在 Docker Hub 将 ${{ secrets.DOCKERHUB_USERNAME }}/hvaccrm 设为 Public"
+          fi
