@@ -10,6 +10,7 @@ Session/Cookie + TOTP · APScheduler · SQLite FTS5 · 本地文件系统 · Doc
 > 见 [`docs/使用手册.md`](docs/使用手册.md) —— 日常使用请从这里开始。
 > 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
 > 见 [`docs/Docker部署指南.md`](docs/Docker部署指南.md)。
+> 📦 **预构建镜像**（GHCR，免构建）：`ghcr.io/st1341815/hvaccrm`，用法见下文 §2.1。
 > 本文档面向开发者，讲的是环境搭建、部署与实现细节。
 
 ---
@@ -36,7 +37,80 @@ export ADMIN_USER=admin ADMIN_PASS='你的初始密码'
 .venv/bin/python -m scripts.seed_demo        # 空库时写入；--force 追加
 ```
 
-## 2. 部署到 NAS（docker compose）
+## 2. 部署
+
+### 2.1 使用预构建镜像（docker pull，推荐）
+
+镜像已发布到 GitHub Container Registry（GHCR），无需 clone 源码或本地构建：
+
+| 标签 | 说明 |
+| --- | --- |
+| `ghcr.io/st1341815/hvaccrm:latest` | 最新正式版 |
+| `ghcr.io/st1341815/hvaccrm:1.4.0` | 固定版本（可复现部署） |
+
+```bash
+docker pull ghcr.io/st1341815/hvaccrm:latest
+```
+
+> 若 GHCR 包未设为 Public（GitHub → Packages → Package settings → Danger Zone → Change visibility），拉取前需登录：
+>
+> ```bash
+> echo "$GHCR_TOKEN" | docker login ghcr.io -u st1341815 --password-stdin
+> ```
+>
+> `GHCR_TOKEN` 为具备 `read:packages` 权限的 GitHub PAT。
+
+**docker run 最小示例：**
+
+```bash
+mkdir -p /srv/hvaccrm/{data,config}
+
+export APP_SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
+export ADMIN_USER=admin
+export ADMIN_PASS='你的初始密码'
+
+docker run -d --name hvaccrm --restart unless-stopped \
+  --user 1000:1000 -p 8090:8000 \
+  -e TZ=Asia/Shanghai \
+  -e APP_SECRET_KEY="$APP_SECRET_KEY" \
+  -e ADMIN_USER="$ADMIN_USER" -e ADMIN_PASS="$ADMIN_PASS" \
+  -e DB_PATH=/data/crm.db -e DATA_DIR=/data -e CONFIG_DIR=/config \
+  -v /srv/hvaccrm/data:/data \
+  -v /srv/hvaccrm/config:/config:ro \
+  ghcr.io/st1341815/hvaccrm:latest
+
+curl -s http://127.0.0.1:8090/health      # {"status":"ok","db":true,...}
+```
+
+**docker compose 示例：**
+
+```yaml
+services:
+  hvaccrm:
+    image: ghcr.io/st1341815/hvaccrm:latest
+    container_name: hvaccrm
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "8090:8000"
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_SECRET_KEY=${APP_SECRET_KEY:?required}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:?required}
+      - DB_PATH=/data/crm.db
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+```
+
+- 首次启动自动执行 Alembic 迁移、创建 admin 与默认工序模板；业务数据全部落在挂载的 `data/`。
+- 镜像基于 `python:3.12-slim` 多阶段构建，非 root（uid/gid 1000）运行，暴露 8000，健康检查 `/health`。
+- 版本与源码 Release 对齐：<https://github.com/st1341815/HVAccRM/releases>。
+
+### 2.2 从源码构建（NAS / docker compose）
 
 ```bash
 # NAS 上，源码目录 /vol1/1000/Docker/Hvaccrm
@@ -133,7 +207,9 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 - 日志：stdout + `data/logs/crm.log`（2MB × 3 轮转）；级别由 `LOG_LEVEL` 控制。
 - 首次启动自动建库建表并创建 admin（`ADMIN_USER` / `ADMIN_PASS`，仅首次生效）。
 
-## 8. v1.0.0 正式版说明
+## 8. 版本说明
+
+当前版本 **v1.4.0**（2026-10-15，全站 UI 视觉改版）；预构建镜像 `ghcr.io/st1341815/hvaccrm:1.4.0` 与源码 Release 保持同版本。
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
 
