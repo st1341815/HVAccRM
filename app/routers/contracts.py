@@ -155,6 +155,18 @@ async def create_contract(
     created_tasks = task_svc.generate_contract_tasks(db, contract)
     log_action(db, user, "create", "contracts", contract.id, new=contract, ip=client_ip(request))
 
+    # 合同创建成功 → 客户状态同步为「已成交」
+    # 幂等：本来就是「已成交」时不重复写审计；状态变化单独留一条 customers 审计
+    prev_status = customer.status or "active"
+    customer.status = "won"
+    status_changed = prev_status != customer.status
+    if status_changed:
+        log_action(
+            db, user, "update", "customers", customer.id,
+            old={"status": prev_status}, new={"status": customer.status},
+            ip=client_ip(request),
+        )
+
     saved, dedup, errors = 0, 0, []
     for f in files:
         if not f or not f.filename:
@@ -178,6 +190,8 @@ async def create_contract(
                 saved += 1
     commit_retry(db)
     message = f"合同 {contract.no} 已创建"
+    if status_changed:
+        message += "；客户状态已更新为「已成交」"
     if saved or dedup:
         message += f"；纸质合同图片新增 {saved} 张、去重 {dedup} 张"
     if errors:

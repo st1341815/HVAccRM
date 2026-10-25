@@ -2,6 +2,7 @@
 {% block title %}新建合同{% endblock %}
 {% block content %}
 <h1>新建合同</h1>
+<p class="muted small">合同保存成功后，关联客户的状态会自动更新为「已成交」。</p>
 <form method="post" action="/contracts/new" class="card stack" enctype="multipart/form-data">
   <div class="grid3">
     <label class="search-picker">客户 *
