@@ -195,8 +195,8 @@
   <div class="card-head">
     <h2>收款明细 <span class="muted small">共 {{ payments|length }} 笔</span></h2>
     <div class="actions">
-      {% if can('payment:edit') %}<a class="btn" href="/payments/new">＋ 登记收款</a>{% endif %}
       <span class="head-sum">合计 <strong>{{ payments_total|money }}</strong></span>
+      {% if can('payment:edit') %}<a class="btn" href="/payments/new">＋ 登记收款</a>{% endif %}
     </div>
   </div>
   {% if payments %}
@@ -231,8 +231,8 @@
   <div class="card-head">
     <h2>成本明细 <span class="muted small">共 {{ cost_rows|length }} 条</span></h2>
     <div class="actions">
-      {% if can('cost:edit') %}<a class="btn" href="/costs/new">＋ 登记费用</a>{% endif %}
       <span class="head-sum">合计 <strong>{{ costs_total|money }}</strong></span>
+      {% if can('cost:edit') %}<a class="btn" href="/costs/new">＋ 登记费用</a>{% endif %}
     </div>
   </div>
   {% if cost_rows %}
