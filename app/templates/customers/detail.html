@@ -192,8 +192,13 @@
 
 {% elif tab == 'payments' %}
 <section class="card">
-  <h2>收款明细 <span class="muted small">共 {{ payments|length }} 笔</span></h2>
-  {% if can('payment:edit') %}<div class="actions"><a class="btn" href="/payments/new">＋ 登记收款</a></div>{% endif %}
+  <div class="card-head">
+    <h2>收款明细 <span class="muted small">共 {{ payments|length }} 笔</span></h2>
+    <div class="actions">
+      {% if can('payment:edit') %}<a class="btn" href="/payments/new">＋ 登记收款</a>{% endif %}
+      <span class="head-sum">合计 <strong>{{ payments_total|money }}</strong></span>
+    </div>
+  </div>
   {% if payments %}
   <table class="tight">
     <thead><tr><th>收款日期</th><th>金额</th><th>合同</th><th>方式</th><th>凭证号</th><th>收款人</th><th>付款截图</th><th>备注</th><th></th></tr></thead>
@@ -223,8 +228,13 @@
 
 {% elif tab == 'costs' %}
 <section class="card">
-  <h2>成本明细 <span class="muted small">共 {{ cost_rows|length }} 条</span></h2>
-  {% if can('cost:edit') %}<div class="actions"><a class="btn" href="/costs/new">＋ 登记费用</a></div>{% endif %}
+  <div class="card-head">
+    <h2>成本明细 <span class="muted small">共 {{ cost_rows|length }} 条</span></h2>
+    <div class="actions">
+      {% if can('cost:edit') %}<a class="btn" href="/costs/new">＋ 登记费用</a>{% endif %}
+      <span class="head-sum">合计 <strong>{{ costs_total|money }}</strong></span>
+    </div>
+  </div>
   {% if cost_rows %}
   <table class="tight">
     <thead><tr><th>日期</th><th>合同</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>附图</th><th></th></tr></thead>

@@ -83,6 +83,9 @@ def test_detail_collects_payments_and_costs(db, admin):
     assert {r.amount for r in ctx["cost_rows"]} == {1000, 800}
     assert ctx["suppliers"][sup.id].name == "供应商A"
     assert ctx["users"][admin.id].username == "admin"
+    # 金额汇总：收款净额（含退款冲减）2800，成本 1000+800
+    assert ctx["payments_total"] == 2800
+    assert ctx["costs_total"] == 1800
 
 
 def test_detail_isolates_other_customers(db, admin):
@@ -101,3 +104,35 @@ def test_detail_isolates_other_customers(db, admin):
 
     assert [p.amount for p in ctx["payments"]] == [100]
     assert ctx["cost_rows"] == []
+    assert ctx["payments_total"] == 100
+    assert ctx["costs_total"] == 0
+
+
+def _render_body(resp) -> str:
+    """取 TemplateResponse 渲染后的 HTML（Starlette 在构造时已渲染到 .body）。"""
+    body = resp.body
+    return body.decode("utf-8") if isinstance(body, (bytes, bytearray)) else str(body)
+
+
+def test_detail_html_renders_head_sum(db, admin):
+    """模板渲染：两个 tab 的标题行里有合计（class=head-sum，数字加粗）。"""
+    cust = _customer(db, admin)
+    c1 = _contract(db, cust, "ONE202610010001")
+    db.add(Payment(contract_id=c1.id, amount=2800, paid_at="2026-10-03"))
+    db.add(ContractCost(contract_id=c1.id, category="材料成本", amount=1800, spent_at="2026-10-05"))
+    db.flush()
+
+    html_pay = _render_body(
+        customer_detail(_request(admin), customer_id=cust.id, tab="payments", db=db, user=admin)
+    )
+    assert 'class="head-sum"' in html_pay
+    assert "合计" in html_pay
+    assert "2,800.00" in html_pay
+    assert "收款明细" in html_pay
+
+    html_cost = _render_body(
+        customer_detail(_request(admin), customer_id=cust.id, tab="costs", db=db, user=admin)
+    )
+    assert 'class="head-sum"' in html_cost
+    assert "1,800.00" in html_cost
+    assert "成本明细" in html_cost
