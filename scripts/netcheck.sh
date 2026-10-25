@@ -151,18 +151,30 @@ fi
 TLS_BLOCKED=0
 if [ -n "${gh_ip:-}" ] && tcp_open "$gh_ip" && ! tls_ok "$gh_ip" "$GH"; then TLS_BLOCKED=1; fi
 
-if [ "$TLS_BLOCKED" -eq 1 ]; then
-  printf '  \033[31m【问题】出口层：TCP 能连，TLS 握手被中断（SNI/IP 级阻断）\033[0m\n'
-  echo "  → 真实 IP 直连也握不上手 → 流量没走代理，被墙了"
+GH_OK=0;     [ "${HTTPS_CODE[$GH]}" = "200" ]  && GH_OK=1
+DOCKER_OK=0; [ "${HTTPS_CODE[$REG]}" = "200" ] || [ "${HTTPS_CODE[$REG]}" = "401" ] || [ "${HTTPS_CODE[$AUTH]}" = "200" ] && DOCKER_OK=1
+
+# 分层报问题
+if [ "$GH_OK" -eq 0 ]; then
+  if [ "$TLS_BLOCKED" -eq 1 ]; then
+    printf '  \033[31m【问题】出口层：TCP 能连，TLS 握手被中断（SNI/IP 级阻断）\033[0m\n'
+    echo "  → 真实 IP 直连也握不上手 → 流量没走代理，被墙了"
+  elif [ "$FAKE_CNT" -gt 0 ] && [ -z "$TUN_ROUTE" ]; then
+    printf '  \033[31m【问题】DNS 层：解析成 fake-ip（198.18/198.19），但没有 TUN 接口/路由\033[0m\n'
+    echo "  → 代理只接管了 DNS，没接管流量（TUN 未建）"
+    echo "  → 检查代理程序是否启动（TUN 接口 + 198.18 路由 + 进程三者要同时在）"
+    echo "  → 或把 DNS 改回真实 DNS（223.5.5.5 / 119.29.29.29）"
+  else
+    printf '  \033[31m【问题】出口层不通（DNS 正常，但 HTTPS 全部失败）\033[0m\n'
+    echo "  → 查上游网络/网关（当前默认路由：${DEF:-未知}）"
+  fi
+else
+  printf '  \033[32mGitHub 可访问\033[0m（DNS 虽是 fake-ip，但转发已生效——代理工作在网关/透明模式，无需 TUN）\n'
 fi
-if [ "$FAKE_CNT" -gt 0 ] && [ -z "$TUN_ROUTE" ]; then
-  printf '  \033[31m【问题】DNS 层：解析成 fake-ip（198.18/198.19），但没有 TUN 接口/路由\033[0m\n'
-  echo "  → 代理只接管了 DNS，没接管流量（TUN 未建）"
-  echo "  → 检查代理程序是否启动（TUN 接口 + 198.18 路由 + 进程三者要同时在）"
-  echo "  → 或把 DNS 改回真实 DNS（223.5.5.5 / 119.29.29.29）"
-fi
-if [ "$TLS_BLOCKED" -eq 0 ] && [ "$FAKE_CNT" -eq 0 ]; then
-  printf '  \033[31m【问题】出口层不通（DNS/TUN 看起来正常，但 HTTPS 全部失败）\033[0m\n'
-  echo "  → 查上游网络/网关（当前默认路由：${DEF:-未知}）"
+
+if [ "$DOCKER_OK" -eq 0 ]; then
+  printf '  \033[31m【问题】Docker Hub 不可达\033[0m（registry-1.docker.io / auth.docker.io）\n'
+  echo "  → 不影响 git 推送；但本地 docker push / docker login 会失败"
+  echo "  → GitHub Actions 上的构建不受影响（跑在 GitHub 服务器）"
 fi
 exit 1
