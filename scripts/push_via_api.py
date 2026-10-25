@@ -1,14 +1,15 @@
-"""用 GitHub Git Data API 推送提交与 tag（当 github.com 的 git 端点不可用时的兜底）。
+"""用 GitHub Git Data API 推送提交与 tag（github.com 的 git 端点不可用时的兜底）。
 
-背景：沙箱/家庭网络到 github.com:443 会阶段性中断，但 api.github.com 通常仍可达。
-本脚本把本地已有 commit 的内容通过 REST API 重建到远端，sha 与本地保持一致，
-最后更新 refs/heads/main 并创建 tag refs（创建 ref 同样会触发 Actions 的 push 事件）。
+背景：本机到 github.com:443 会阶段性 TLS 中断，但 api.github.com 通常仍可达。
+本脚本把「远端 main → 本地 HEAD」之间的所有 commit 通过 REST API 重建到远端
+（tree/message/author/committer 都照搬，正常情况下重建出的 sha 与本地完全一致），
+最后更新 refs/heads/main，并为链上的本地 tag 创建 refs。
 
 用法：
     GH_TOKEN=xxx python3 scripts/push_via_api.py
     # 或把 GH_TOKEN 写在工作区 .env，脚本会自动读取
 
-幂等：远端 main 已是最终提交时跳过 commit 构建；tag 已存在时跳过（HTTP 422）。
+幂等：远端 main 已是本地 HEAD 时跳过；tag 已存在（422）跳过。
 """
 from __future__ import annotations
 
@@ -26,36 +27,23 @@ API = "https://api.github.com/repos/" + REPO
 CWD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKSPACE = os.path.dirname(os.path.dirname(CWD))  # agents/<ID>
 
-# 需要发布的提交链（从远端当前 head 开始，按顺序）
-BASE = "67fd2f502093032af5c0d67527cd10b6fe9ff0ef"
-CHAIN = [
-    "1ebc486d4e5e1d68279414d1713627dfee7430e0",  # v1.4.3
-    "bc7181c3109325408a0d1274bd9ce5a25132bca6",  # v1.4.4
-    "3e5360faa79a4bef50a6108254ee4e21f0a5eb36",  # v1.4.5
-]
-TAGS = {
-    "v1.4.3": CHAIN[0],
-    "v1.4.4": CHAIN[1],
-    "v1.4.5": CHAIN[2],
-}
-
 
 def load_token() -> str:
     tok = os.environ.get("GH_TOKEN")
     if tok:
         return tok.strip()
-    env_path = os.path.join(WORKSPACE, ".env")
-    if os.path.exists(env_path):
-        for line in open(env_path, encoding="utf-8"):
-            if line.startswith("GH_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    for p in (os.path.join(WORKSPACE, ".env"), os.path.join(WORKSPACE, ".octop", ".env")):
+        if os.path.exists(p):
+            for line in open(p, encoding="utf-8"):
+                if line.startswith("GH_TOKEN="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
     raise SystemExit("缺少 GH_TOKEN（环境变量或工作区 .env）")
 
 
 TOKEN = load_token()
 
 
-def api(method: str, path: str, data=None, tries: int = 4):
+def api(method: str, path: str, data=None, tries: int = 6):
     body = json.dumps(data).encode("utf-8") if data is not None else None
     last: Exception | None = None
     for attempt in range(tries):
@@ -75,7 +63,7 @@ def api(method: str, path: str, data=None, tries: int = 4):
         except Exception as e:  # 网络抖动重试
             last = e
             print("retry %d/%d: %s" % (attempt + 1, tries, type(e).__name__), file=sys.stderr)
-            time.sleep(4)
+            time.sleep(5)
     raise last  # type: ignore[misc]
 
 
@@ -84,22 +72,42 @@ def git(*args: str, binary: bool = False):
     return out if binary else out.decode("utf-8")
 
 
-def main() -> int:
-    final = CHAIN[-1]
+def build_plan():
+    """返回 (remote_sha, chain, tags{name: local_sha})"""
     remote = api("GET", "/git/ref/heads/main")["object"]["sha"]
-    print("remote main =", remote)
+    head = git("rev-parse", "HEAD").strip()
+    print("remote main =", remote[:8], " local HEAD =", head[:8])
 
-    chain: list[str] = []
-    if remote == final:
-        print("main 已在最终提交，跳过 commit 构建")
-    elif remote == BASE:
-        chain = CHAIN
-    else:
-        print("远端 main 处于未知状态（%s），中止" % remote, file=sys.stderr)
-        return 2
+    if remote == head:
+        return remote, [], {}
 
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", remote, head], cwd=CWD)
+    if r.returncode != 0:
+        raise SystemExit("远端 main 与本地 HEAD 分叉，中止（需要人工 rebase）")
+
+    chain = git("rev-list", "--reverse", f"{remote}..{head}").split()
+    tags: dict[str, str] = {}
+    for line in git("for-each-ref", "--format=%(refname:short) %(objectname)", "refs/tags").splitlines():
+        name, _, sha = line.partition(" ")
+        if sha in chain:
+            tags[name] = sha
+    print("chain:", [c[:8] for c in chain], "tags:", list(tags))
+    return remote, chain, tags
+
+
+def main() -> int:
+    _, chain, tags = build_plan()
+
+    if not chain:
+        # 只补 tag
+        created = create_tags(tags)
+        print("DONE" if created or not tags else "DONE")
+        return 0
+
+    remote = api("GET", "/git/ref/heads/main")["object"]["sha"]
     parent = remote
     tree_sha = api("GET", "/git/commits/" + remote)["tree"]["sha"]
+    sha_map: dict[str, str] = {}
 
     for full in chain:
         diff = git("diff-tree", "--no-commit-id", "--name-status", "-r", "-z", parent + ".." + full, binary=True)
@@ -151,25 +159,35 @@ def main() -> int:
         })
         same = "SAME" if new_commit["sha"] == full else "DIFF"
         print("commit", full[:8], "->", new_commit["sha"][:8], same)
+        sha_map[full] = new_commit["sha"]
         parent = new_commit["sha"]
         tree_sha = new_tree["sha"]
 
     if parent != remote:
-        api("PATCH", "/git/ref/heads/main", {"sha": parent, "force": False})
-        print("main ->", parent)
+        api("PATCH", "/git/refs/heads/main", {"sha": parent, "force": False})
+        print("main ->", parent[:8])
 
-    for name, sha in TAGS.items():
+    # tag 指向重建后的 sha
+    mapped = {name: sha_map.get(sha, sha) for name, sha in tags.items()}
+    create_tags(mapped)
+    print("DONE")
+    return 0
+
+
+def create_tags(tags: dict[str, str]) -> bool:
+    any_ok = False
+    for name, sha in tags.items():
         try:
             r = api("POST", "/git/refs", {"ref": "refs/tags/" + name, "sha": sha})
             print("tag", name, "created ->", r["object"]["sha"][:8])
+            any_ok = True
         except urllib.error.HTTPError as e:
             if e.code == 422:
                 print("tag", name, "已存在，跳过")
+                any_ok = True
             else:
                 raise
-
-    print("DONE")
-    return 0
+    return any_ok
 
 
 if __name__ == "__main__":
