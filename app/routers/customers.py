@@ -13,8 +13,10 @@ from ..models import (
     Contact,
     Customer,
     CustomerShare,
+    Payment,
     Project,
     Room,
+    Supplier,
     User,
     encode_products,
     now_iso,
@@ -234,9 +236,31 @@ def customer_detail(
         s = finance_svc.contract_summary(db, c)
         plan_rows.append((c, s, cost_svc.profit_summary(db, c) if show_cost else None))
 
+    # 收款明细 / 成本明细：按该客户名下所有合同归集
+    contract_ids = [c.id for c in contracts]
+    payments: list[Payment] = []
+    payment_photos: dict[int, list] = {}
+    cost_rows: list = []
+    cost_photos: dict[int, list] = {}
+    suppliers: dict[int, Supplier] = {}
+    if has_perm(user, "payment:view") and contract_ids:
+        payments = list(
+            db.scalars(
+                select(Payment)
+                .where(Payment.contract_id.in_(contract_ids))
+                .order_by(Payment.paid_at.desc(), Payment.id.desc())
+            ).all()
+        )
+        payment_photos = photo_svc.photos_by_payment(db, [p.id for p in payments])
+    if has_perm(user, "cost:view") and contract_ids:
+        cost_rows = cost_svc.query_costs(db, contract_ids=contract_ids)
+        cost_photos = photo_svc.photos_by_cost(db, [r.id for r in cost_rows])
+        suppliers = {s.id: s for s in db.scalars(select(Supplier)).all()}
+
     assignees = list(db.scalars(select(User).where(User.is_active == 1)).all())
     shares = list(db.scalars(select(CustomerShare).where(CustomerShare.customer_id == customer.id)).all())
-    share_users = {u.id: u for u in db.scalars(select(User)).all()}
+    all_users = db.scalars(select(User)).all()
+    share_users = {u.id: u for u in all_users}
     return render(
         request,
         "customers/detail.html",
@@ -249,6 +273,12 @@ def customer_detail(
         summary=summary,
         plan_rows=plan_rows,
         show_cost=show_cost,
+        payments=payments,
+        payment_photos=payment_photos,
+        cost_rows=cost_rows,
+        cost_photos=cost_photos,
+        suppliers=suppliers,
+        users=share_users,
         assignees=assignees,
         shares=shares,
         share_users=share_users,

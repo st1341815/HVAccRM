@@ -47,6 +47,8 @@
   <a href="?tab=tasks" class="{{ 'active' if tab == 'tasks' else '' }}">施工工序</a>
   <a href="?tab=contacts" class="{{ 'active' if tab == 'contacts' else '' }}">联系人</a>
   {% if can('contract:view') %}<a href="?tab=finance" class="{{ 'active' if tab == 'finance' else '' }}">合同与收款</a>{% endif %}
+  {% if can('payment:view') %}<a href="?tab=payments" class="{{ 'active' if tab == 'payments' else '' }}">收款明细</a>{% endif %}
+  {% if can('cost:view') %}<a href="?tab=costs" class="{{ 'active' if tab == 'costs' else '' }}">成本明细</a>{% endif %}
   <a href="/photos/album/{{ customer.id }}">现场照片</a>
   <a href="?tab=share" class="{{ 'active' if tab == 'share' else '' }}">共享设置</a>
 </nav>
@@ -186,6 +188,68 @@
     </tbody>
   </table>
   {% else %}<p class="muted">还没有合同。</p>{% endif %}
+</section>
+
+{% elif tab == 'payments' %}
+<section class="card">
+  <h2>收款明细 <span class="muted small">共 {{ payments|length }} 笔</span></h2>
+  {% if can('payment:edit') %}<div class="actions"><a class="btn" href="/payments/new">＋ 登记收款</a></div>{% endif %}
+  {% if payments %}
+  <table class="tight">
+    <thead><tr><th>收款日期</th><th>金额</th><th>合同</th><th>方式</th><th>凭证号</th><th>收款人</th><th>付款截图</th><th>备注</th><th></th></tr></thead>
+    <tbody>
+    {% for p in payments %}
+      <tr class="{{ 'row-alert' if p.amount < 0 else '' }}">
+        <td class="nowrap">{{ p.paid_at }}</td>
+        <td class="{{ 'red' if p.amount < 0 else '' }}"><strong>{{ p.amount|money }}</strong></td>
+        <td>{% set c = contracts_map.get(p.contract_id) %}{% if c %}<a href="/contracts/{{ c.id }}">{{ c.no }}</a>{% else %}-{% endif %}</td>
+        <td class="nowrap">{{ p.method or '-' }}</td>
+        <td class="nowrap">{{ p.voucher_no or '-' }}</td>
+        <td class="nowrap">{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
+        <td>
+          {% set phs = payment_photos.get(p.id, []) %}
+          {% for ph in phs[:3] %}<a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>{% endfor %}
+          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {% if not phs %}<span class="muted small">—</span>{% endif %}
+        </td>
+        <td>{{ p.remark or '-' }}</td>
+        <td class="nowrap">{% if can('payment:edit') %}<a class="btn ghost" href="/payments/{{ p.id }}/edit">修改</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">该客户还没有收款记录。</p>{% endif %}
+</section>
+
+{% elif tab == 'costs' %}
+<section class="card">
+  <h2>成本明细 <span class="muted small">共 {{ cost_rows|length }} 条</span></h2>
+  {% if can('cost:edit') %}<div class="actions"><a class="btn" href="/costs/new">＋ 登记费用</a></div>{% endif %}
+  {% if cost_rows %}
+  <table class="tight">
+    <thead><tr><th>日期</th><th>合同</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>附图</th><th></th></tr></thead>
+    <tbody>
+    {% for r in cost_rows %}
+      <tr>
+        <td class="nowrap">{{ r.spent_at or '-' }}</td>
+        <td>{% set c = contracts_map.get(r.contract_id) %}{% if c %}<a href="/contracts/{{ c.id }}">{{ c.no }}</a>{% else %}-{% endif %}</td>
+        <td>{{ r.category }}</td>
+        <td><strong>{{ r.amount|money }}</strong></td>
+        <td>{{ suppliers[r.supplier_id].name if r.supplier_id and suppliers.get(r.supplier_id) else '-' }}</td>
+        <td>{{ users[r.installer_id].display_name if r.installer_id and users.get(r.installer_id) else '-' }}</td>
+        <td class="break">{{ r.remark or '-' }}</td>
+        <td>
+          {% set phs = cost_photos.get(r.id, []) %}
+          {% for ph in phs[:3] %}<a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>{% endfor %}
+          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {% if not phs %}<span class="muted small">—</span>{% endif %}
+        </td>
+        <td class="nowrap">{% if can('cost:edit') %}<a class="btn ghost" href="/costs/{{ r.id }}/edit">修改</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">该客户还没有成本记录。</p>{% endif %}
 </section>
 
 {% else %}
