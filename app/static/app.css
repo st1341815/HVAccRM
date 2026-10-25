@@ -140,6 +140,14 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 /* 页头操作区里的 tab 导航：去掉自带的下边距，避免与同排按钮垂直错位 */
 .page-head .actions .tabs { margin-bottom: 0; }
 
+/* 卡片内标题行（如客户详情的「收款明细/成本明细」）：标题在左，操作按钮与金额汇总推到最右 */
+.card-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .7rem; }
+.card-head h2 { margin: 0; }
+.card-head .actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; flex-wrap: wrap; }
+/* 金额汇总：数字加粗、稍大于正文，靠近最右侧 */
+.head-sum { font-size: .88rem; color: var(--muted); white-space: nowrap; }
+.head-sum strong { font-size: 1.08rem; font-weight: 700; color: var(--ink); }
+
 /* 详情页顶部信息条 */
 .meta {
   display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; align-items: center;

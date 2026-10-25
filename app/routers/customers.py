@@ -256,6 +256,9 @@ def customer_detail(
         cost_rows = cost_svc.query_costs(db, contract_ids=contract_ids)
         cost_photos = photo_svc.photos_by_cost(db, [r.id for r in cost_rows])
         suppliers = {s.id: s for s in db.scalars(select(Supplier)).all()}
+    # 金额汇总（收款含退款冲减，成本为绝对值合计）
+    payments_total = round(sum(p.amount or 0 for p in payments), 2)
+    costs_total = round(sum(r.amount or 0 for r in cost_rows), 2)
 
     assignees = list(db.scalars(select(User).where(User.is_active == 1)).all())
     shares = list(db.scalars(select(CustomerShare).where(CustomerShare.customer_id == customer.id)).all())
@@ -275,8 +278,10 @@ def customer_detail(
         show_cost=show_cost,
         payments=payments,
         payment_photos=payment_photos,
+        payments_total=payments_total,
         cost_rows=cost_rows,
         cost_photos=cost_photos,
+        costs_total=costs_total,
         suppliers=suppliers,
         users=share_users,
         assignees=assignees,
