@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 访问地址 | `http://192.168.11.8:8090` |
+| 访问地址 | 外网 `https://crm.2ii.cn:8443` · 局域网 `http://192.168.11.8:8090` |
 | 容器名 / 镜像 | `crm` / `crm:local`（177 MB，多阶段构建，非 root） |
 | 挂载 | `/vol1/1000/Docker/Hvaccrm/data → /data`、`/vol1/1000/Docker/Hvaccrm/config → /config:ro` |
 | 环境变量 | `TZ=Asia/Shanghai`、`APP_SECRET_KEY`、`ADMIN_USER/ADMIN_PASS`、`DB_PATH=/data/crm.db`、`DATA_DIR=/data`、`CONFIG_DIR=/config`、`LOG_LEVEL=INFO` |
