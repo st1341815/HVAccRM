@@ -20,6 +20,7 @@ services:
       - DATA_DIR=/data
       - CONFIG_DIR=/config
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
     volumes:
       - /vol1/1000/Docker/Hvaccrm/data:/data
       - /vol1/1000/Docker/Hvaccrm/config:/config:ro

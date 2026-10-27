@@ -5,18 +5,22 @@
 """
 from __future__ import annotations
 
+import json
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..db import commit_retry, get_db
-from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso
+from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso, today_str
 from ..permissions import has_perm, require
 from ..services import cases as cases_svc
+from ..services import share_stats as stats_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int, return_path
+from ..utils import client_ip, get_or_404, parse_date, parse_int, return_path
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -79,7 +83,7 @@ def list_cases(
             "date_from": date_from,
             "date_to": date_to,
         },
-        base_url=str(request.base_url),
+        base_url=stats_svc.public_base(request),
         can_edit=has_perm(user, "case:edit"),
         now=now_iso(),
     )
@@ -128,7 +132,7 @@ def manage_links(
         request,
         "cases/links.html",
         rows=rows,
-        base_url=str(request.base_url),
+        base_url=stats_svc.public_base(request),
         can_edit=has_perm(user, "case:edit"),
         durations=list(cases_svc.SHARE_DURATIONS.keys()) + [cases_svc.SHARE_UNLIMITED],
         view_limits=list(cases_svc.SHARE_VIEW_LIMITS.keys()) + [cases_svc.SHARE_UNLIMITED],
@@ -306,6 +310,18 @@ def case_image_thumb(
 
 
 # ------------------------------------------------------------ 匿名分享
+def _og_title(case: Case) -> str:
+    site = case.site_label or "施工案例"
+    kind = f"{case.product_type}施工案例" if case.product_type else f"{case.stage}案例"
+    return f"{kind} · {site}"
+
+
+def _og_desc(case: Case) -> str:
+    bits = [b for b in (case.work_date, case.stage, case.product_type) if b]
+    head = " · ".join(bits)
+    return (head + " 现场施工实拍，仅作效果展示参考。") if head else "现场施工实拍，仅作效果展示参考。"
+
+
 @router.get("/share/{token}")
 def share_case(request: Request, token: str, db: Session = Depends(get_db)):
     case = db.scalars(select(Case).where(Case.share_token == token)).first()
@@ -314,15 +330,110 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
     valid, reason = cases_svc.share_state(case)
     if not valid:
         return render(request, "cases/share_expired.html", reason=reason)
-    # 有效访问：计数 +1
+
+    images = list(
+        db.scalars(
+            select(CaseImage)
+            .where(CaseImage.case_id == case.id)
+            .order_by(CaseImage.sort_order, CaseImage.id)
+        ).all()
+    )
+    # 有效访问：计数 +1，并留一条匿名访问明细（用于统计）
     case.share_views = (case.share_views or 0) + 1
+    visit, need_cookie = stats_svc.record_visit(db, case, request, len(images))
     commit_retry(db)
-    return render(
+
+    cover = stats_svc.ensure_cover(case, images[0] if images else None)
+    base = stats_svc.public_base(request)
+    response = render(
         request,
         "cases/share.html",
         case=case,
-        images=list(db.scalars(select(CaseImage).where(CaseImage.case_id == case.id).order_by(CaseImage.sort_order, CaseImage.id)).all()),
+        images=images,
+        visit_id=visit.id,
+        share_url=stats_svc.share_url(request, token),
+        qr_url=stats_svc.share_url(request, token, "qr"),
+        og_title=_og_title(case),
+        og_desc=_og_desc(case),
+        og_image=(f"{base}cases/share/{token}/cover.jpg?v={len(images)}" if cover else None),
     )
+    if need_cookie:
+        response.set_cookie(
+            stats_svc.VISITOR_COOKIE,
+            visit.visitor_id or "",
+            max_age=stats_svc.VISITOR_MAX_AGE,
+            path=stats_svc.VISITOR_COOKIE_PATH,
+            httponly=True,
+            samesite="lax",
+        )
+    return response
+
+
+@router.post("/share/{token}/ping")
+async def share_ping(request: Request, token: str, db: Session = Depends(get_db)):
+    """分享页埋点：回填停留时长与图片曝光。始终 204，不暴露链接是否有效。"""
+    case = db.scalars(select(Case).where(Case.share_token == token)).first()
+    if case is None:
+        return Response(status_code=204)
+    try:
+        payload = json.loads((await request.body()) or b"{}")
+    except (ValueError, TypeError):
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    try:
+        visit_id = int(payload.get("visit") or 0)
+    except (TypeError, ValueError):
+        visit_id = 0
+    if visit_id:
+        stats_svc.apply_beacon(
+            db,
+            case.id,
+            visit_id,
+            payload.get("dwell"),
+            payload.get("imgs"),
+            payload.get("total"),
+        )
+        commit_retry(db)
+    return Response(status_code=204)
+
+
+@router.get("/share/{token}/cover.jpg")
+def share_cover(token: str, db: Session = Depends(get_db)):
+    """分享封面图（1200×630 JPEG，按第一张展示图生成并缓存）——供社交平台抓取。"""
+    case = db.scalars(select(Case).where(Case.share_token == token)).first()
+    if case is None:
+        return JSONResponse({"detail": "分享链接无效"}, status_code=404)
+    valid, _reason = cases_svc.share_state(case)
+    if not valid:
+        return JSONResponse({"detail": "分享已失效"}, status_code=410)
+    first = db.scalars(
+        select(CaseImage)
+        .where(CaseImage.case_id == case.id)
+        .order_by(CaseImage.sort_order, CaseImage.id)
+        .limit(1)
+    ).first()
+    path = stats_svc.ensure_cover(case, first)
+    if path is None or not path.exists():
+        return JSONResponse({"detail": "无封面图"}, status_code=404)
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@router.get("/share/{token}/qrcode.svg")
+def share_qrcode(request: Request, token: str, db: Session = Depends(get_db)):
+    """分享二维码（SVG）：内容为带 ?src=qr 的分享页地址，便于扫码来源统计。"""
+    case = db.scalars(select(Case).where(Case.share_token == token)).first()
+    if case is None:
+        return JSONResponse({"detail": "分享链接无效"}, status_code=404)
+    valid, _reason = cases_svc.share_state(case)
+    if not valid:
+        return JSONResponse({"detail": "分享已失效"}, status_code=410)
+    svg = stats_svc.qrcode_svg(stats_svc.share_url(request, token, "qr"))
+    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @router.get("/share/{token}/image/{image_id}")
@@ -354,3 +465,65 @@ def _share_image_response(db: Session, token: str, image_id: int, thumb: bool = 
     if thumb and str(path).endswith(".webp"):
         return FileResponse(path, media_type="image/webp")
     return FileResponse(path)
+
+
+# ------------------------------------------------------------ 分享统计
+@router.get("/stats")
+def share_stats_page(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    q: str = "",
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+):
+    """分享统计：谁在什么时候打开了哪条案例、看了多久、看了几张图。
+
+    数据只来自匿名访问明细（share_visits），不含任何客户信息。
+    """
+    today = today_str()
+    d_from = parse_date(date_from) or (date.today() - timedelta(days=29)).isoformat()
+    d_to = parse_date(date_to) or today
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
+
+    # 关键词先圈定案例范围：None = 不筛选；[] = 无匹配（必须返回空，不能退化成"全部"）
+    case_ids: list[int] | None = None
+    kw = (q or "").strip()
+    if kw:
+        like = f"%{kw}%"
+        case_ids = list(db.scalars(select(Case.id).where(Case.room_label.like(like))).all())
+
+    agg = stats_svc.case_rows(db, case_ids, d_from, d_to)
+    cases_map: dict[int, Case] = {}
+    if agg:
+        cases_map = {
+            c.id: c
+            for c in db.scalars(select(Case).where(Case.id.in_(list(agg.keys())))).all()
+        }
+    rows = []
+    for cid, data in agg.items():
+        case = cases_map.get(cid)
+        if case is None:
+            continue
+        rows.append({"case": case, "wechat_pct": (data["wechat"] / data["opens"] * 100) if data["opens"] else 0.0, **data})
+    rows.sort(key=lambda r: (-r["opens"], r["case"].work_date or "", r["case"].id))
+
+    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    trend = stats_svc.daily_trend(db, days, case_ids)
+    trend_max = max([n for _, n in trend] + [1])
+
+    total = stats_svc.totals(db, case_ids, d_from, d_to)
+    total["wechat_pct"] = (total["wechat"] / total["opens"] * 100) if total["opens"] else 0.0
+    total["today"] = stats_svc.today_opens(db, today, case_ids)
+
+    return render(
+        request,
+        "cases/stats.html",
+        rows=rows,
+        trend=[{"day": d, "opens": n, "pct": round(n / trend_max * 100)} for d, n in trend],
+        total=total,
+        recent=stats_svc.recent_visits(db, case_ids, 50),
+        filters={"date_from": d_from, "date_to": d_to, "q": kw},
+        truncated=len(rows) >= 200,
+    )

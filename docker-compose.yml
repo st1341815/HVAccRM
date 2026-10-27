@@ -17,6 +17,7 @@ services:
       - DATA_DIR=/data
       - CONFIG_DIR=/config
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
     volumes:
       - ./data:/data
       - ./config:/config:ro
