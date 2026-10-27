@@ -1,6 +1,7 @@
 """模板渲染与 Flash 提示。"""
 from __future__ import annotations
 
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +12,22 @@ from fastapi.templating import Jinja2Templates
 from . import __version__, models, permissions, regions
 from .config import get_settings
 from .models import today_str
-from .security import make_flash, loads
+from .security import loads, make_csrf_token, make_flash, verify_csrf
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# 当前请求是否为 https（由 main.py 的中间件在每个请求开始时写入），
+# 这样 Cookie 的 Secure 标志可以在不改 50 处 `set_cookie` 调用签名的前提下统一生效。
+_SECURE_CTX: ContextVar[bool] = ContextVar("crm_secure_ctx", default=False)
+
+
+def set_request_secure(flag: bool) -> None:
+    _SECURE_CTX.set(bool(flag))
+
+
+def cookie_secure() -> bool:
+    return get_settings().cookie_secure_flag(_SECURE_CTX.get())
 
 
 def money(v: Any) -> str:
@@ -74,6 +87,21 @@ def flash_cookie_name() -> str:
     return get_settings().session_cookie + "_flash"
 
 
+def csrf_cookie_name() -> str:
+    return get_settings().session_cookie + "_csrf"
+
+
+def csrf_token_for(request: Request) -> str:
+    """当前请求可用的 CSRF token：Cookie 里已有有效值就复用，否则现生成一个。
+
+    复用而不是每次刷新新值，是为了让「同时打开多个标签页/多张表单」都能提交成功。
+    """
+    raw = request.cookies.get(csrf_cookie_name())
+    if raw and verify_csrf(raw, raw):
+        return raw
+    return make_csrf_token()
+
+
 def read_flash(request: Request) -> dict[str, str] | None:
     data = loads(request.cookies.get(flash_cookie_name()))
     if not data:
@@ -83,12 +111,14 @@ def read_flash(request: Request) -> dict[str, str] | None:
 
 def render(request: Request, name: str, status_code: int = 200, **ctx: Any):
     user = getattr(request.state, "user", None)
+    csrf = csrf_token_for(request)
     ctx.update(
         {
             "user": user,
             "settings": get_settings(),
             "version": __version__,
             "today": today_str(),
+            "csrf_token": csrf,
             "can": lambda perm: permissions.has_perm(user, perm),
             "can_amount": permissions.can_see_amount(user),
             "perms": sorted(permissions.perms_for(user)),
@@ -101,6 +131,16 @@ def render(request: Request, name: str, status_code: int = 200, **ctx: Any):
     response = templates.TemplateResponse(request, name, ctx, status_code=status_code)
     if request.cookies.get(flash_cookie_name()):
         response.delete_cookie(flash_cookie_name(), path="/")
+    if request.cookies.get(csrf_cookie_name()) != csrf:
+        response.set_cookie(
+            csrf_cookie_name(),
+            csrf,
+            max_age=get_settings().session_max_age,
+            httponly=True,
+            samesite="lax",
+            secure=cookie_secure(),
+            path="/",
+        )
     return response
 
 
@@ -113,6 +153,7 @@ def redirect(url: str, message: str | None = None, level: str = "ok") -> Redirec
             max_age=60,
             httponly=True,
             samesite="lax",
+            secure=cookie_secure(),
             path="/",
         )
     return response

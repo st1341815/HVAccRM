@@ -29,7 +29,9 @@
     {% for s in stages %}
       <tr>
         <td>
-          <form id="stage-edit-{{ s.id }}" method="post" action="/admin/stages/{{ s.id }}/update" hidden></form>
+          <form id="stage-edit-{{ s.id }}" method="post" action="/admin/stages/{{ s.id }}/update" hidden>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          </form>
           <input form="stage-edit-{{ s.id }}" name="sort_order" value="{{ s.sort_order }}" inputmode="numeric" style="width:4.5rem">
         </td>
         <td><strong>{{ s.name }}</strong></td>
@@ -48,6 +50,7 @@
           <div style="display:flex; gap:.4rem; align-items:center">
             <button form="stage-edit-{{ s.id }}">保存</button>
             <form method="post" action="/admin/stages/{{ s.id }}/delete" class="inline" onsubmit="return confirm('删除工序节点「{{ s.name }}」？已使用该节点的客户任务不会被删除。');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="ghost danger">删除</button>
             </form>
           </div>
@@ -62,6 +65,7 @@
 <section class="card">
   <h2>新增工序节点</h2>
   <form method="post" action="/admin/stages/new" class="filterbar">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input name="name" placeholder="节点名称" required>
     <input name="sort_order" placeholder="顺序" inputmode="numeric">
     <input name="output_doc" placeholder="产出物说明">

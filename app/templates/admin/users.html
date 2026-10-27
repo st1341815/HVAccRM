@@ -28,6 +28,7 @@
         <td>{{ u.last_login_at or '-' }}</td>
         <td>
           <form method="post" action="/admin/users/{{ u.id }}/update" class="stack tight-stack">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input name="full_name" value="{{ u.full_name or '' }}" placeholder="姓名（表单里优先显示）">
             <select name="role">
               {% for key, label in roles.items() %}<option value="{{ key }}" {{ 'selected' if u.role == key else '' }}>{{ label }}</option>{% endfor %}
@@ -41,6 +42,7 @@
         </td>
         <td>
           <form method="post" action="/admin/users/{{ u.id }}/reset-password" class="stack tight-stack" onsubmit="return confirm('重置该用户密码？其会话将立即失效。');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input name="new_password" placeholder="新密码（≥8位含字母数字）" required>
             <button class="ghost">重置</button>
           </form>
@@ -55,6 +57,7 @@
 <section class="card">
   <h2>新增用户</h2>
   <form method="post" action="/admin/users/new" class="filterbar">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input name="full_name" placeholder="姓名（如 张三，表单里显示这个）">
     <input name="username" placeholder="登录账号（如 zhangsan）" required>
     <input name="password" placeholder="初始密码（≥8位，含字母数字）" required>

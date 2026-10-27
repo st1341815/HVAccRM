@@ -125,3 +125,27 @@ def make_session(user_id: int, session_version: int, must_change: bool = False) 
 
 def make_flash(level: str, message: str) -> str:
     return dumps({"lvl": level, "msg": message, "exp": time.time() + 60})
+
+
+# ------------------------------------------------------------------ CSRF
+def _csrf_sig(nonce: str) -> str:
+    key = get_settings().app_secret_key.encode()
+    return hmac.new(key, f"csrf|{nonce}".encode(), hashlib.sha256).hexdigest()
+
+
+def make_csrf_token() -> str:
+    """生成 `<nonce>.<hmac>` 形式的 CSRF token（自签，不依赖第三方库）。"""
+    nonce = secrets.token_urlsafe(24)
+    return f"{nonce}.{_csrf_sig(nonce)}"
+
+
+def verify_csrf(cookie_value: str | None, submitted: str | None) -> bool:
+    """双提交校验：表单字段必须等于 Cookie 值，且 Cookie 自身的签名必须有效。"""
+    if not cookie_value or not submitted:
+        return False
+    if not hmac.compare_digest(cookie_value, submitted):
+        return False
+    nonce, _, sig = cookie_value.partition(".")
+    if not nonce or not sig:
+        return False
+    return hmac.compare_digest(_csrf_sig(nonce), sig)

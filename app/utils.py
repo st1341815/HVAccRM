@@ -60,6 +60,11 @@ def _to_local_path(value: str | None) -> str | None:
         v = parsed.path or ""
         if parsed.query:
             v = f"{v}?{parsed.query}"
+    # 反斜杠在浏览器的 URL 解析里等价于 "/"（WHATWG URL 规范），
+    # 所以 `/\evil.com` 会被解析成 `//evil.com` → 协议相对外跳；
+    # 控制字符（\r\n\t\0）可以拼接出畸形 Location 头。两者一律拒收。
+    if "\\" in v or any(ord(ch) < 0x20 for ch in v):
+        return None
     if v.startswith("/") and not v.startswith("//"):
         return v
     return None
@@ -71,3 +76,12 @@ def return_path(back: str | None, referer: str | None, default: str) -> str:
     只接受站内相对路径，避免被构造成外部跳转（开放重定向）。
     """
     return _to_local_path(back) or _to_local_path(referer) or default
+
+
+def safe_next(value: str | None, default: str = "/") -> str:
+    """登录后跳转等「用户可控落点」的净化：只接受站内相对路径。
+
+    必须挡住 `//evil.com`（协议相对 URL）与 `https://evil.com`，
+    所以统一走 `_to_local_path`（它唯一一处判断写对了，别在调用点重复实现）。
+    """
+    return _to_local_path(value) or default

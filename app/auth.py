@@ -1,6 +1,7 @@
 """认证：登录/登出、强制改密、可选 TOTP 二步验证、会话版本失效。"""
 from __future__ import annotations
 
+import ipaddress
 import logging
 import time
 from datetime import datetime
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from .audit import log_action
 from .config import get_settings
+from .csrf import csrf_protect
 from .db import get_db
 from .models import User, now_iso
 from .security import (
@@ -21,10 +23,12 @@ from .security import (
     password_problem,
     totp_now,
     totp_uri,
+    verify_csrf,
     verify_password,
     verify_totp,
 )
-from .templating import redirect, render
+from .templating import cookie_secure, csrf_cookie_name, redirect, render
+from .utils import safe_next
 
 log = logging.getLogger("crm.auth")
 router = APIRouter()
@@ -37,30 +41,60 @@ class NotAuthenticated(Exception):
     """未登录访问受保护页面。"""
 
 
+def _looks_like_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
 def get_client_ip(request: Request) -> str:
+    """取客户端 IP。
+
+    `X-Forwarded-For` 只在**首段是合法 IP** 时才采纳（防伪造垃圾头污染审计与限速键）；
+    真正的防绕过不靠这里，而是靠 `login_max_attempts_account` —— 账号维度锁定与 IP 无关。
+    """
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()
+        first = fwd.split(",")[0].strip()
+        if _looks_like_ip(first):
+            return first
     return request.client.host if request.client else "-"
 
 
-def _locked(key: str) -> int:
+def _lock_keys(ip: str, username: str) -> list[str]:
+    """两个维度：IP+账号（防撞库）、纯账号（防伪造 XFF 绕过）。"""
+    name = username.strip().lower()
+    return [f"{ip}|{name}", f"acct|{name}"]
+
+
+def _locked(key: str, limit: int) -> int:
     s = get_settings()
     now = time.time()
     hits = [t for t in _attempts.get(key, []) if now - t < s.login_lock_seconds]
     _attempts[key] = hits
-    if len(hits) >= s.login_max_attempts:
+    if len(hits) >= limit:
         wait = int(s.login_lock_seconds - (now - hits[0]))
         return max(wait, 1)
     return 0
 
 
-def _record_failure(key: str) -> None:
-    _attempts.setdefault(key, []).append(time.time())
+def _wait_seconds(ip: str, username: str) -> int:
+    s = get_settings()
+    ip_key, acct_key = _lock_keys(ip, username)
+    return max(_locked(ip_key, s.login_max_attempts), _locked(acct_key, s.login_max_attempts_account))
 
 
-def _clear_failures(key: str) -> None:
-    _attempts.pop(key, None)
+def _record_failure(ip: str, username: str) -> None:
+    now = time.time()
+    for key in _lock_keys(ip, username):
+        _attempts.setdefault(key, []).append(now)
+
+
+def _clear_failures(ip: str, username: str) -> None:
+    for key in _lock_keys(ip, username):
+        _attempts.pop(key, None)
 
 
 def load_user(request: Request, db: Session) -> User | None:
@@ -99,6 +133,7 @@ def set_session_cookie(response, user: User) -> None:
         max_age=s.session_max_age,
         httponly=True,
         samesite="lax",
+        secure=cookie_secure(),
         path="/",
     )
 
@@ -110,7 +145,8 @@ def clear_session_cookie(response) -> None:
 @router.get("/login")
 def login_page(request: Request, next: str = "/"):
     if getattr(request.state, "user", None):
-        return RedirectResponse(next or "/", status_code=303)
+        # 已登录再访问 /login：落点同样必须净化，否则 //evil.com 这类会变成开放重定向
+        return RedirectResponse(safe_next(next, "/"), status_code=303)
     return render(request, "login.html", next=next)
 
 
@@ -121,12 +157,21 @@ def login_submit(
     password: str = Form(...),
     totp: str = Form(""),
     next: str = Form("/"),
+    csrf_token: str = Form(""),
     db: Session = Depends(get_db),
 ):
     username = username.strip()
     ip = get_client_ip(request)
-    key = f"{ip}|{username.lower()}"
-    wait = _locked(key)
+    if not verify_csrf(request.cookies.get(csrf_cookie_name()), csrf_token):
+        return render(
+            request,
+            "login.html",
+            status_code=400,
+            next=next,
+            error="页面已过期，请刷新后重新登录",
+            username=username,
+        )
+    wait = _wait_seconds(ip, username)
     if wait:
         return render(
             request,
@@ -138,7 +183,7 @@ def login_submit(
         )
     user = db.scalars(select(User).where(User.username == username)).first()
     if not user or not user.is_active or not verify_password(password, user.password_hash):
-        _record_failure(key)
+        _record_failure(ip, username)
         if user:
             log_action(db, user, "login_failed", "users", user.id, ip=ip, commit=True)
         log.warning("登录失败 user=%s ip=%s", username, ip)
@@ -156,7 +201,7 @@ def login_submit(
                 need_totp=True,
             )
         if not verify_totp(user.totp_secret or "", totp):
-            _record_failure(key)
+            _record_failure(ip, username)
             log_action(db, user, "totp_failed", "users", user.id, ip=ip, commit=True)
             return render(
                 request,
@@ -168,22 +213,22 @@ def login_submit(
                 need_totp=True,
             )
 
-    _clear_failures(key)
+    _clear_failures(ip, username)
     user.last_login_at = now_iso()
     log_action(db, user, "login", "users", user.id, ip=ip, commit=True)
 
     if user.must_change_password:
         target = "/account/password"
     else:
-        target = next if next and next.startswith("/") else "/"
+        target = safe_next(next, "/")
     response = RedirectResponse(target, status_code=303)
     set_session_cookie(response, user)
     return response
 
 
-@router.get("/logout")
 @router.post("/logout")
 def logout(request: Request, db: Session = Depends(get_db)):
+    """登出只接受 POST：GET 会带来「被第三方页面强制登出」和被代理缓存的问题。"""
     user = getattr(request.state, "user", None)
     if user:
         log_action(db, user, "logout", "users", user.id, ip=get_client_ip(request), commit=True)
@@ -212,6 +257,7 @@ def update_profile(
     full_name: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
+    _csrf: None = Depends(csrf_protect),
 ):
     """本人修改姓名（表决不用管理员，改完立刻在各类表单里生效）。"""
     me = fresh_user(db, user)
@@ -233,6 +279,7 @@ def change_password(
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
+    _csrf: None = Depends(csrf_protect),
 ):
     if new_password != confirm_password:
         return render(request, "account.html", status_code=400, error="两次输入的新密码不一致", new_totp_secret=generate_totp_secret() if not user.totp_enabled else None)
@@ -270,6 +317,7 @@ def totp_enable(
     code: str = Form(...),
     db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
+    _csrf: None = Depends(csrf_protect),
 ):
     if not verify_totp(secret, code):
         return render(request, "account.html", status_code=400, error="验证码不正确，请确认手机时间同步后重试", new_totp_secret=secret)
@@ -290,6 +338,7 @@ def totp_disable(
     password: str = Form(...),
     db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
+    _csrf: None = Depends(csrf_protect),
 ):
     if not verify_password(password, user.password_hash):
         return render(request, "account.html", status_code=400, error="密码不正确，无法关闭二步验证", new_totp_secret=None)

@@ -26,6 +26,7 @@
   <div class="kpi"><span class="kpi-num">{{ (media.bytes / 1024 / 1024)|number(2) }} MB</span><span class="kpi-label">媒体占用</span></div>
   <div class="kpi-actions">
     <form method="post" action="/admin/backups/run">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit">立即备份</button>
     </form>
   </div>
@@ -45,6 +46,7 @@
           {% if b.is_zip %}
           <a class="btn ghost" href="/admin/backups/download?name={{ b.name }}">下载</a>
           <form method="post" action="/admin/backups/delete" class="inline" onsubmit="return confirm('删除备份 {{ b.name }}？此操作不可恢复。');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="name" value="{{ b.name }}">
             <button class="btn danger">删除</button>
           </form>
@@ -62,6 +64,7 @@
   <h2>导入备份（恢复数据）</h2>
   <form method="post" action="/admin/backups/import" enctype="multipart/form-data"
         onsubmit="return confirm('导入将【覆盖】当前全部数据（数据库 + 媒体 + 设置），导入后系统会自动重启。确定继续？');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="file" name="file" accept=".zip" required>
     <label class="checkline"><input type="checkbox" name="restore_config" value="1" checked> 同时恢复设置（config/deploy.env）</label>
     <button class="btn danger" type="submit">导入并恢复</button>
@@ -72,6 +75,7 @@
 <section class="card">
   <h2>备份设置</h2>
   <form method="post" action="/admin/backups/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label class="inline-label">保存路径
       <input name="dir" value="{{ cfg.dir }}" placeholder="{{ default_dir }}">
     </label>

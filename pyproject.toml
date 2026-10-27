@@ -1,23 +1,33 @@
 [project]
 name = "onecrm"
-version = "1.6.3"
+version = "1.7.0"
 description = "HVAccRM — 暖通空调客户管理系统，NAS 自托管版"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.115.6",
     "uvicorn==0.34.0",
-    "jinja2==3.1.5",
+    "jinja2==3.1.6",
     "python-multipart==0.0.20",
     "sqlalchemy==2.0.36",
     "alembic==1.14.0",
     "apscheduler==3.11.0",
     "pydantic-settings==2.7.0",
-    "pillow==11.1.0",
-    "pytest==9.1.1",
+    "pillow==11.3.0",
+    "segno==1.6.6",
 ]
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+# 只挑「真错误」类规则，避免历史代码被格式类规则淹没（E501 行长等不在此列）
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+# E402：项目里存在「函数内 import」与条件 import，属既有风格
+ignore = ["E402"]
 
 [tool.pytest.ini_options]
 # pytest 发现 / 运行配置

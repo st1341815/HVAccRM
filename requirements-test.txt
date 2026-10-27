@@ -1,0 +1,4 @@
+# 开发/测试依赖（**不进生产镜像**）
+# 用法：pip install -r requirements.txt -r requirements-test.txt
+pytest==9.1.1
+httpx==0.28.1

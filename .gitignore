@@ -13,3 +13,8 @@ __pycache__/
 dist/
 build/
 *.tar.gz
+
+# 本地联调/测试产生的目录
+.localrun*/
+.pytest-config/
+.pytest-data/

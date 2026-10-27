@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DB_PATH", ":memory:")
+# 让「首启自动生成密钥」写到工作区里而不是 /config（测试不应污染宿主机）
+os.environ.setdefault("CONFIG_DIR", str(ROOT / ".pytest-config"))
+os.environ.setdefault("DATA_DIR", str(ROOT / ".pytest-data"))
 
 import pytest  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
