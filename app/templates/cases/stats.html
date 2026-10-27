@@ -9,8 +9,12 @@
     <a href="/cases/stats" class="active">统计</a>
   </nav>
 </div>
-<p class="muted small">只统计匿名访问（打开次数 / 独立访客 / 停留时长 / 图片曝光），不含任何客户信息。IP 只存单向摘要，不保留原始地址。
-微信在生成链接预览时会先抓一次页面（停留 0、看图 0），这类抓取会算进「打开次数」但不算「有停留的访问」——判断客户是否真的看了，看后一个指标更准。</p>
+<p class="muted small">
+  只统计匿名访问，不含任何客户信息；IP 只存单向摘要，不保留原始地址。<br>
+  <b>有效浏览</b>＝停留 ≥ 3 秒（点开就走、微信生成预览时的抓取都不算）；
+  <b>看完率</b>＝看过 ≥ 80% 图片的次数占比；
+  <b>中位停留</b>只统计有效浏览——停留时长是长尾分布，页面挂着不动也会被算成停留，所以平均值为副、中位数为准。
+</p>
 
 <section class="card">
   <form method="get" action="/cases/stats" class="filterbar">
@@ -25,10 +29,17 @@
 <section class="kpis">
   <div class="kpi"><span class="kpi-num">{{ total.opens }}</span><span class="kpi-label">打开次数</span></div>
   <div class="kpi"><span class="kpi-num">{{ total.uv }}</span><span class="kpi-label">独立访客</span></div>
-  <div class="kpi"><span class="kpi-num">{{ total.effective }}</span><span class="kpi-label">有停留的访问</span></div>
+  <div class="kpi" title="停留 ≥ 3 秒的访问；点开即关与微信预览抓取不计入">
+    <span class="kpi-num">{{ total.effective }}</span><span class="kpi-label">有效浏览</span>
+  </div>
+  <div class="kpi" title="看过 ≥ 80% 图片的次数 / 有图的访问次数">
+    <span class="kpi-num">{{ total.finish_rate|round(0)|int }}%</span><span class="kpi-label">看完率</span>
+  </div>
+  <div class="kpi" title="只统计有效浏览（≥3 秒），避免挂机把平均值拉偏">
+    <span class="kpi-num">{{ total.median_dwell|duration }}</span><span class="kpi-label">中位停留</span>
+    <span class="kpi-sub">均值 {{ total.avg_dwell|duration }}</span>
+  </div>
   <div class="kpi"><span class="kpi-num">{{ total.wechat_pct|round(0)|int }}%</span><span class="kpi-label">微信内打开</span></div>
-  <div class="kpi"><span class="kpi-num">{{ total.avg_dwell|duration }}</span><span class="kpi-label">平均停留</span></div>
-  <div class="kpi"><span class="kpi-num">{{ total.avg_imgs|number(1) }}</span><span class="kpi-label">平均看图（张）</span></div>
   <div class="kpi"><span class="kpi-num">{{ total.today }}</span><span class="kpi-label">今日打开</span></div>
 </section>
 
@@ -52,8 +63,8 @@
     <thead>
       <tr>
         <th>案例</th><th>施工工序</th><th>产品</th>
-        <th class="num">打开</th><th class="num">独立访客</th><th class="num">微信占比</th>
-        <th class="num">平均停留</th><th class="num">平均看图</th><th>最近打开</th><th></th>
+        <th class="num">打开</th><th class="num">独立访客</th><th class="num">有效浏览</th>
+        <th class="num">看完率</th><th class="num">中位停留</th><th>最近打开</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -64,9 +75,9 @@
         <td>{{ r.case.product_type or '-' }}</td>
         <td class="num">{{ r.opens }}</td>
         <td class="num">{{ r.uv }}</td>
-        <td class="num">{{ r.wechat_pct|round(0)|int }}%</td>
-        <td class="num nowrap">{{ r.avg_dwell|duration }}</td>
-        <td class="num">{{ r.avg_imgs|number(1) }}</td>
+        <td class="num">{{ r.effective }}</td>
+        <td class="num">{{ r.finish_rate|round(0)|int }}%</td>
+        <td class="num nowrap">{{ r.median_dwell|duration }}</td>
         <td class="nowrap">{{ r.last_at|short_dt }}</td>
         <td><a class="btn ghost small" href="/cases/share/{{ r.case.share_token }}" target="_blank" rel="noopener">预览</a></td>
       </tr>
@@ -83,11 +94,12 @@
   {% if recent %}
   <table class="tight">
     <thead>
-      <tr><th>时间</th><th>案例</th><th>来源</th><th>设备</th><th class="num">停留</th><th class="num">看图</th></tr>
+      <tr><th>时间</th><th>案例</th><th>来源</th><th>设备</th><th class="num">停留</th><th class="num">看图</th><th class="num">完成度</th></tr>
     </thead>
     <tbody>
     {% for v in recent %}
       {% set visit = v.visit %}
+      {% set pct = (visit.viewed_images / visit.image_total * 100)|round(0)|int if visit.image_total else 0 %}
       <tr>
         <td class="nowrap">{{ visit.visited_at|short_dt }}</td>
         <td>{{ v.case.site_label or v.case.room_label }} <span class="muted small">{{ v.case.stage }}</span></td>
@@ -98,6 +110,7 @@
         <td class="nowrap">{{ {'mobile':'手机','tablet':'平板','desktop':'电脑'}.get(visit.device, visit.device or '-') }}{% if visit.os_name %} · {{ visit.os_name }}{% endif %}</td>
         <td class="num nowrap">{{ visit.dwell_ms|duration }}</td>
         <td class="num">{{ visit.viewed_images }}{% if visit.image_total %} / {{ visit.image_total }}{% endif %}</td>
+        <td class="num{% if pct >= 80 %} done{% endif %}">{{ pct }}%</td>
       </tr>
     {% endfor %}
     </tbody>

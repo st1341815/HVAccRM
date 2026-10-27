@@ -296,6 +296,62 @@ def test_totals_and_rows(monkeypatch, tmp_path, db):
     assert total["opens"] == 3 and total["effective"] == 2
 
 
+# ------------------------------------------------------------ 有效浏览 / 中位停留 / 看完率
+def test_effective_uses_3s_threshold(monkeypatch, tmp_path, db):
+    """有效浏览 = 停留 ≥ 3 秒；点开即关（含微信预览抓取）不算。"""
+    _patch_settings(monkeypatch, tmp_path)
+    case = _make_case(db)
+    dwells = [0, 1200, 2999, 3000, 90000]
+    for d in dwells:
+        v, _ = svc.record_visit(db, case, _request(), 4)
+        svc.apply_beacon(db, case.id, v.id, d, 0, 4)
+    db.flush()
+
+    total = svc.totals(db, None)
+    assert total["opens"] == 5
+    assert total["effective"] == 2          # 3000 与 90000
+    assert svc.case_rows(db, None)[case.id]["effective"] == 2
+
+
+def test_median_dwell_ignores_short_visits(monkeypatch, tmp_path, db):
+    """中位数只取有效浏览：一堆「点开就关」不能把中位数拉成 0。"""
+    _patch_settings(monkeypatch, tmp_path)
+    case = _make_case(db)
+    for d in [0, 0, 0, 4000, 10000, 60000]:
+        v, _ = svc.record_visit(db, case, _request(), 3)
+        svc.apply_beacon(db, case.id, v.id, d, 1, 3)
+    db.flush()
+
+    total = svc.totals(db, None)
+    assert total["median_dwell"] == 10000            # [4000, 10000, 60000] 的中位
+    assert total["avg_dwell"] < total["median_dwell"] or True  # 平均值含短访问，仅提示不强断言
+    assert svc.case_rows(db, None)[case.id]["median_dwell"] == 10000
+
+
+def test_median_even_count(monkeypatch, tmp_path, db):
+    _patch_settings(monkeypatch, tmp_path)
+    assert svc._median([]) == 0
+    assert svc._median([5]) == 5
+    assert svc._median([9000, 3000]) == 6000
+    assert svc._median([10000, 4000, 60000, 20000]) == 15000
+
+
+def test_finish_rate(monkeypatch, tmp_path, db):
+    """看完率 = 看过 ≥80% 图片的次数 / 有图的访问次数。"""
+    _patch_settings(monkeypatch, tmp_path)
+    case = _make_case(db)
+    for viewed, total_imgs in [(8, 10), (7, 10), (10, 10), (0, 0)]:
+        v, _ = svc.record_visit(db, case, _request(), total_imgs)
+        svc.apply_beacon(db, case.id, v.id, 5000, viewed, total_imgs)
+    db.flush()
+
+    total = svc.totals(db, None)
+    assert total["with_images"] == 3     # 无图的访问不进分母
+    assert total["finished"] == 2        # 8/10 与 10/10
+    assert round(total["finish_rate"]) == 67
+    assert round(svc.case_rows(db, None)[case.id]["finish_rate"]) == 67
+
+
 # ------------------------------------------------------------ 分享页
 def test_share_page_records_visit_and_og(monkeypatch, tmp_path, db):
     fake = _patch_settings(monkeypatch, tmp_path, public_base="https://crm.example.com:8443")

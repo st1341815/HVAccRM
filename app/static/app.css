@@ -679,6 +679,10 @@ tbody tr { transition: background-color 120ms ease; }
 .card-title .muted { font-weight: 400; }
 th.num, td.num { text-align: right; white-space: nowrap; }
 .stats-table td:first-child { font-weight: 600; }
+/* KPI 副标（如「中位停留」下的均值） */
+.kpi-sub { display: block; font-size: .66rem; color: var(--muted); margin-top: .1rem; white-space: nowrap; }
+/* 完成度 ≥80%：淡绿底，一眼看出「看完了」 */
+td.num.done { color: var(--success-ink); font-weight: 600; }
 
 /* 近 14 天柱状趋势（纯 CSS，无图表库） */
 .trend-bars { display: flex; align-items: flex-end; gap: .35rem; height: 8.5rem; padding-top: .4rem; }

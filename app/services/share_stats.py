@@ -34,7 +34,16 @@ SRC_ALLOWED = {"qr", "link", "direct"}
 # 停留时长上限（6 小时，防异常上报把平均值带歪）
 DWELL_MAX_MS = 6 * 3600 * 1000
 
+# 「有效浏览」门槛：停留 ≥ 3 秒才算真的看到了内容。
+# 用 >0 当门槛等于没门槛（1 毫秒也算），也挡不住「点开就关」；
+# 而微信生成链接预览时会抓一次页面，这种抓取停留 ≈0，自然被挡在外面。
+EFFECTIVE_DWELL_MS = 3000
+
+# 「看完」的门槛：看过图片数 ≥ 总图数 × 4/5（80%）
+FINISH_NUM, FINISH_DEN = 4, 5
+
 COVER_SIZE = (1200, 630)  # 微信/社交平台通用的 1.91:1 分享图
+
 
 
 # ------------------------------------------------------------ 请求解析
@@ -272,33 +281,89 @@ def _case_filter(stmt, case_ids: list[int] | None):
 
 
 
+def _median(values: list[int]) -> int:
+    """中位数（空集返回 0）。偶数个取中间两数的均值向下取整。"""
+    if not values:
+        return 0
+    s = sorted(values)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) // 2
+
+
+def _dwell_samples(db: Session, case_ids: list[int] | None, date_from: str, date_to: str) -> list[tuple[int, int]]:
+    """取「有效浏览」的停留样本 (case_id, dwell_ms)，用于算中位数。
+
+    只取 ≥ EFFECTIVE_DWELL_MS 的：停留时长是长尾分布（挂机几分钟会把平均值拉偏），
+    中位数必须基于「真的看了」的那批访问，否则会被一堆 0~2 秒的点开拉成 0。
+    数据量按天计（几十~几千行），一次取出在 Python 层算比 SQL 窗口函数更直白。
+    """
+    stmt = select(ShareVisit.case_id, ShareVisit.dwell_ms).where(
+        ShareVisit.dwell_ms >= EFFECTIVE_DWELL_MS
+    )
+    stmt = _case_filter(_time_filter(stmt, date_from, date_to), case_ids)
+    return [(int(cid), int(d or 0)) for cid, d in db.execute(stmt).all()]
+
+
+def _finish_exprs():
+    """看完率分子/分母表达式：numerator = 看到 ≥80% 的次数，denominator = 有图的访问数。
+
+    判据：viewed / total ≥ 4/5  ⇔  viewed × 5 ≥ total × 4
+    """
+    finished = case(
+        (ShareVisit.viewed_images * FINISH_DEN >= ShareVisit.image_total * FINISH_NUM, 1),
+        else_=0,
+    )
+    with_images = case((ShareVisit.image_total > 0, 1), else_=0)
+    return func.sum(case((ShareVisit.image_total > 0, finished), else_=0)), func.sum(with_images)
+
+
+def _rate(num: int, den: int) -> float:
+    return (num / den * 100.0) if den else 0.0
+
+
 def case_rows(db: Session, case_ids: list[int] | None, date_from: str = "", date_to: str = "") -> dict[int, dict]:
-    """按案例聚合：打开数 / 独立访客 / 微信占比 / 平均停留 / 平均看图 / 最近打开。"""
+    """按案例聚合：打开 / 独立访客 / 有效浏览 / 看完率 / 中位停留 / 最近打开。"""
+    finished_expr, with_images_expr = _finish_exprs()
     stmt = select(
         ShareVisit.case_id,
         func.count(ShareVisit.id),
         func.count(distinct(ShareVisit.visitor_id)),
         func.sum(ShareVisit.is_wechat),
-        func.avg(func.nullif(ShareVisit.dwell_ms, 0)),
-        func.avg(ShareVisit.viewed_images),
+        func.sum(case((ShareVisit.dwell_ms >= EFFECTIVE_DWELL_MS, 1), else_=0)),
+        finished_expr,
+        with_images_expr,
         func.max(ShareVisit.visited_at),
     ).group_by(ShareVisit.case_id)
     stmt = _case_filter(_time_filter(stmt, date_from, date_to), case_ids)
+
+    by_case: dict[int, list[int]] = {}
+    for cid, dwell in _dwell_samples(db, case_ids, date_from, date_to):
+        by_case.setdefault(cid, []).append(dwell)
+
     out: dict[int, dict] = {}
-    for cid, opens, uv, wechat, avg_dwell, avg_imgs, last_at in db.execute(stmt).all():
+    for cid, opens, uv, wechat, effective, finished, with_images, last_at in db.execute(stmt).all():
+        opens = int(opens or 0)
         out[cid] = {
-            "opens": int(opens or 0),
+            "opens": opens,
             "uv": int(uv or 0),
             "wechat": int(wechat or 0),
-            "avg_dwell": float(avg_dwell or 0),
-            "avg_imgs": float(avg_imgs or 0),
+            "effective": int(effective or 0),
+            "finish_rate": _rate(int(finished or 0), int(with_images or 0)),
+            "median_dwell": _median(by_case.get(cid, [])),
             "last_at": last_at,
         }
     return out
 
 
 def totals(db: Session, case_ids: list[int] | None, date_from: str = "", date_to: str = "") -> dict:
-    """总览指标。"""
+    """总览指标。
+
+    - `effective`：有效浏览（停留 ≥3 秒）。用来过滤「点开就关」与微信预览抓取。
+    - `median_dwell`：中位停留（只统计有效浏览）。**不要用平均值**
+      —— 页面开着挂机 3 分钟也会被算成停留，长尾会把平均值拉高十几倍。
+    - `finish_rate`：看完率 = 看过 ≥80% 图片的次数 / 有图的访问次数。
+    """
+    finished_expr, with_images_expr = _finish_exprs()
     stmt = select(
         func.count(ShareVisit.id),
         func.count(distinct(ShareVisit.visitor_id)),
@@ -306,12 +371,13 @@ def totals(db: Session, case_ids: list[int] | None, date_from: str = "", date_to
         func.avg(func.nullif(ShareVisit.dwell_ms, 0)),
         func.avg(ShareVisit.viewed_images),
         func.count(distinct(ShareVisit.case_id)),
-        # 「有停留的访问」：微信在生成链接预览时也会抓一次页面（停留 0、看图 0），
-        # 用这个口径把「真人真的看了」与「只是被抓了预览」区分开。
-        func.sum(case((ShareVisit.dwell_ms > 0, 1), else_=0)),
+        func.sum(case((ShareVisit.dwell_ms >= EFFECTIVE_DWELL_MS, 1), else_=0)),
+        finished_expr,
+        with_images_expr,
     )
     stmt = _case_filter(_time_filter(stmt, date_from, date_to), case_ids)
-    opens, uv, wechat, avg_dwell, avg_imgs, cases_hit, effective = db.execute(stmt).one()
+    opens, uv, wechat, avg_dwell, avg_imgs, cases_hit, effective, finished, with_images = db.execute(stmt).one()
+    samples = [d for _cid, d in _dwell_samples(db, case_ids, date_from, date_to)]
     return {
         "opens": int(opens or 0),
         "uv": int(uv or 0),
@@ -320,7 +386,12 @@ def totals(db: Session, case_ids: list[int] | None, date_from: str = "", date_to
         "avg_imgs": float(avg_imgs or 0),
         "cases_hit": int(cases_hit or 0),
         "effective": int(effective or 0),
+        "median_dwell": _median(samples),
+        "finish_rate": _rate(int(finished or 0), int(with_images or 0)),
+        "finished": int(finished or 0),
+        "with_images": int(with_images or 0),
     }
+
 
 
 def today_opens(db: Session, day: str, case_ids: list[int] | None) -> int:
