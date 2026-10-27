@@ -569,3 +569,19 @@ def test_links_page_marks_time_limited_case(monkeypatch, tmp_path, db, admin):
     html = cases_router.manage_links(_request(path="/cases/links"), db=db, user=admin).body.decode("utf-8")
     assert "限时" in html
     assert "2099-01-01 00:00" in html
+
+
+def test_no_markup_leaked_into_title_block():
+    """回归：v1.6.2 用「替换第一个 endblock」的方式插脚本，误把 <script> 塞进了 title 块，
+    导致浏览器标题变成「外链管理<script>…」。这里全模板扫一遍，禁止 title 块里出现标签。"""
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "app" / "templates"
+    bad = []
+    for path in sorted(root.rglob("*.html")):
+        src = path.read_text(encoding="utf-8")
+        for m in re.finditer(r"{%\s*block title\s*%}(.*?){%\s*endblock\s*%}", src, re.S):
+            if "<" in m.group(1) or "script" in m.group(1):
+                bad.append(path.name)
+    assert not bad, f"title 块里混入了标签/脚本：{bad}"
