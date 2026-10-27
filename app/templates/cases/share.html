@@ -79,7 +79,12 @@
   if (window.IntersectionObserver) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
-        if (e.isIntersecting) seen[e.target.getAttribute('data-idx')] = 1;
+        var img = e.target;
+        // ⚠️ 懒加载图在真正加载前高度为 0，零面积元素会被判成 isIntersecting，
+        // 导致「没滑到也全算看过」。必须要求图片已加载出真实尺寸再计数。
+        if (e.isIntersecting && img.complete && img.naturalWidth > 0) {
+          seen[img.getAttribute('data-idx')] = 1;
+        }
       });
     }, { threshold: 0.5 });
     document.querySelectorAll('.share-gallery img').forEach(function (img, i) {
