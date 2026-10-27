@@ -45,7 +45,7 @@
 
 <section class="card">
   <h2>按合同核算（{{ rows|length }} 份，按{{ dict(sort_options).get(sort, '签订日') }}{{ '升序' if order == 'asc' else '降序' }}）</h2>
-  <table class="tight">
+  <table class="tight has-sum">
     <thead>
       <tr>
         <th>房号</th>
@@ -53,6 +53,18 @@
         <th class="sortable"><a href="{{ sort_links[key] }}">{{ label }}{% if sort == key %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
         {% endfor %}
         <th></th>
+      </tr>
+      <tr class="sum-row">
+        <td class="sum-label">合计</td>
+        <td></td>
+        <td></td>
+        <td data-label="收入">{{ totals.income|money }}</td>
+        <td data-label="成本">{{ totals.cost|money }}</td>
+        <td data-label="毛利" class="{{ 'red' if totals.gross_profit < 0 else '' }}">{{ totals.gross_profit|money }}</td>
+        <td data-label="毛利率">{{ totals.gross_margin }}%</td>
+        <td data-label="已收">{{ totals.received|money }}</td>
+        <td data-label="未收" class="{{ 'red' if totals.outstanding > 0 else '' }}">{{ totals.outstanding|money }}</td>
+        <td></td>
       </tr>
     </thead>
     <tbody>
