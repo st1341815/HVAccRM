@@ -15,6 +15,8 @@ APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose · PWA（Serv
 > 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
 > 见 [`docs/Docker部署指南.md`](docs/Docker部署指南.md)。
 > 📦 **预构建镜像**（Docker Hub `13uncle/hvaccrm` / GHCR `ghcr.io/st1341815/hvaccrm`，免构建），用法见下文 §2.1。
+> 📱 **微信小程序案例分享方案**（把案例同步到小程序、用微信卡片发给客户）：
+> 见 [`docs/微信小程序案例同步方案.md`](docs/微信小程序案例同步方案.md)。
 > 本文档面向开发者，讲的是环境搭建、部署与实现细节。
 
 ---
@@ -168,7 +170,7 @@ crm/
 │   │                           # / admin / ui
 │   ├── templates/              # 页面 + _fragments（HTMX 片段）
 │   └── static/                 # app.css · htmx.min.js · PWA（manifest / SW / offline / icons）
-└── docs/                       # 使用手册、Docker 部署指南、版本更新记录
+└── docs/                       # 使用手册、Docker 部署指南、微信小程序方案、版本更新记录
 ```
 
 ## 4. 核心业务规则（实现位置）
