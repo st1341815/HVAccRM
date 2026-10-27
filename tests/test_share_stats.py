@@ -540,3 +540,32 @@ def test_set_share_limits_only_duration(db):
     cases_svc.set_share_limits(db, case, "不限")
     assert case.share_expires_at is None
     assert case.share_duration == "不限"
+
+
+def test_links_page_no_view_limit_and_has_hint(monkeypatch, tmp_path, db, admin):
+    """外链管理页：无「访问次数」、无次数下拉，且有「保存会重算截止时间」的提示。"""
+    _patch_settings(monkeypatch, tmp_path)
+    _make_case(db)
+    db.flush()
+
+    resp = cases_router.manage_links(_request(path="/cases/links"), db=db, user=admin)
+    assert resp.status_code == 200
+    html = resp.body.decode("utf-8")
+    assert "访问次数" not in html
+    assert 'name="limit"' not in html
+    assert "重新计算截止时间" in html          # 提示条
+    assert "share-settings" in html            # 保存确认的钩子目标
+    assert 'name="duration"' in html           # 有效期仍可设
+
+
+def test_links_page_marks_time_limited_case(monkeypatch, tmp_path, db, admin):
+    """带有效期的案例在列表里要高亮「限时」，避免被忽略。"""
+    _patch_settings(monkeypatch, tmp_path)
+    case = _make_case(db)
+    case.share_expires_at = "2099-01-01 00:00:00"
+    case.share_duration = "1月"
+    db.flush()
+
+    html = cases_router.manage_links(_request(path="/cases/links"), db=db, user=admin).body.decode("utf-8")
+    assert "限时" in html
+    assert "2099-01-01 00:00" in html
