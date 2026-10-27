@@ -3,12 +3,13 @@ FROM python:3.12-slim AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
+    PIP_DEFAULT_TIMEOUT=60 \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /build
 # 只装运行依赖；测试依赖在 requirements-test.txt（不进生产镜像）
 COPY requirements.txt .
-RUN pip install --prefix=/install --no-warn-script-location -r requirements.txt
+RUN pip install --prefix=/install --no-warn-script-location --retries 8 --timeout 60 -r requirements.txt
 
 # ---------- 运行阶段 ----------
 FROM python:3.12-slim AS runtime
