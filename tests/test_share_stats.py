@@ -373,7 +373,8 @@ def test_share_page_records_visit_and_og(monkeypatch, tmp_path, db):
     visits = db.query(ShareVisit).all()
     assert len(visits) == 1
     assert visits[0].case_id == case.id
-    assert case.share_views == 1
+    # v1.6.0 起不再维护 cases.share_views（统计只认 share_visits）
+    assert (case.share_views or 0) == 0
 
 
 def test_share_page_404_and_expired(monkeypatch, tmp_path, db):
@@ -488,3 +489,54 @@ def test_stats_page_keyword_no_match_is_empty(monkeypatch, tmp_path, db, admin):
     html = resp.body.decode("utf-8")
     assert "还没有访问记录" in html
     assert "颐园清苑 6#" not in html
+
+
+# ------------------------------------------------------------ v1.6.0：取消访问次数限制
+def test_share_state_ignores_legacy_view_limit(monkeypatch, tmp_path, db):
+    """历史案例可能残留 share_max_views（旧版默认 10 次）——不再据此判失效。"""
+    from app.services import cases as cases_svc
+
+    case = _make_case(db)
+    case.share_max_views = 10
+    case.share_views = 99
+    case.share_expires_at = None
+    case.share_disabled = 0
+    db.flush()
+
+    ok, reason = cases_svc.share_state(case)
+    assert ok is True and reason == "有效"
+
+
+def test_share_state_still_expires_and_disables(db):
+    from app.services import cases as cases_svc
+
+    case = _make_case(db, token="exp1")
+    case.share_expires_at = "2020-01-01 00:00:00"
+    case.share_disabled = 0
+    db.flush()
+    assert cases_svc.share_state(case)[0] is False
+    assert "过期" in cases_svc.share_state(case)[1]
+
+    case2 = _make_case(db, token="dis1")
+    case2.share_expires_at = None
+    case2.share_disabled = 1
+    db.flush()
+    assert cases_svc.share_state(case2) == (False, "已被手动停用")
+
+
+def test_set_share_limits_only_duration(db):
+    """只设置有效期，不再写 share_max_views / share_views。"""
+    from app.services import cases as cases_svc
+
+    case = _make_case(db)
+    case.share_max_views = 10
+    case.share_views = 7
+    cases_svc.set_share_limits(db, case, "1周")
+    assert case.share_duration == "1周"
+    assert case.share_expires_at
+    assert case.share_max_views == 10   # 历史值原样保留，不再读写
+    assert case.share_views == 7
+
+    cases_svc.set_share_limits(db, case, "不限")
+    assert case.share_expires_at is None
+    assert case.share_duration == "不限"

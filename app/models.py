@@ -468,8 +468,10 @@ class Case(Base):
     share_token = Column(String, unique=True, nullable=False)  # 外链分享令牌
     share_expires_at = Column(String)  # 分享有效期截止（YYYY-MM-DD HH:MM:SS），空 = 不限
     share_duration = Column(String)  # 时间限制标签（不限/1天/3天/1周/1月），用于表单回显
-    share_max_views = Column(Integer)  # 分享访问次数上限，空 = 不限
-    share_views = Column(Integer, default=0)  # 已访问次数（每次成功打开分享页 +1）
+    # 以下两列自 v1.6.0 起废弃（「按访问次数限制/计数」已取消，改由 share_visits 统计），
+    # 保留列以兼容历史数据，不再读写。
+    share_max_views = Column(Integer)  # [废弃] 访问次数上限
+    share_views = Column(Integer, default=0)  # [废弃] 已访问次数
     share_disabled = Column(Integer, default=0)  # 手动失效开关（1 = 已失效）
     created_at = Column(String, nullable=False, default=now_iso)
 
