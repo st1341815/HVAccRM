@@ -48,8 +48,8 @@ export DB_PATH=$PWD/data/crm.db DATA_DIR=$PWD/data CONFIG_DIR=$PWD/config
 
 | 镜像源 | 标签 | 说明 |
 | --- | --- | --- |
-| **Docker Hub** | `13uncle/hvaccrm:latest` / `13uncle/hvaccrm:1.4.1` | 推荐（公开仓库，匿名可拉） |
-| GHCR | `ghcr.io/st1341815/hvaccrm:latest` / `:1.4.1` | GitHub 容器仓库 |
+| **Docker Hub** | `13uncle/hvaccrm:latest` / `13uncle/hvaccrm:1.4.7` | 推荐（公开仓库，匿名可拉；每次打 `v*` tag 由 Actions 自动发布） |
+| GHCR | `ghcr.io/st1341815/hvaccrm:latest` / `:1.4.1` | GitHub 容器仓库（**无自动化流程，可能滞后**；以 Docker Hub 为准） |
 
 ```bash
 docker pull 13uncle/hvaccrm:latest            # Docker Hub
@@ -225,7 +225,9 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 
 ## 8. 版本说明
 
-当前版本 **v1.4.1**（2026-10-20，简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填）；预构建镜像同步发布于 **Docker Hub** `13uncle/hvaccrm:1.4.1` 与 **GHCR** `ghcr.io/st1341815/hvaccrm:1.4.1`，与源码 Release 保持同版本。
+当前版本 **v1.4.7**（2026-10-27，成本与利润「按合同核算」新增表头内合计行：收入 / 成本 / 毛利 / 毛利率 / 已收 / 未收，按当前筛选结果汇总）；预构建镜像 **Docker Hub** `13uncle/hvaccrm:1.4.7`（含 `:latest`），与源码 Release 同版本。
+
+> 更早的版本说明见 `docs/版本更新记录.md`；`v1.4.1`（2026-10-20）为「简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填」。
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
 
