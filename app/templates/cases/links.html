@@ -1,5 +1,20 @@
 {% extends "layout.html" %}
-{% block title %}外链管理{% endblock %}
+{% block title %}外链管理<script>
+// 「保存」防误触：选了具体有效期就二次确认，避免像 v1.6.1 之前那样
+// 顺手点保存把链接写成「1 天」，客户几天后打开只看到「已失效」。
+document.addEventListener('submit', function (e) {
+  var f = e.target;
+  if (!f || !f.classList || !f.classList.contains('share-settings')) return;
+  var sel = f.querySelector('select[name="duration"]');
+  if (!sel) return;
+  var v = sel.value;
+  if (v === '不限') return;
+  var ok = window.confirm('把有效期设为「' + v + '」？\n\n' + v + '之后客户打开这个链接会显示「已失效」。\n'
+    + '如果只是想停止分享，请点「失效」按钮，不要设有效期。');
+  if (!ok) e.preventDefault();
+});
+</script>
+{% endblock %}
 {% block content %}
 <div class="page-head">
   <h1>外链管理 <span class="muted small">共 {{ rows|length }} 条</span></h1>
@@ -9,7 +24,7 @@
     <a href="/cases/stats">统计</a>
   </nav>
 </div>
-<p class="muted small">查询所有分享外链的状态。超过有效期即自动失效，也可手动让有效链接失效。链接的打开次数、停留时长、看图张数请到 <a href="/cases/stats">统计</a> 页查看。</p>
+<p class="muted small">查询所有分享外链的状态。链接默认<b>永久有效</b>，要停止分享请点「失效」（随时可「恢复」）。链接的打开次数、停留时长、看图张数请到 <a href="/cases/stats">统计</a> 页查看。</p><p class="muted small tip-line">⚠️ 「保存」会按所选有效期<b>重新计算截止时间</b>——选了 1 天/3 天/1 周/1 月就会在那之后失效。只想让客户看不到，请用「失效」按钮，不要设短有效期。</p>
 
 <section class="card">
   <form method="get" action="/cases/links" class="filterbar">
@@ -54,7 +69,7 @@
         <td>
           {% if r.valid %}<span class="badge ok">有效</span>{% else %}<span class="badge warn" title="{{ r.reason }}">已失效</span><div class="muted small">{{ r.reason }}</div>{% endif %}
         </td>
-        <td>{{ c.share_expires_at[:16] if c.share_expires_at else '不限' }}</td>
+        <td>{% if c.share_expires_at %}<span class="badge warn" title="到期后客户打开会显示「已失效」">限时</span> {{ c.share_expires_at[:16] }}{% else %}<span class="muted">不限</span>{% endif %}</td>
         <td>
           <a class="btn ghost small" href="/cases/share/{{ c.share_token }}" target="_blank" rel="noopener">打开</a>
           <button type="button" class="btn ghost small js-copy" data-url="{{ share_url }}">复制链接</button>
@@ -70,7 +85,7 @@
         </td>
         <td>
           <div class="share-actions">
-            <button type="submit" form="share-settings-{{ c.id }}" class="ghost">保存</button>
+            <button type="submit" form="share-settings-{{ c.id }}" class="ghost" title="保存会按所选有效期重算截止时间">保存</button>
             {% if r.valid %}
             <form method="post" action="/cases/{{ c.id }}/share/disable" class="inline" onsubmit="return confirm('手动失效这条分享链接？');">
               <input type="hidden" name="back" value="/cases/links">
@@ -92,4 +107,19 @@
   {% if not rows %}<p class="muted">还没有可管理的外链。完成「前期施工」或「后期施工」工序生成案例后，这里会自动出现分享链接。</p>{% endif %}
 </section>
 
+<script>
+// 「保存」防误触：选了具体有效期就二次确认，避免像 v1.6.1 之前那样
+// 顺手点保存把链接写成「1 天」，客户几天后打开只看到「已失效」。
+document.addEventListener('submit', function (e) {
+  var f = e.target;
+  if (!f || !f.classList || !f.classList.contains('share-settings')) return;
+  var sel = f.querySelector('select[name="duration"]');
+  if (!sel) return;
+  var v = sel.value;
+  if (v === '不限') return;
+  var ok = window.confirm('把有效期设为「' + v + '」？\n\n' + v + '之后客户打开这个链接会显示「已失效」。\n'
+    + '如果只是想停止分享，请点「失效」按钮，不要设有效期。');
+  if (!ok) e.preventDefault();
+});
+</script>
 {% endblock %}

@@ -698,3 +698,17 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   .trend-num { font-size: .6rem; }
   .share-tools .btn { flex: 1 1 auto; }
 }
+
+/* ---------------------------------------------------------------- 外链管理：操作提示条 */
+/* 场景：曾发生过「顺手点保存 → 有效期被写成 1 天 → 客户几天后打开显示已失效」，
+   用一条暖黄提示把「保存会重算截止时间」说清楚，别再靠事后解释。 */
+.tip-line {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-ink);
+  border-radius: var(--radius-md);
+  padding: .5rem .75rem;
+  margin: 0 0 1rem;
+}
+.tip-line b { font-weight: 700; }
+@media (max-width: 780px) { .tip-line { margin-bottom: .75rem; } }
