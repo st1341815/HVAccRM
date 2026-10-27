@@ -116,6 +116,7 @@ def overview(
     totals = {
         "income": round(sum(p.income for _, _, p in rows), 2),
         "received": round(sum(p.received for _, _, p in rows), 2),
+        "outstanding": round(sum(f.outstanding for _, f, _ in rows), 2),
         "cost": round(sum(p.cost for _, _, p in rows), 2),
         "gross_profit": round(sum(p.gross_profit for _, _, p in rows), 2),
     }

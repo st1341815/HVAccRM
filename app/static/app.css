@@ -191,6 +191,14 @@ table.tasks th:nth-child(2), table.tasks td:nth-child(2) { width: 6.2rem; }
 table.tasks th:nth-child(3), table.tasks td:nth-child(3) { width: 4.4rem; }
 table.tasks th:nth-child(6), table.tasks td:nth-child(6) { width: 4.4rem; }
 table.tasks th { white-space: nowrap; }
+/* 表头内的汇总行（如利润核算「按合同核算」的合计行）：加粗 + 浅底与明细区分。
+   注意单元格用 td（不是 th），避免被 th 的 .8rem / 灰色字覆盖；数字列不折行（含 - 的金额会断行）。 */
+tr.sum-row td {
+  font-weight: 700; color: var(--ink);
+  background: var(--paper-3); border-bottom: 2px solid var(--brand-200);
+  white-space: nowrap;
+}
+tr.sum-row td.sum-label { color: var(--muted); }
 tbody tr { background: var(--row-bg, transparent); }
 tbody tr:nth-child(even) { --row-bg: var(--paper-2); }
 tr.row-alert { --row-bg: var(--danger-bg); }
@@ -460,6 +468,13 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
     font-size: .9rem; font-weight: 700; text-align: left;
   }
   table.js-stack td:not([data-label])::before { content: none; }
+  /* 表头内的汇总行：卡片化模式下保留（表头其余行照常隐藏），作为「合计」卡片显示在最上方 */
+  table.js-stack.has-sum thead { display: block; }
+  table.js-stack.has-sum thead tr:not(.sum-row) { display: none; }
+  table.js-stack.has-sum thead tr.sum-row { background: var(--paper-3); border-color: var(--brand-200); }
+  table.js-stack.has-sum thead tr.sum-row td { white-space: normal; }
+  table.js-stack.has-sum thead tr.sum-row td.sum-label { text-align: left; font-size: .95rem; }
+  table.js-stack.has-sum thead tr.sum-row td:empty { display: none; }
   table.js-stack td.actions-cell { flex-direction: column; align-items: flex-end; }
   table.js-stack td.actions-cell form { width: 100%; justify-content: flex-end; }
   table.js-stack td.actions-cell input { width: auto; flex: 1 1 auto; min-width: 0; font-size: 14px; }
