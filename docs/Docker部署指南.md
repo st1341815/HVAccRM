@@ -141,7 +141,7 @@ curl -s http://127.0.0.1:8090/health
 # 期望输出：{"status":"ok","db":true,"version":"..."}
 
 # ⑦ 浏览器打开 http://<宿主机IP>:8090 登录
-#    本环境：外网 https://crm.2ii.cn:8443 · 局域网 http://192.168.11.8:8090
+#    本环境：外网 https://<your-domain>:8443 · 局域网 http://<nas-ip>:8090
 ```
 
 > **首次启动**会自动执行 `app.bootstrap`：迁移数据库 → 创建 admin 账号 → 写入 4 个标准工序模板（上门勘测/前期施工/后期施工/调试验收）。之后重复启动是幂等的，不会重建已有数据。
@@ -167,7 +167,7 @@ docker compose exec crm sh        # 进容器 shell
 在 NAS（如飞牛 fnOS）上，相对路径 `./data` 可能因工作目录解析不同而失效，仓库另提供了 `docker-compose.nas.yml`，用宿主机绝对路径挂载：
 
 ```bash
-# 在 NAS 上、源码目录 /vol1/1000/Docker/Hvaccrm 内执行：
+# 在 NAS 上、源码目录 <data-directory>/Docker/Hvaccrm 内执行：
 docker compose -f docker-compose.nas.yml up -d --build
 ```
 
@@ -175,8 +175,8 @@ docker compose -f docker-compose.nas.yml up -d --build
 
 ```yaml
     volumes:
-      - /vol1/1000/Docker/Hvaccrm/data:/data
-      - /vol1/1000/Docker/Hvaccrm/config:/config:ro
+      - <data-directory>/Docker/Hvaccrm/data:/data
+      - <data-directory>/Docker/Hvaccrm/config:/config:ro
 ```
 
 ### 3.5 变体：内置 nginx 反代的完整栈（HTTPS）
@@ -260,8 +260,13 @@ server {
 
 | 变量 | 说明 | 示例 / 默认 |
 | --- | --- | --- |
-| `APP_SECRET_KEY` | 会话签名密钥；默认值可直接启动，**公网部署必须**改成随机串 | 默认 `dev-insecure-change-me`；`python3 -c "import secrets;print(secrets.token_urlsafe(48))"` |
-| `ADMIN_PASS` | admin 初始密码（仅首次创建生效）；默认 `admin888`，公网请改强密码 | `admin888` |
+| `APP_SECRET_KEY` | 会话签名密钥。**留空即自动生成**随机密钥并保存到 `<CONFIG_DIR>/.app_secret`（0600）；多副本共享会话时必须显式填同一个值 | 留空（推荐）或 `python3 -c "import secrets;print(secrets.token_urlsafe(48))"` |
+| `ADMIN_PASS` | admin 初始密码（仅首次创建生效）。**留空即随机生成**并写入 `<DATA_DIR>/first_boot.txt`（0600），首登强制改密 | 留空（推荐）或自定义强密码 |
+| `ADMIN_RANDOM_INITIAL_PASSWORD` | `true` | 为 `false` 时按 `ADMIN_PASS`（含默认 `admin888`）创建，不推荐 |
+| `COOKIE_SECURE` | `auto` | `auto` 判定为 https 才给 Cookie 加 `Secure`；`1`/`0` 强制开/关 |
+| `HSTS_MAX_AGE` | `0`（关闭） | >0 时下发 HSTS，建议改在反代层统一加 |
+| `API_DOCS` | `false` | 是否暴露 `/api/docs`、`/api/openapi.json`、`/redoc` |
+| `LOGIN_MAX_ATTEMPTS` / `LOGIN_MAX_ATTEMPTS_ACCOUNT` / `LOGIN_LOCK_SECONDS` | `5` / `20` / `300` | 登录限速：IP+账号维度阈值 / 账号维度阈值（防伪造 XFF）/ 锁定时长 |
 
 ### 账号与会话
 
@@ -322,7 +327,7 @@ data/
 └── logs/           # crm.log 等应用日志
 ```
 
-- 卷写在宿主机路径（`./data` 相对项目目录；NAS 上用 `docker-compose.nas.yml` 写绝对路径 `/vol1/1000/Docker/Hvaccrm/data`）。
+- 卷写在宿主机路径（`./data` 相对项目目录；NAS 上用 `docker-compose.nas.yml` 写绝对路径 `<data-directory>/Docker/Hvaccrm/data`）。
 - **备份、迁移、升级只需保住 `data/` 目录**，容器/镜像可随时重建。
 
 ---

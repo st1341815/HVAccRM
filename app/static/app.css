@@ -105,6 +105,15 @@ h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
 .sidebar .me-links { display: flex; gap: .4rem; margin-top: .55rem; }
 .sidebar .me-links a { color: var(--sidebar-fg); font-size: .85rem; padding: .32rem .6rem; border-radius: var(--radius-sm); transition: background-color .15s ease, color .15s ease; }
 .sidebar .me-links a:hover { background: var(--sidebar-hover); color: #fff; text-decoration: none; }
+/* 登出改成 POST 表单后，按钮要长得像同排的链接 */
+button.linklike {
+  background: none; border: 0; margin: 0; padding: .32rem .6rem; cursor: pointer;
+  font: inherit; font-size: .85rem; line-height: inherit; text-align: left;
+  color: var(--sidebar-fg); border-radius: var(--radius-sm);
+  transition: background-color .15s ease, color .15s ease;
+}
+button.linklike:hover { background: var(--sidebar-hover); color: #fff; }
+.sidebar .me-links form { margin: 0; display: contents; }
 .sidebar-toggle {
   display: none; position: fixed; top: .7rem; left: .7rem; z-index: 60;
   width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);

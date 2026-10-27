@@ -63,7 +63,7 @@
       <div class="who">{{ user.display_name }}<div class="role">{{ role_label }}</div></div>
       <div class="me-links">
         <a href="/account">账户</a>
-        <a href="/logout">退出</a>
+        <form method="post" action="/logout" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="linklike">退出</button></form>
       </div>
     </div>
   </aside>

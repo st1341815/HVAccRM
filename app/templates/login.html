@@ -5,6 +5,7 @@
   <h1>🌡️ HVAccRM</h1>
   <p class="muted">暖通空调客户管理系统 · 内网自用 · 请使用管理员分配的账号登录</p>
   <form method="post" action="/login" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="next" value="{{ next or '/' }}">
     <label>账号<input name="username" value="{{ username or '' }}" required autofocus autocomplete="username"></label>
     <label>密码<input type="password" name="password" required autocomplete="current-password"></label>

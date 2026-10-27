@@ -1,0 +1,51 @@
+name: CI
+
+# 门禁：测试 + 静态检查。任何一个红，就不该打 tag 发镜像。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Lint（只查真错误：语法/未定义名/重复定义）
+        run: |
+          pip install ruff
+          ruff check app tests scripts
+
+      - name: 生产镜像不得包含测试依赖
+        run: |
+          grep -qE '^pytest' requirements.txt && { echo "::error::requirements.txt 不应包含 pytest（会打进生产镜像）"; exit 1; } || true
+          test -f requirements-test.txt
+
+      - name: Run tests
+        run: pytest tests/ -q
+        env:
+          DB_PATH: ":memory:"
+          CONFIG_DIR: ${{ runner.temp }}/cfg
+          DATA_DIR: ${{ runner.temp }}/data

@@ -22,6 +22,18 @@ jobs:
           V=$(grep -oP '__version__\s*=\s*"\K[0-9.]+' app/__init__.py)
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
+      - name: Install test deps
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run tests（门禁：测试不过不打镜像）
+        run: pytest tests/ -q
+        env:
+          DB_PATH: ":memory:"
+          CONFIG_DIR: ${{ runner.temp }}/cfg
+          DATA_DIR: ${{ runner.temp }}/data
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 

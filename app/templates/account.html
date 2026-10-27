@@ -8,6 +8,7 @@
   <section class="card">
     <h2>我的姓名</h2>
     <form method="post" action="/account/profile" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>姓名<input name="full_name" value="{{ user.full_name or '' }}" maxlength="32" placeholder="如 张三"></label>
       <button type="submit">保存姓名</button>
     </form>
@@ -17,6 +18,7 @@
   <section class="card">
     <h2>修改密码</h2>
     <form method="post" action="/account/password" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       {% if not user.must_change_password %}
       <label>原密码<input type="password" name="old_password" required></label>
       {% endif %}
@@ -31,6 +33,7 @@
     {% if user.totp_enabled %}
       <p class="ok-text">已开启。登录时需要输入验证器 App 中的 6 位动态码。</p>
       <form method="post" action="/account/totp/disable" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label>当前密码<input type="password" name="password" required></label>
         <button type="submit" class="danger">关闭二步验证</button>
       </form>
@@ -40,6 +43,7 @@
       {% if totp_uri %}<p class="muted small">otpauth 链接：<code class="break">{{ totp_uri }}</code></p>{% endif %}
       {% if totp_preview %}<p class="muted small">当前时间点验证码（仅用于校验服务器时间）：<code>{{ totp_preview }}</code></p>{% endif %}
       <form method="post" action="/account/totp/enable" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="secret" value="{{ new_totp_secret }}">
         <label>输入 App 显示的验证码<input name="code" inputmode="numeric" required></label>
         <button type="submit">开启二步验证</button>

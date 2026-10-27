@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -31,13 +32,26 @@ from .routers import (
     ui,
 )
 from .scheduler import start_scheduler, stop_scheduler
-from .templating import flash_cookie_name, render
+from .templating import flash_cookie_name, render, set_request_secure
 
 log = logging.getLogger("crm.main")
 settings = get_settings()
 
-EXEMPT_PREFIXES = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/api/docs", "/api/openapi.json", "/redoc", "/cases/share")
+_BASE_EXEMPT = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/cases/share")
+# API 文档默认只在显式开启时暴露（公开仓库 + 公网实例不该让任何人拉到完整接口清单）
+_DOCS_EXEMPT = ("/api/docs", "/api/openapi.json", "/redoc") if settings.api_docs else ()
+EXEMPT_PREFIXES = _BASE_EXEMPT + _DOCS_EXEMPT
 PASSWORD_CHANGE_PATHS = ("/account", "/account/password", "/logout")
+
+
+def _is_https(request: Request) -> bool:
+    """判定「客户端到反代这一跳」是否为 https（反代终止 TLS 时靠 X-Forwarded-Proto）。"""
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if proto in ("https", "wss"):
+        return True
+    if proto in ("http", "ws"):
+        return False
+    return str(request.url.scheme) == "https"
 
 
 @asynccontextmanager
@@ -64,8 +78,9 @@ app = FastAPI(
     title="HVAccRM · 暖通空调客户管理系统",
     version=__version__,
     lifespan=lifespan,
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if settings.api_docs else None,
+    redoc_url="/redoc" if settings.api_docs else None,
+    openapi_url="/api/openapi.json" if settings.api_docs else None,
 )
 
 static_dir = Path(__file__).resolve().parent / "static"
@@ -117,6 +132,8 @@ def offline_page() -> Response:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    secure = _is_https(request)
+    set_request_secure(secure)  # 供 Cookie 的 Secure 标志统一取用
     request.state.user = None
     if not _is_exempt(path):
         with session_scope() as db:
@@ -138,6 +155,9 @@ async def auth_middleware(request: Request, call_next):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        hsts = int(get_settings().hsts_max_age or 0)
+        if hsts > 0 and secure:
+            response.headers.setdefault("Strict-Transport-Security", f"max-age={hsts}")
     return response
 
 
@@ -237,17 +257,29 @@ async def validation_handler(request: Request, exc: RequestValidationError):
 
 @app.exception_handler(IntegrityError)
 async def integrity_handler(request: Request, exc: IntegrityError):
-    """唯一约束/外键冲突：给出可读提示而不是 500。"""
+    """唯一约束/外键冲突：给可读提示，原文（含表名/列名）只进日志。"""
     log.warning("数据完整性冲突 %s %s: %s", request.method, request.url.path, exc.orig)
-    detail = f"数据冲突（唯一性或关联约束）：{exc.orig}"
+    detail = "数据冲突（唯一性或关联约束），请检查输入后重试"
     if request.url.path.startswith("/api"):
         return JSONResponse({"detail": detail}, status_code=409)
-    return render(request, "error.html", status_code=409, detail=detail)
+    return _error_page(request, 409, detail)
 
 
 @app.exception_handler(Exception)
 async def unhandled_handler(request: Request, exc: Exception):
-    log.exception("未处理异常 %s %s", request.method, request.url.path)
+    """未处理异常：对外只给通用文案 + 追踪号，细节（可能含路径/SQL/表结构）只进日志。"""
+    trace_id = uuid.uuid4().hex[:8]
+    log.exception("未处理异常 [%s] %s %s", trace_id, request.method, request.url.path)
+    detail = f"服务器内部错误，请稍后重试（追踪号 {trace_id}）"
     if request.url.path.startswith("/api"):
-        return JSONResponse({"detail": f"服务器内部错误：{exc}"}, status_code=500)
-    return render(request, "error.html", status_code=500, detail=f"服务器内部错误：{exc}")
+        return JSONResponse({"detail": detail, "trace_id": trace_id}, status_code=500)
+    return _error_page(request, 500, detail)
+
+
+def _error_page(request: Request, status_code: int, detail: str):
+    """渲染错误页；渲染本身失败时退化为纯文本（异常处理器里不能再抛异常）。"""
+    try:
+        return render(request, "error.html", status_code=status_code, detail=detail)
+    except Exception:  # pragma: no cover - 兜底
+        log.exception("错误页渲染失败")
+        return Response(f"{detail}\n", status_code=status_code, media_type="text/plain; charset=utf-8")

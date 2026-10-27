@@ -19,7 +19,7 @@ from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso, today_str
 from ..permissions import has_perm, require
 from ..services import cases as cases_svc
 from ..services import share_stats as stats_svc
-from ..templating import redirect, render
+from ..templating import cookie_secure, redirect, render
 from ..utils import client_ip, get_or_404, parse_date, parse_int, return_path
 
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -361,6 +361,7 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
             path=stats_svc.VISITOR_COOKIE_PATH,
             httponly=True,
             samesite="lax",
+            secure=cookie_secure(),
         )
     return response
 

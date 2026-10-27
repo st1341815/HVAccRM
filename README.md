@@ -9,7 +9,8 @@ APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose · PWA（Serv
 功能模块：楼盘/房号 · 客户 · 合同/增项 · 收款/退款 · 成本/供应商/利润 · 施工工序/现场照片 ·
 对外案例/分享外链/分享统计 · 报表（按月/年/客户） · 全功能备份与导入 · 用户/角色/权限 · 审计日志。
 
-> 🌐 **本环境线上实例**：外网 `https://crm.2ii.cn:8443` · 局域网 `http://192.168.11.8:8090`
+> 🏠 **本仓库只放代码与通用文档**：具体部署地址（域名 / 内网 IP / 服务器路径）属于运维信息，
+> 请记录在你的私有部署笔记里，不要提交回本仓库。
 > 📖 **使用手册**（面向使用者：登录、各模块操作、角色权限、手机端、FAQ）：
 > 见 [`docs/使用手册.md`](docs/使用手册.md) —— 日常使用请从这里开始。
 > 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
@@ -29,7 +30,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # 可选：cp .env.example .env 自定义密钥/密码；不复制也能用默认值启动
 
 export DB_PATH=$PWD/data/crm.db DATA_DIR=$PWD/data CONFIG_DIR=$PWD/config
-# 默认管理员：admin / admin888（可用 ADMIN_PASS 覆盖）
+# 管理员：用户名 admin；密码在首次启动时生成，见 data/first_boot.txt（或显式设 ADMIN_PASS）
 
 .venv/bin/python -m app.bootstrap                 # 建目录 + 迁移 + 工序模板 + admin
 .venv/bin/python -m uvicorn app.main:app --port 8000
@@ -75,7 +76,7 @@ mkdir -p /srv/hvaccrm/{data,config}
 docker run -d --name hvaccrm --restart unless-stopped \
   --user 1000:1000 -p 8090:8000 \
   -e TZ=Asia/Shanghai \
-  -e ADMIN_USER=admin -e ADMIN_PASS=admin888 \
+  -e ADMIN_USER=admin \
   -e DB_PATH=/data/crm.db -e DATA_DIR=/data -e CONFIG_DIR=/config \
   -v /srv/hvaccrm/data:/data \
   -v /srv/hvaccrm/config:/config:ro \
@@ -97,10 +98,11 @@ services:
       - "8090:8000"
     environment:
       - TZ=Asia/Shanghai
-      - APP_SECRET_KEY=${APP_SECRET_KEY:-dev-insecure-change-me}
+      - APP_SECRET_KEY=${APP_SECRET_KEY:-}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:-admin888}
+      - ADMIN_PASS=${ADMIN_PASS:-}
       - ADMIN_FORCE_PASSWORD_CHANGE=${ADMIN_FORCE_PASSWORD_CHANGE:-false}
+      - COOKIE_SECURE=${COOKIE_SECURE:-auto}
       - DB_PATH=/data/crm.db
       - DATA_DIR=/data
       - CONFIG_DIR=/config
@@ -109,17 +111,17 @@ services:
       - ./config:/config:ro
 ```
 
-- **默认账号：`admin` / `admin888`**（首次登录后建议在「账户」页修改）。
+- **首次启动的 admin 密码**：未显式设置 `ADMIN_PASS` 时随机生成，写入 `data/first_boot.txt`（0600），首次登录强制改密；`APP_SECRET_KEY` 未设置时同样自动生成并保存到 `config/.app_secret`（0600）。
 - 首次启动自动执行 Alembic 迁移、创建 admin 与默认工序模板；业务数据全部落在挂载的 `data/`。
 - 镜像基于 `python:3.12-slim` 多阶段构建，非 root（uid/gid 1000）运行，暴露 8000，健康检查 `/health`。
 - 版本与源码 Release 对齐：<https://github.com/st1341815/HVAccRM/releases>。
-- **公网 / 生产环境**：请通过 `.env` 覆盖 `APP_SECRET_KEY`（随机串）与 `ADMIN_PASS`，并建议 `ADMIN_FORCE_PASSWORD_CHANGE=true`；默认值仅适合内网可信环境。
+- **公网 / 生产环境**：建议显式设置 `APP_SECRET_KEY`（随机串）与 `ADMIN_PASS`，并建议 `ADMIN_FORCE_PASSWORD_CHANGE=true`；`COOKIE_SECURE=auto` 会在反代透传 `X-Forwarded-Proto: https` 时自动给 Cookie 加 `Secure`。
 
 ### 2.2 从源码构建（NAS / docker compose）
 
 ```bash
-# NAS 上，源码目录 /vol1/1000/Docker/Hvaccrm
-cd /vol1/1000/Docker/Hvaccrm
+# NAS 上，源码目录按你的实际部署路径（示例：<data-directory>/Docker/Hvaccrm）
+cd <data-directory>/Docker/Hvaccrm
 set -a; . config/deploy.env; set +a          # APP_SECRET_KEY / ADMIN_PASS 等
 docker compose -f docker-compose.nas.yml up -d --build
 curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
@@ -135,7 +137,7 @@ curl -s http://127.0.0.1:8090/health         # {"status":"ok","db":true,...}
 ```
 crm/
 ├── docker-compose.yml          # 通用（相对路径挂载）
-├── docker-compose.nas.yml      # NAS 专用（绝对路径 /vol1/1000/Docker/Hvaccrm）
+├── docker-compose.nas.yml      # NAS 专用（绝对路径 <data-directory>/Docker/Hvaccrm）
 ├── Dockerfile                  # 多阶段构建 → python:3.12-slim，非 root 运行
 ├── pyproject.toml / requirements.txt
 ├── alembic.ini + migrations/   # Alembic 迁移（0001 ~ 0015）
@@ -200,7 +202,7 @@ crm/
 
 ```bash
 # 端到端自检（默认打本地 8012，可用环境变量指向 NAS）
-BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test.sh
+BASE_URL=http://127.0.0.1:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test.sh
 ```
 
 覆盖：认证、页面可达性、楼盘/房号级联与模糊搜索、客户 CRUD 与 FTS、
@@ -227,7 +229,7 @@ BASE_URL=http://192.168.11.8:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_t
 
 ## 8. 版本说明
 
-当前版本 **v1.4.7**（2026-10-27，成本与利润「按合同核算」新增表头内合计行：收入 / 成本 / 毛利 / 毛利率 / 已收 / 未收，按当前筛选结果汇总）；预构建镜像 **Docker Hub** `13uncle/hvaccrm:1.4.7`（含 `:latest`），与源码 Release 同版本。
+当前版本 **v1.7.0**（2026-10-28，安全加固版：登录开放重定向 / CSRF / 异常脱敏 / 密钥与初始口令随机化 / Cookie Secure / 依赖升级 / CI 门禁）；预构建镜像 **Docker Hub** `13uncle/hvaccrm:1.7.0`（含 `:latest`），与源码 Release 同版本。
 
 > 更早的版本说明见 `docs/版本更新记录.md`；`v1.4.1`（2026-10-20）为「简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填」。
 

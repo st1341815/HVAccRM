@@ -15,9 +15,22 @@ from sqlalchemy.orm import Session
 from ..models import AppSetting, now_iso
 
 # ------------------------------------------------------------- 默认值
-DEFAULTS: dict[str, str] = {
-    # 备份保存目录（容器内路径；NAS 上 = /vol1/1000/Docker/Hvaccrm/data/backups）
-    "backup.dir": "/data/backups",
+def _default_backup_dir() -> str:
+    """默认备份目录跟随 `DATA_DIR`（容器内 = /data/backups）。
+
+    以前这里写死 "/data/backups"：当 DATA_DIR 不是 /data（本地开发、换卷部署）时，
+    备份页会因为往 /data 建目录失败而 500。改为跟随配置，写死值只作最后兜底。
+    """
+    try:
+        from ..config import get_settings
+
+        return str(get_settings().backup_dir)
+    except Exception:  # pragma: no cover - 配置不可用时兜底
+        return "/data/backups"
+
+
+_STATIC_DEFAULTS: dict[str, str] = {
+    # 备份保存目录（默认跟随 DATA_DIR；NAS 上 = /vol1/1000/Docker/Hvaccrm/data/backups）
     # 保留最近 N 份 zip
     "backup.keep": "30",
     # 每日自动备份
@@ -30,13 +43,20 @@ DEFAULTS: dict[str, str] = {
 }
 
 
+def defaults() -> dict[str, str]:
+    """静态默认值 + 跟随运行环境的 backup.dir。"""
+    d = dict(_STATIC_DEFAULTS)
+    d["backup.dir"] = _default_backup_dir()
+    return d
+
+
 def get(db: Session, key: str, default: str | None = None) -> str | None:
     row = db.get(AppSetting, key)
     if row is not None and row.value is not None:
         return row.value
     if default is not None:
         return default
-    return DEFAULTS.get(key)
+    return defaults().get(key)
 
 
 def set_(db: Session, key: str, value: str) -> None:
@@ -50,7 +70,7 @@ def set_(db: Session, key: str, value: str) -> None:
 
 def all_settings(db: Session) -> dict[str, str]:
     stored = {r.key: r.value for r in db.scalars(select(AppSetting)).all()}
-    merged = {**DEFAULTS, **{k: v for k, v in stored.items() if v is not None}}
+    merged = {**defaults(), **{k: v for k, v in stored.items() if v is not None}}
     return merged
 
 
@@ -72,7 +92,7 @@ def get_backup_config(db: Session) -> dict:
         return max(lo, min(hi, v))
 
     return {
-        "dir": (raw.get("backup.dir") or DEFAULTS["backup.dir"]).strip(),
+        "dir": (raw.get("backup.dir") or _default_backup_dir()).strip(),
         "keep": _int("backup.keep", 1, 999, 30),
         "daily_enabled": raw.get("backup.daily.enabled", "1") == "1",
         "daily_hour": _int("backup.daily.hour", 0, 23, 3),

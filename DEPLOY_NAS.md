@@ -2,22 +2,22 @@
 
 系统：**HVAccRM — 暖通空调客户管理系统**（界面品牌名 `HVAccRM`；容器/项目/路径仍沿用短名 `crm`，见 §1.1）
 
-设备：飞牛 OS（fnOS）· x86_64 · Docker 28.5.2 · 源码目录 `/vol1/1000/Docker/Hvaccrm`
+设备：飞牛 OS（fnOS）· x86_64 · Docker 28.5.2 · 源码目录 `<data-directory>/Docker/Hvaccrm`
 
 ## 1. 当前部署状态（已验证）
 
 | 项 | 值 |
 | --- | --- |
-| 访问地址 | 外网 `https://crm.2ii.cn:8443` · 局域网 `http://192.168.11.8:8090` |
+| 访问地址 | 外网 `https://<your-domain>:8443` · 局域网 `http://<nas-ip>:8090` |
 | 容器名 / 镜像 | `crm` / `crm:local`（177 MB，多阶段构建，非 root） |
-| 挂载 | `/vol1/1000/Docker/Hvaccrm/data → /data`、`/vol1/1000/Docker/Hvaccrm/config → /config:ro` |
+| 挂载 | `<data-directory>/Docker/Hvaccrm/data → /data`、`<data-directory>/Docker/Hvaccrm/config → /config:ro` |
 | 环境变量 | `TZ=Asia/Shanghai`、`APP_SECRET_KEY`、`ADMIN_USER/ADMIN_PASS`、`DB_PATH=/data/crm.db`、`DATA_DIR=/data`、`CONFIG_DIR=/config`、`LOG_LEVEL=INFO` |
 | 资源限制 | `mem_limit 512m`，日志 `json-file 5m × 3` |
 | 健康检查 | 容器内 `GET /health`（60s 间隔）→ `healthy` |
 | 验证结果 | `scripts/smoke_test.sh` 92/92 通过 |
-| 部署形态 | **fnOS Docker Compose 项目**，项目名 `hvaccrm`，工作目录 `/vol1/1000/Docker/Hvaccrm`，compose 文件 `docker-compose.yml` |
+| 部署形态 | **fnOS Docker Compose 项目**，项目名 `hvaccrm`，工作目录 `<data-directory>/Docker/Hvaccrm`，compose 文件 `docker-compose.yml` |
 
-部署变量保存在 NAS：`/vol1/1000/Docker/Hvaccrm/config/deploy.env`，并已派生一份 `/vol1/1000/Docker/Hvaccrm/.env`（compose 默认读取，权限均为 `600`，含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
+部署变量保存在 NAS：`<data-directory>/Docker/Hvaccrm/config/deploy.env`，并已派生一份 `<data-directory>/Docker/Hvaccrm/.env`（compose 默认读取，权限均为 `600`，含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
 
 ### 1.1 在飞牛 Docker 界面里管理（推荐入口）
 
@@ -27,13 +27,13 @@
 - 飞牛桌面 → **Docker → 项目**：可见项目 `crm`（running 1/1），可从这里启动/停止/查看容器；
 - 飞牛桌面 → **Docker → 容器**：可见容器 `hvaccrm`，`所属项目` 列显示 `crm`；
 - 项目工作目录必须是**宿主机真实路径**。若用 `docker:cli` 之类的容器代跑 compose，挂载必须
-  写成 `/vol1/1000:/vol1/1000`（路径一致），否则 `com.docker.compose.project.working_dir`
+  写成 `<data-directory>:<data-directory>`（路径一致），否则 `com.docker.compose.project.working_dir`
   会记成容器内路径（如 `/work/crm`），飞牛界面点进项目时找不到 compose 文件。
 
 在 NAS 上手动管理（等价于界面操作）：
 
 ```bash
-cd /vol1/1000/Docker/Hvaccrm
+cd <data-directory>/Docker/Hvaccrm
 docker compose up -d            # 启动/更新（自动读取同目录 .env）
 docker compose ps
 docker compose down             # 停止并删除容器（不动 data/、config/）
@@ -42,12 +42,12 @@ docker compose up -d --build    # 改代码后重建镜像
 
 > 注意：飞牛的「项目」页对项目信息有缓存。若界面显示的路径仍是改造前的 `work/crm`，
 > 刷新页面或重进 Docker 应用即可；`docker compose ls` / 容器标签里的路径是准确的
-> （`/vol1/1000/Docker/Hvaccrm`）。
+> （`<data-directory>/Docker/Hvaccrm`）。
 
 ## 2. 常用运维命令（NAS 上执行）
 
 ```bash
-cd /vol1/1000/Docker/Hvaccrm
+cd <data-directory>/Docker/Hvaccrm
 set -a; . config/deploy.env; set +a
 
 docker compose -f docker-compose.nas.yml up -d --build   # 构建并启动
@@ -66,9 +66,9 @@ ls -lt data/backups | head                               # 备份列表
 NAS 上未开 SSH 时，用 `trim-cli`（fnOS CLI）完成上传、解压与镜像构建：
 
 ```bash
-# 1) 上传源码压缩包并解压到 /vol1/1000（file extract 为异步任务，耐心等待）
-trim-cli --profile home --allow-insecure-http file upload /vol1/1000 ./crm-src.tar.gz --overwrite replace --yes
-trim-cli --profile home --allow-insecure-http file extract /vol1/1000/Docker/Hvaccrm-src.tar.gz /vol1/1000 --overwrite replace --yes
+# 1) 上传源码压缩包并解压到 <data-directory>（file extract 为异步任务，耐心等待）
+trim-cli --profile home --allow-insecure-http file upload <data-directory> ./crm-src.tar.gz --overwrite replace --yes
+trim-cli --profile home --allow-insecure-http file extract <data-directory>/Docker/Hvaccrm-src.tar.gz <data-directory> --overwrite replace --yes
 
 # 2) 拉取基础镜像
 trim-cli --profile home --allow-insecure-http docker image pull python:3.12-slim --yes
@@ -77,14 +77,14 @@ trim-cli --profile home --allow-insecure-http docker image pull docker:cli --yes
 # 3) 用 docker:cli 容器（挂载宿主 docker.sock）构建镜像
 trim-cli --profile home --allow-insecure-http docker container create \
   --image docker:cli --name crm-build \
-  --mount /vol1/1000:/work:rw --mount /var/run/docker.sock:/var/run/docker.sock:rw \
+  --mount <data-directory>:/work:rw --mount /var/run/docker.sock:/var/run/docker.sock:rw \
   --cmd sh --cmd /work/nas_build.sh --start --yes
 
 # 4) 启动应用容器
-set -a; . /vol1/1000/Docker/Hvaccrm/config/deploy.env; set +a
+set -a; . <data-directory>/Docker/Hvaccrm/config/deploy.env; set +a
 trim-cli --profile home --allow-insecure-http docker container create \
   --image crm:local --name hvaccrm \
-  --mount /vol1/1000/Docker/Hvaccrm/data:/data:rw --mount /vol1/1000/Docker/Hvaccrm/config:/config:ro \
+  --mount <data-directory>/Docker/Hvaccrm/data:/data:rw --mount <data-directory>/Docker/Hvaccrm/config:/config:ro \
   --port 8090:8000 --memory 512 --restart --start --yes \
   --env TZ=Asia/Shanghai --env "APP_SECRET_KEY=$APP_SECRET_KEY" \
   --env ADMIN_USER=admin --env "ADMIN_PASS=$ADMIN_PASS" \
@@ -108,7 +108,7 @@ trim-cli --profile home --allow-insecure-http docker container create \
 | 构建上下文被塞进整个项目目录 | 无 `.dockerignore` 时 `docker compose build` 会把 `data/`（含 DB/照片）、`config/`、`.env`、`.git` 一起传给 daemon | 仓库已加 `.dockerignore`；`Dockerfile` 只 `COPY` 代码目录，不会把数据打进镜像 |
 
 NAS 侧无法读取容器 stdout 时，本次的做法是临时起一个 `python:3.12-slim` 静态文件服务容器
-（`python3 -m http.server 8099 -d /work`，挂载 `/vol1/1000`）来读取 `data/logs/crm.log`、
+（`python3 -m http.server 8099 -d /work`，挂载 `<data-directory>`）来读取 `data/logs/crm.log`、
 `build.log` 等文件；**调试结束务必删除该容器**（它会把家目录暴露成无认证的 HTTP 目录）。
 
 ## 5. 数据安全

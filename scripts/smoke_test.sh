@@ -16,15 +16,22 @@ code() { curl -s -D $HDR -o $OUT -w "%{http_code}" "$@"; }
 loc()  { grep -i '^location:' $HDR | tail -1 | sed 's/\r//' | awk '{print $2}'; }
 last_id() { loc | grep -o '[0-9]*$'; }
 has() { grep -q "$1" $OUT; }
+# 取 CSRF token（双提交 Cookie：登录与高危 POST 需要，先 GET 一次页面拿到）
+csrf() { # jar [path]
+  local jar=$1 path=${2:-/}
+  curl -s -b "$jar" -c "$jar" "$B$path" | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//'
+}
 
 # 登录并按需完成强制改密
 login_user() { # username password jar [newpass]
   rm -f $3
-  local c
-  c=$(code -c $3 -b $3 -X POST -d "username=$1&password=$2&next=/" $B/login)
+  local c t
+  t=$(csrf $3 /login)
+  c=$(code -c $3 -b $3 -X POST -d "csrf_token=$t&username=$1&password=$2&next=/" $B/login)
   if [ "$c" != "303" ]; then echo "login failed($c) for $1"; return 1; fi
   if loc | grep -q "/account/password"; then
-    c=$(code -b $3 -c $3 -X POST -d "old_password=$2&new_password=$4&confirm_password=$4" $B/account/password)
+    t=$(csrf $3 /account/password)
+    c=$(code -b $3 -c $3 -X POST -d "csrf_token=$t&old_password=$2&new_password=$4&confirm_password=$4" $B/account/password)
     [ "$c" == "303" ] || { echo "forced password change failed($c) for $1"; return 1; }
   fi
   return 0
@@ -33,7 +40,8 @@ login_user() { # username password jar [newpass]
 mkdir -p /tmp/crmtest
 
 echo "== 1. 认证与页面 =="
-code -c $J -b $J -X POST -d "username=admin&password=$APW&next=/" $B/login > /dev/null
+CT=$(csrf $J /login)
+code -c $J -b $J -X POST -d "csrf_token=$CT&username=admin&password=$APW&next=/" $B/login > /dev/null
 chk "admin 登录" 303 "$(grep -c . $HDR >/dev/null; echo 303)"
 for p in / /customers /projects /contracts /payments /tasks /admin /admin/users /admin/audit /admin/stages /admin/backups /admin/permissions /payments/overdue /account /customers/new /projects/new /contracts/new; do
   c=$(code -b $J $B$p); chk "GET $p" 200 "$c"
@@ -122,14 +130,14 @@ has "测试楼盘A" && ok "搜索命中楼盘名称" || bad "按楼盘名搜索�
 has "1203" && ok "搜索结果含该楼盘下的房号" || bad "按楼盘名搜索未返回房号"
 
 echo "== 3b. 工序模板 CRUD =="
-c=$(code -b $J -X POST --data-urlencode "name=临时工序$RUN" --data-urlencode "sort_order=99" --data-urlencode "default_days=2" --data-urlencode "require_photo=1" $B/admin/stages/new)
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" --data-urlencode "name=临时工序$RUN" --data-urlencode "sort_order=99" --data-urlencode "default_days=2" --data-urlencode "require_photo=1" $B/admin/stages/new)
 chk "新增工序模板" 303 "$c"
 c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && ok "新模板出现在列表" || bad "新模板未出现"
 SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "临时工序$RUN" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
-c=$(code -b $J -X POST "$B/admin/stages/$SID/delete"); chk "删除未使用的工序" 303 "$c"
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" "$B/admin/stages/$SID/delete"); chk "删除未使用的工序" 303 "$c"
 c=$(code -b $J "$B/admin/stages"); has "临时工序$RUN" && bad "未使用的工序删除无效" || ok "未使用的工序已删除"
 USED_SID=$(curl -s -b $J "$B/admin/stages" | tr '\n' ' ' | sed 's/<tr>/\n<tr>/g' | grep "上门勘测" | grep -o 'stages/[0-9]*/delete' | head -1 | grep -o '[0-9]*')
-c=$(code -b $J -X POST "$B/admin/stages/$USED_SID/delete"); chk "删除在用工序被拒（重定向）" 303 "$c"
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" "$B/admin/stages/$USED_SID/delete"); chk "删除在用工序被拒（重定向）" 303 "$c"
 c=$(code -b $J "$B/admin/stages"); has "上门勘测" && ok "在用工序未被误删" || bad "在用工序被删掉了"
 
 echo "== 3c. 楼盘删除 =="
@@ -350,7 +358,7 @@ c=$(code -b $J -X POST $B/photos/$PH/delete); chk "删除照片" 303 "$c"
 
 echo "== 7. 权限点 / 数据范围 / 金额隔离 =="
 mk_user() { # name role scope  → 打印新用户 ID
-  code -b $J -X POST -d "username=$1&password=$2&role=$3&data_scope=$4" $B/admin/users/new > /dev/null
+  code -b $J -X POST -d "csrf_token=$CT&username=$1&password=$2&role=$3&data_scope=$4" $B/admin/users/new > /dev/null
   loc | grep -o '#u[0-9]*' | grep -o '[0-9]*'
 }
 DU="designer_$RUN"; IU="installer_$RUN"; SU="sales_$RUN"; FU="finance_$RUN"
@@ -389,17 +397,17 @@ has "sales自有客户$RUN" && ok "sales 能看到自己新建的客户" || bad 
 c=$(code -b $D $B/admin); chk "sales 访问系统管理" 403 "$c"
 
 echo "== 7b. 用户姓名（表单优先显示） =="
-c=$(code -b $J -X POST --data-urlencode "full_name=张三名" --data-urlencode "username=name$RUN" --data-urlencode "password=Abcd1234$RUN" -d "role=sales" $B/admin/users/new)
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" --data-urlencode "full_name=张三名" --data-urlencode "username=name$RUN" --data-urlencode "password=Abcd1234$RUN" -d "role=sales" $B/admin/users/new)
 chk "新建带姓名的用户" 303 "$c"
 c=$(code -b $J "$B/admin/users"); has "张三名" && ok "用户列表显示姓名" || bad "用户列表未显示姓名"
 has "name$RUN" && ok "用户列表保留登录账号列" || bad "用户列表缺少账号"
 c=$(code -b $J "$B/customers/new"); has "张三名（销售）" && ok "客户表单负责人下拉优先显示姓名" || bad "负责人下拉未显示姓名"
 c=$(code -b $J "$B/tasks?scope=all"); has ">张三名<" && ok "施工看板责任人筛选显示姓名" || bad "施工看板未显示姓名"
-c=$(code -b $J -c $J -X POST --data-urlencode "full_name=李四" $B/account/profile); chk "本人修改姓名" 303 "$c"
+c=$(code -b $J -c $J -X POST --data-urlencode "csrf_token=$CT" --data-urlencode "full_name=李四" $B/account/profile); chk "本人修改姓名" 303 "$c"
 c=$(code -b $J "$B/account"); has "李四" && ok "账户页显示新姓名" || bad "账户页未显示新姓名"
-c=$(code -b $J -c $J -X POST --data-urlencode "full_name=" $B/account/profile); chk "清空姓名" 303 "$c"
+c=$(code -b $J -c $J -X POST --data-urlencode "csrf_token=$CT" --data-urlencode "full_name=" $B/account/profile); chk "清空姓名" 303 "$c"
 c=$(code -b $J "$B/account"); has "admin" && ok "姓名清空后回落显示登录账号" || bad "清空后未回落账号"
-c=$(code -b $J -X POST --data-urlencode "full_name=超长姓名$(printf 'x%.0s' {1..40})" $B/account/profile); chk "超长姓名被拒" 303 "$c"
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" --data-urlencode "full_name=超长姓名$(printf 'x%.0s' {1..40})" $B/account/profile); chk "超长姓名被拒" 303 "$c"
 
 echo "== 7c. 成本与利润核算 =="
 c=$(code -b $J -X POST --data-urlencode "name=测试供应商$RUN" --data-urlencode "contact=王经理" --data-urlencode "phone=13900001111" $B/costs/suppliers/new)
@@ -476,8 +484,8 @@ echo "== 7d. 关键字筛选（客户手机号/合同号 替代 客户ID/合同I
 c=$(code -b $J "$B/contracts?customer_q=13711112222"); chk "合同台账按手机号筛选" 200 "$c"
 has "1203" && ok "手机号筛选命中合同（显示房号）" || bad "手机号筛选未命中合同"
 c=$(code -b $J "$B/contracts"); has 'name="customer_id"' && bad "合同台账仍用客户 ID 筛选" || ok "合同台账已改关键字筛选"
-c=$(code -b $J "$B/payments?contract_q=ONE"); chk "收款按合同号筛选" 200 "$c"
-has "ONE" && ok "合同号筛选命中收款" || bad "合同号筛选未命中收款"
+c=$(code -b $J "$B/payments?contract_q=ONE"); chk "收款按合同号筛选（后端参数保留）" 200 "$c"
+has 'name="contract_q"' && bad "收款页仍显示合同号筛选框（v0.14.77 已移除）" || ok "收款页已移除合同号筛选框（后端参数保留）"
 c=$(code -b $J "$B/payments"); has 'name="contract_id"' && bad "收款仍用合同 ID 筛选" || ok "收款已改合同号关键字筛选"
 c=$(code -b $J "$B/costs?customer_q=13711112222"); chk "利润核算按手机号筛选" 200 "$c"
 has "1203" && ok "手机号筛选命中利润核算" || bad "手机号筛选未命中利润核算"
@@ -486,10 +494,10 @@ c=$(code -b $J "$B/costs"); has 'name="customer_id"' && bad "利润核算仍用�
 echo "== 8. 会话失效 / 备份 / 审计 =="
 login_user $SU sales12345 $D sales12345x && ok "sales 重新登录" || bad "sales 重新登录失败"
 c=$(code -b $D $B/customers); chk "sales 会话有效" 200 "$c"
-c=$(code -b $J -X POST -d "data_scope=all&is_active=1" $B/admin/users/$SID/update)
+c=$(code -b $J -X POST -d "csrf_token=$CT&data_scope=all&is_active=1" $B/admin/users/$SID/update)
 chk "管理员调整 sales1 数据范围" 303 "$c"
 c=$(code -b $D $B/customers); chk "旧会话已失效(跳登录)" 303 "$c"
-c=$(code -b $J -X POST $B/admin/backups/run); chk "手动备份" 303 "$c"
+c=$(code -b $J -X POST --data-urlencode "csrf_token=$CT" $B/admin/backups/run); chk "手动备份" 303 "$c"
 ls -1 /tmp/crmtest/backups/ | tail -3
 code -b $J $B/admin/audit > /dev/null
 has "login" && ok "审计日志已记录登录事件" || bad "审计日志缺失"
@@ -533,6 +541,11 @@ def curl(*args, data=None):
 def body():
     return open(OUT, encoding="utf-8", errors="replace").read()
 
+def token(path="/login"):
+    curl(f"{B}{path}")
+    m = re.search(r'name="csrf_token" value="([^"]+)"', body())
+    return m.group(1) if m else ""
+
 def totp(secret, step=30):
     key = base64.b32decode(secret.upper() + "=" * (-len(secret) % 8))
     d = hmac.new(key, struct.pack(">Q", int(time.time()) // step), hashlib.sha1).digest()
@@ -547,21 +560,22 @@ def chk(name, cond):
 
 # 未开启二步验证时，登录页不应显示验证码输入框
 curl(f"{B}/login")
+TOK = token("/login")   # 双提交 CSRF token（同一 cookie jar 内复用）
 chk("登录页默认不显示验证码控件", 'name="totp"' not in body())
 
-chk("admin 登录", curl(f"{B}/login", data=[f"username=admin", f"password={apw}", "next=/"]) == "303")
+chk("admin 登录", curl(f"{B}/login", data=[f"csrf_token={TOK}", f"username=admin", f"password={apw}", "next=/"]) == "303")
 curl(f"{B}/account")
 m = re.search(r'name="secret" value="([A-Z2-7]+)"', body())
 chk("取到 TOTP 密钥", bool(m))
 secret = m.group(1)
-chk("开启二步验证", curl(f"{B}/account/totp/enable", data=[f"secret={secret}", f"code={totp(secret)}"]) == "303")
-chk("无验证码登录被拒(401)", curl(f"{B}/login", data=["username=admin", f"password={apw}", "next=/"]) == "401")
+chk("开启二步验证", curl(f"{B}/account/totp/enable", data=[f"csrf_token={TOK}", f"secret={secret}", f"code={totp(secret)}"]) == "303")
+chk("无验证码登录被拒(401)", curl(f"{B}/login", data=[f"csrf_token={TOK}", "username=admin", f"password={apw}", "next=/"]) == "401")
 chk("需要验证码时登录页显示输入框", 'name="totp"' in body())
-chk("错误验证码被拒(401)", curl(f"{B}/login", data=["username=admin", f"password={apw}", "totp=000000", "next=/"]) == "401")
-chk("正确验证码登录(303)", curl(f"{B}/login", data=["username=admin", f"password={apw}", f"totp={totp(secret)}", "next=/"]) == "303")
+chk("错误验证码被拒(401)", curl(f"{B}/login", data=[f"csrf_token={TOK}", "username=admin", f"password={apw}", "totp=000000", "next=/"]) == "401")
+chk("正确验证码登录(303)", curl(f"{B}/login", data=[f"csrf_token={TOK}", "username=admin", f"password={apw}", f"totp={totp(secret)}", "next=/"]) == "303")
 chk("带 TOTP 会话可用(200)", curl(f"{B}/") == "200")
-chk("关闭二步验证", curl(f"{B}/account/totp/disable", data=[f"password={apw}"]) == "303")
-chk("关闭后免验证码登录(303)", curl(f"{B}/login", data=["username=admin", f"password={apw}", "next=/"]) == "303")
+chk("关闭二步验证", curl(f"{B}/account/totp/disable", data=[f"csrf_token={TOK}", f"password={apw}"]) == "303")
+chk("关闭后免验证码登录(303)", curl(f"{B}/login", data=[f"csrf_token={TOK}", "username=admin", f"password={apw}", "next=/"]) == "303")
 chk("状态已复位", "已开启" not in (curl(f"{B}/account") and body()))
 print(f"  —— 第 9 节：通过 {ok}，失败 {fail}")
 with open("/tmp/crmtest/section9.txt", "w") as fh:

@@ -7,7 +7,7 @@
 ```bash
 cd crm
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # 含 pytest
+.venv/bin/pip install -r requirements.txt -r requirements-test.txt   # 运行依赖 + 测试依赖（pytest/httpx 不进生产镜像）
 cp .env.example .env                        # 可选：默认值即可启动（admin / admin888）
 ```
 
@@ -58,7 +58,7 @@ python scripts/bump_version.py            # 一致性检查（部署前跑一次
 见 `docs/Docker部署指南.md` 与 `DEPLOY_NAS.md`。要点：
 
 1. `file upload <远程目录> <本地文件>` 的 `<远程目录>` 是**纯目录**（不带文件名）
-2. NAS 部署目录是 `/vol1/1000/Docker/Hvaccrm`（大写 H 小写 m）
+2. NAS 部署目录是 `<data-directory>/Docker/Hvaccrm`（大写 H 小写 m）
 3. 部署前更新 `compose_build.sh` 里的回滚 tag 为「当前线上版本」
 4. 增量重建用 docker:cli 容器跑 `compose_build.sh`，日志看 `build_result.log`
 5. 验证：`GET /health` 版本号 + 容器 `healthy` + 关键页面冒烟
