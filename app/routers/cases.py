@@ -135,7 +135,6 @@ def manage_links(
         base_url=stats_svc.public_base(request),
         can_edit=has_perm(user, "case:edit"),
         durations=list(cases_svc.SHARE_DURATIONS.keys()) + [cases_svc.SHARE_UNLIMITED],
-        view_limits=list(cases_svc.SHARE_VIEW_LIMITS.keys()) + [cases_svc.SHARE_UNLIMITED],
         installer_options=_installer_options(db),
         stage_options=CASE_STAGE_OPTIONS,
         product_options=PRODUCT_OPTIONS,
@@ -232,16 +231,15 @@ def set_share_settings(
     request: Request,
     case_id: int,
     duration: str = Form("不限"),
-    limit: str = Form("不限"),
     back: str = Form(""),
     db: Session = Depends(get_db),
     user=Depends(require("case:edit")),
 ):
     case = get_or_404(db, Case, case_id, "案例")
-    cases_svc.set_share_limits(db, case, duration, limit)
+    cases_svc.set_share_limits(db, case, duration)
     log_action(
         db, user, "update", "cases", case.id,
-        new={"share_expires_at": case.share_expires_at, "share_max_views": case.share_max_views, "duration": duration, "limit": limit},
+        new={"share_expires_at": case.share_expires_at, "duration": duration},
         ip=client_ip(request),
     )
     commit_retry(db)
@@ -273,10 +271,9 @@ def enable_share(
 ):
     case = get_or_404(db, Case, case_id, "案例")
     case.share_disabled = 0
-    case.share_views = 0
     log_action(db, user, "share_enable", "cases", case.id, ip=client_ip(request))
     commit_retry(db)
-    return redirect(return_path(back, request.headers.get("referer"), "/cases/links"), "分享链接已恢复，访问次数已清零")
+    return redirect(return_path(back, request.headers.get("referer"), "/cases/links"), "分享链接已恢复")
 
 
 # ------------------------------------------------------------ 图片读取
@@ -338,8 +335,7 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
             .order_by(CaseImage.sort_order, CaseImage.id)
         ).all()
     )
-    # 有效访问：计数 +1，并留一条匿名访问明细（用于统计）
-    case.share_views = (case.share_views or 0) + 1
+    # 留一条匿名访问明细（统计的唯一数据源；v1.6.0 起不再维护 cases.share_views）
     visit, need_cookie = stats_svc.record_visit(db, case, request, len(images))
     commit_retry(db)
 

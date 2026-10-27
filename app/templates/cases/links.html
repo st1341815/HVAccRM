@@ -9,7 +9,7 @@
     <a href="/cases/stats">统计</a>
   </nav>
 </div>
-<p class="muted small">查询所有分享外链的状态。时间限制与次数限制满足任意一条即自动失效；也可手动让有效链接失效。</p>
+<p class="muted small">查询所有分享外链的状态。超过有效期即自动失效，也可手动让有效链接失效。链接的打开次数、停留时长、看图张数请到 <a href="/cases/stats">统计</a> 页查看。</p>
 
 <section class="card">
   <form method="get" action="/cases/links" class="filterbar">
@@ -41,7 +41,7 @@
 <section class="card">
   <table class="tight">
     <thead>
-      <tr><th>房号信息</th><th>工序</th><th>施工时间</th><th>状态</th><th>有效期</th><th>访问次数</th><th>分享链接</th>{% if can_edit %}<th>限制设置</th><th>操作</th>{% endif %}</tr>
+      <tr><th>房号信息</th><th>工序</th><th>施工时间</th><th>状态</th><th>有效期</th><th>分享链接</th>{% if can_edit %}<th>限制设置</th><th>操作</th>{% endif %}</tr>
     </thead>
     <tbody>
     {% for r in rows %}
@@ -55,7 +55,6 @@
           {% if r.valid %}<span class="badge ok">有效</span>{% else %}<span class="badge warn" title="{{ r.reason }}">已失效</span><div class="muted small">{{ r.reason }}</div>{% endif %}
         </td>
         <td>{{ c.share_expires_at[:16] if c.share_expires_at else '不限' }}</td>
-        <td>{{ c.share_views or 0 }} / {{ c.share_max_views if c.share_max_views else '不限' }}</td>
         <td>
           <a class="btn ghost small" href="/cases/share/{{ c.share_token }}" target="_blank" rel="noopener">打开</a>
           <button type="button" class="btn ghost small js-copy" data-url="{{ share_url }}">复制链接</button>
@@ -64,14 +63,8 @@
         <td>
           <form method="post" action="/cases/{{ c.id }}/share/settings" class="inline share-settings" id="share-settings-{{ c.id }}">
             <input type="hidden" name="back" value="/cases/links">
-            <select name="duration" title="时间限制">
+            <select name="duration" title="有效期">
               {% for d in durations %}<option value="{{ d }}" {{ 'selected' if (c.share_duration or '不限') == d else '' }}>{{ d }}</option>{% endfor %}
-            </select>
-            <select name="limit" title="次数限制">
-              <option value="10次" {{ 'selected' if c.share_max_views == 10 else '' }}>10次</option>
-              <option value="50次" {{ 'selected' if c.share_max_views == 50 else '' }}>50次</option>
-              <option value="200次" {{ 'selected' if c.share_max_views == 200 else '' }}>200次</option>
-              <option value="不限" {{ 'selected' if not c.share_max_views else '' }}>不限</option>
             </select>
           </form>
         </td>

@@ -80,10 +80,9 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
             else product_type_for_customer(db, customer)
         ),
         share_token=_new_token(db),
-        # 外链默认限制：1 天 + 10 次（可在「外链管理」里改）
+        # 外链默认限制：1 天（可在「外链管理」里改；只按时间，不做次数限制）
         share_duration="1天",
         share_expires_at=share_expiry_from("1天"),
-        share_max_views=share_view_limit("10次"),
     )
     db.add(case)
     db.flush()
@@ -164,7 +163,6 @@ def sync_case_fields(db: Session, case: Case, task: Task) -> list[str]:
 
 # ------------------------------------------------------------ 分享限制
 SHARE_DURATIONS: dict[str, int] = {"1天": 1, "3天": 3, "1周": 7, "1月": 30}
-SHARE_VIEW_LIMITS: dict[str, int] = {"10次": 10, "50次": 50, "200次": 200}
 SHARE_UNLIMITED = "不限"
 
 
@@ -177,29 +175,24 @@ def share_expiry_from(duration: str, base: datetime | None = None) -> str | None
     return (base + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def share_view_limit(limit: str) -> int | None:
-    """把「10次/50次/200次/不限」换算为次数上限；不限返回 None。"""
-    return SHARE_VIEW_LIMITS.get(limit)
-
-
 def share_state(case: Case) -> tuple[bool, str]:
-    """分享链接当前状态：返回 (是否有效, 说明)。满足任一条件即失效。"""
+    """分享链接当前状态：返回 (是否有效, 说明)。
+
+    只有两种失效条件：手动停用、超过有效期。
+    （v1.6.0 起取消「按访问次数限制」——统计页已经能看打开次数，
+    再用次数卡死链接只会误伤回头客，且会让客户二次打开时看到「已失效」。）
+    """
     if case.share_disabled:
         return False, "已被手动停用"
     if case.share_expires_at and now_iso() >= case.share_expires_at:
         return False, f"已于 {case.share_expires_at[:16]} 过期"
-    if case.share_max_views and (case.share_views or 0) >= case.share_max_views:
-        return False, "已达访问次数上限"
     return True, "有效"
 
 
-def set_share_limits(db: Session, case: Case, duration: str, limit: str) -> None:
-    """设置分享时间/次数限制；两者独立，空/不限即不限制。"""
+def set_share_limits(db: Session, case: Case, duration: str) -> None:
+    """设置分享有效期（空/不限即不限制）。失效开关仍由用户手动控制。"""
     case.share_duration = duration if duration in SHARE_DURATIONS else SHARE_UNLIMITED
     case.share_expires_at = share_expiry_from(duration)
-    case.share_max_views = share_view_limit(limit)
-    # 改了限制后：次数从 0 重新计（语义更清晰）；失效开关保留由用户手动控制
-    case.share_views = 0
 
 
 # ------------------------------------------------------------ 案例展示图
