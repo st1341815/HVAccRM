@@ -50,7 +50,18 @@ echo "MARKER=BUILD_OK"
 
 echo "===== health check（文件名即数据） ====="
 rm -f $DIR/health_*.txt
-H=$(docker exec hvaccrm python3 -c "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=8).read().decode())" 2>&1)
+# 容器起来到应用能响应有几十秒窗口，直接查会拿到 Connection refused（曾写出误导性的
+# health_Traceback*.txt），这里最多重试 12 次 × 5 秒。
+H=""
+i=0
+while [ $i -lt 12 ]; do
+  H=$(docker exec hvaccrm python3 -c "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=8).read().decode())" 2>&1)
+  case "$H" in
+    *'"status":"ok"'*) break ;;
+  esac
+  i=$((i + 1))
+  sleep 5
+done
 echo "HEALTH=$H"
 SAFE=$(printf '%s' "$H" | tr -cd 'A-Za-z0-9._-' | cut -c1-150)
 : > "$DIR/health_${SAFE}.txt"
