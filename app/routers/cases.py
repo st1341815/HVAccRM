@@ -424,16 +424,25 @@ def share_cover(token: str, db: Session = Depends(get_db)):
 
 
 @router.get("/share/{token}/qrcode.svg")
-def share_qrcode(request: Request, token: str, db: Session = Depends(get_db)):
-    """分享二维码（SVG）：内容为带 ?src=qr 的分享页地址，便于扫码来源统计。"""
+def share_qrcode(request: Request, token: str, base: str = "", db: Session = Depends(get_db)):
+    """分享二维码（SVG）：内容为带 ?src=qr 的分享页地址。
+
+    `base` 由前端传当前 `location.origin`——内网穿透域名不固定、公网域名可能被微信拦截，
+    写死任何域名都会变成死链；不传/不合法则回落到按请求头推断。
+    """
     case = db.scalars(select(Case).where(Case.share_token == token)).first()
     if case is None:
         return JSONResponse({"detail": "分享链接无效"}, status_code=404)
     valid, _reason = cases_svc.share_state(case)
     if not valid:
         return JSONResponse({"detail": "分享已失效"}, status_code=410)
-    svg = stats_svc.qrcode_svg(stats_svc.share_url(request, token, "qr"))
-    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=3600"})
+    url = stats_svc.share_url_from(stats_svc.safe_base(request, base), token, "qr")
+    svg = stats_svc.qrcode_svg(url)
+    return Response(
+        svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/share/{token}/image/{image_id}")

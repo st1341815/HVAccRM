@@ -80,6 +80,39 @@
 </div>
 {% endif %}
 <script>
+// 「复制链接」统一处理：**用当前浏览器地址的 origin 重写**，不写死域名。
+// 原因：公网域名可能被微信拦截、内网穿透（DDNSTO）域名是浮动的，
+// 只有「用户此刻打开这个页面的域名/IP + 端口」才是真正的有效地址。
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('.js-copy');
+  if (!btn) return;
+  var raw = btn.getAttribute('data-url') || location.href;
+  var url = raw;
+  try {
+    var u = new URL(raw, location.origin);
+    url = location.origin + u.pathname + u.search;
+  } catch (err) {}
+  var old = btn.textContent;
+  function done() { btn.textContent = '已复制'; setTimeout(function () { btn.textContent = old; }, 1500); }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = url;
+    ta.setAttribute('readonly', 'readonly');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var copied = false;
+    try { copied = document.execCommand('copy'); } catch (err) {}
+    document.body.removeChild(ta);
+    if (copied) done();
+    else window.prompt('复制这个链接', url);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, fallback);
+  } else { fallback(); }
+});
+</script>
+<script>
 // 图片放大查看：点缩略图弹灯箱（不再跳转到原图页面 / 触发下载）
 //   左滑 ← / 右滑 → 切换同一组内的上一张、下一张；桌面端可用 ← → 方向键与两侧按钮；
 //   点图片在「适应屏幕」与「2 倍放大」之间切换；Esc 或点空白处关闭。

@@ -99,21 +99,4 @@
   {% if not rows %}<p class="muted">还没有可管理的外链。完成「前期施工」或「后期施工」工序生成案例后，这里会自动出现分享链接。</p>{% endif %}
 </section>
 
-<script>
-document.addEventListener('click', function (e) {
-  var btn = e.target.closest && e.target.closest('.js-copy');
-  if (!btn) return;
-  var url = btn.getAttribute('data-url') || '';
-  function done() { btn.textContent = '已复制'; setTimeout(function () { btn.textContent = '复制链接'; }, 1500); }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(done, function () { fallback(); });
-  } else { fallback(); }
-  function fallback() {
-    var ta = document.createElement('textarea');
-    ta.value = url; document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); done(); } catch (err) {}
-    document.body.removeChild(ta);
-  }
-});
-</script>
 {% endblock %}
