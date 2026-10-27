@@ -54,3 +54,22 @@ def test_finish_already_done_short_circuits(db, admin, today):
     # "done" 状态在前置守卫里没有显式分支，但若落地真实场景应早返回
     # 这里仅作为烟雾测试，确保不抛异常
     assert isinstance(ok, bool)
+
+
+def test_case_default_share_unlimited(db, admin, today):
+    """v1.6.1：新建案例的分享外链默认「不限」有效期，靠手动失效控制。"""
+    from sqlalchemy import select
+
+    from app.models import Case
+
+    cust = Customer(name="默认不限", owner_id=admin.id, status="active")
+    db.add(cust); db.flush()
+    _, t = _make_task(db, admin, cust, "前期施工", status="doing")
+    ok, msg = finish_task(db, t, done_date=today)
+    assert ok, msg
+
+    case = db.scalars(select(Case).where(Case.customer_id == cust.id)).first()
+    assert case is not None
+    assert case.share_duration == "不限"
+    assert case.share_expires_at is None
+    assert (case.share_max_views or 0) == 0      # 不再有次数上限
