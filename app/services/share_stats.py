@@ -83,24 +83,59 @@ def hash_ip(ip: str) -> str:
 
 
 def public_base(request) -> str:
-    """对外可访问的站点根地址（带尾斜杠）。
+    """对外可访问的站点根地址（带尾斜杠）——**跟随当前访问入口**，不写死域名。
 
-    优先级：app_settings/env 的 PUBLIC_BASE_URL → 反代传来的 X-Forwarded-Proto → 请求自身。
-    反代（Lucky）终止 TLS 后转发的是 http，uvicorn 默认不认 X-Forwarded-Proto，
-    故这里显式兜一层，避免把 https 站点生成成 http 分享链接。
+    优先级：`PUBLIC_BASE_URL`（留空即不覆盖）→ 反代转发的 `X-Forwarded-Proto/Host`
+    → 请求自身（Host 头 + scheme）。
+
+    之所以默认不写死：公网域名会被微信拦截、内网穿透（DDNSTO）域名是浮动的，
+    写死任何域名都会在换入口后变成死链。所以默认按「用户此刻从哪个域名/IP 打开」生成。
     """
     base = (get_settings().public_base_url or "").strip().rstrip("/")
-    if not base:
-        base = str(request.base_url).rstrip("/")
-        fwd = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
-        if fwd in ("http", "https") and base.startswith("http://") and fwd == "https":
-            base = "https://" + base[len("http://"):]
-    return base + "/"
+    if base:
+        return base + "/"
+
+    def _first(name: str) -> str:
+        raw = request.headers.get(name) or ""
+        return raw.split(",")[0].strip()
+
+    scheme = _first("x-forwarded-proto").lower()
+    if scheme not in ("http", "https"):
+        scheme = str(request.url.scheme or "http")
+    host = _first("x-forwarded-host") or (request.headers.get("host") or "").strip()
+    if not host:
+        host = str(request.url.netloc)
+    return f"{scheme}://{host}/"
+
+
+
+def share_url_from(base: str, token: str, src: str | None = None) -> str:
+    """用给定站点根地址拼分享链接（base 可带可不带尾斜杠）。"""
+    url = base.rstrip("/") + "/cases/share/" + token
+    return f"{url}?src={src}" if src else url
 
 
 def share_url(request, token: str, src: str | None = None) -> str:
-    url = public_base(request) + "cases/share/" + token
-    return f"{url}?src={src}" if src else url
+    return share_url_from(public_base(request), token, src)
+
+
+def safe_base(request, base: str) -> str:
+    """校验前端传来的「当前页面 origin」（二维码用）。
+
+    二维码必须编码「用户此刻访问的那个地址」——内网穿透（DDNSTO）域名随时会变，
+    服务端无法预知。故由前端把 `location.origin` 传上来，这里只做基本校验：
+    只接受 http/https、只接受纯 origin（不带路径/参数）、限长。
+    """
+    b = (base or "").strip().rstrip("/")
+    if not (8 <= len(b) <= 200):
+        return public_base(request)
+    parts = urlparse(b)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return public_base(request)
+    if parts.path not in ("", "/") or parts.query or parts.fragment:
+        return public_base(request)
+    return b + "/"
+
 
 
 # ------------------------------------------------------------ 访问记录

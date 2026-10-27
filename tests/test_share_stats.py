@@ -133,6 +133,48 @@ def test_public_base_honors_forwarded_proto(monkeypatch, tmp_path):
     assert svc.public_base(req).startswith("https://")
 
 
+def test_public_base_follows_current_host(monkeypatch, tmp_path):
+    """默认不写死域名：跟着请求的 Host 走（内网穿透域名浮动、公网域名可能被微信拦截）。"""
+    _patch_settings(monkeypatch, tmp_path, public_base="")
+    req = _request()
+    assert svc.public_base(req) == "http://crm.example.com/"
+    assert svc.share_url(req, "abc") == "http://crm.example.com/cases/share/abc"
+
+
+def test_public_base_prefers_forwarded_host(monkeypatch, tmp_path):
+    _patch_settings(monkeypatch, tmp_path, public_base="")
+    req = Request(
+        {
+            "type": "http", "http_version": "1.1", "method": "GET",
+            "path": "/cases/share/tok123", "raw_path": b"/cases/share/tok123",
+            "query_string": b"", "headers": [
+                (b"host", b"192.168.11.8:8090"),
+                (b"x-forwarded-host", b"abc123.ddnsto.com"),
+                (b"x-forwarded-proto", b"https"),
+            ],
+            "client": ("10.0.0.9", 1), "server": ("x", 80), "scheme": "http", "root_path": "",
+        }
+    )
+    assert svc.public_base(req) == "https://abc123.ddnsto.com/"
+
+
+@pytest.mark.parametrize("base", ["https://abc123.ddnsto.com", "http://192.168.11.8:8090"])
+def test_safe_base_accepts_plain_origin(monkeypatch, tmp_path, base):
+    _patch_settings(monkeypatch, tmp_path, public_base="https://fixed.example.com")
+    assert svc.safe_base(_request(), base) == base + "/"
+    assert svc.share_url_from(svc.safe_base(_request(), base), "tok", "qr").startswith(base + "/cases/share/tok")
+
+
+@pytest.mark.parametrize(
+    "base",
+    ["", "   ", "javascript:alert(1)", "ftp://x.com", "https://x.com/some/path",
+     "https://x.com/?q=1", "https://x.com#frag", "https://" + "a" * 300 + ".com"],
+)
+def test_safe_base_rejects_bad_input(monkeypatch, tmp_path, base):
+    _patch_settings(monkeypatch, tmp_path, public_base="https://fallback.example.com")
+    assert svc.safe_base(_request(), base) == "https://fallback.example.com/"
+
+
 # ------------------------------------------------------------ 访问记录
 def test_record_visit_fields(monkeypatch, tmp_path, db):
     fake = _patch_settings(monkeypatch, tmp_path)
@@ -343,10 +385,20 @@ def test_cover_and_qrcode(monkeypatch, tmp_path, db):
     with Image.open(out) as im:
         assert im.size == svc.COVER_SIZE
 
-    svg = cases_router.share_qrcode(_request(), "tok123", db)
+    svg = cases_router.share_qrcode(_request(), "tok123", db=db)
     assert svg.status_code == 200
     assert svg.media_type == "image/svg+xml"
     assert b"<svg" in svg.body
+    assert svg.headers.get("cache-control") == "no-store"
+
+    # 前端传当前 origin：二维码内容随入口变化（域名不写死）
+    other = cases_router.share_qrcode(_request(), "tok123", base="https://abc123.ddnsto.com", db=db)
+    assert other.status_code == 200
+    assert other.body != svg.body
+
+    # 垃圾 base 不能把二维码指到别处（回落到按请求头推断）
+    bad = cases_router.share_qrcode(_request(), "tok123", base="javascript:alert(1)", db=db)
+    assert bad.body == svg.body
 
     assert cases_router.share_cover("nope", db).status_code == 404
 
