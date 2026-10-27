@@ -80,9 +80,11 @@ def create_case_for_task(db: Session, task: Task) -> Case | None:
             else product_type_for_customer(db, customer)
         ),
         share_token=_new_token(db),
-        # 外链默认限制：1 天（可在「外链管理」里改；只按时间，不做次数限制）
-        share_duration="1天",
-        share_expires_at=share_expiry_from("1天"),
+        # 外链默认「不限」有效期：案例图本就是脱敏的公开素材，
+        # 靠「手动失效」+ 统计（谁在什么时候看了多久）控制即可。
+        # 1 天的默认值只会让客户点开看到「链接已失效」，是假故障的来源。
+        share_duration=SHARE_UNLIMITED,
+        share_expires_at=None,
     )
     db.add(case)
     db.flush()
