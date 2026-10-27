@@ -1,0 +1,109 @@
+{% extends "layout.html" %}
+{% block title %}分享统计{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>分享统计 <span class="muted small">{{ filters.date_from }} ~ {{ filters.date_to }}</span></h1>
+  <nav class="tabs inline-tabs">
+    <a href="/cases">案例</a>
+    <a href="/cases/links">外链管理</a>
+    <a href="/cases/stats" class="active">统计</a>
+  </nav>
+</div>
+<p class="muted small">只统计匿名访问（打开次数 / 独立访客 / 停留时长 / 图片曝光），不含任何客户信息。IP 只存单向摘要，不保留原始地址。
+微信在生成链接预览时会先抓一次页面（停留 0、看图 0），这类抓取会算进「打开次数」但不算「有停留的访问」——判断客户是否真的看了，看后一个指标更准。</p>
+
+<section class="card">
+  <form method="get" action="/cases/stats" class="filterbar">
+    <input name="q" value="{{ filters.q }}" placeholder="房号 / 楼盘关键词">
+    <label class="inline-label">从 <input type="date" name="date_from" value="{{ filters.date_from }}"></label>
+    <label class="inline-label">到 <input type="date" name="date_to" value="{{ filters.date_to }}"></label>
+    <button type="submit">筛选</button>
+    <a class="btn ghost" href="/cases/stats">近 30 天</a>
+  </form>
+</section>
+
+<section class="kpis">
+  <div class="kpi"><span class="kpi-num">{{ total.opens }}</span><span class="kpi-label">打开次数</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.uv }}</span><span class="kpi-label">独立访客</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.effective }}</span><span class="kpi-label">有停留的访问</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.wechat_pct|round(0)|int }}%</span><span class="kpi-label">微信内打开</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.avg_dwell|duration }}</span><span class="kpi-label">平均停留</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.avg_imgs|number(1) }}</span><span class="kpi-label">平均看图（张）</span></div>
+  <div class="kpi"><span class="kpi-num">{{ total.today }}</span><span class="kpi-label">今日打开</span></div>
+</section>
+
+<section class="card">
+  <h2 class="card-title">近 14 天打开趋势</h2>
+  <div class="trend-bars">
+    {% for t in trend %}
+    <div class="trend-col" title="{{ t.day }}：{{ t.opens }} 次">
+      <span class="trend-num">{{ t.opens if t.opens else '' }}</span>
+      <div class="trend-bar" style="height: {{ t.pct if t.opens else 0 }}%"></div>
+      <span class="trend-day">{{ t.day[5:] }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2 class="card-title">按案例 <span class="muted small">共 {{ rows|length }} 条{% if truncated %}（仅显示前 200 条）{% endif %}</span></h2>
+  {% if rows %}
+  <table class="tight stats-table">
+    <thead>
+      <tr>
+        <th>案例</th><th>施工工序</th><th>产品</th>
+        <th class="num">打开</th><th class="num">独立访客</th><th class="num">微信占比</th>
+        <th class="num">平均停留</th><th class="num">平均看图</th><th>最近打开</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.case.site_label or r.case.room_label }}</td>
+        <td>{{ r.case.stage }}</td>
+        <td>{{ r.case.product_type or '-' }}</td>
+        <td class="num">{{ r.opens }}</td>
+        <td class="num">{{ r.uv }}</td>
+        <td class="num">{{ r.wechat_pct|round(0)|int }}%</td>
+        <td class="num nowrap">{{ r.avg_dwell|duration }}</td>
+        <td class="num">{{ r.avg_imgs|number(1) }}</td>
+        <td class="nowrap">{{ r.last_at|short_dt }}</td>
+        <td><a class="btn ghost small" href="/cases/share/{{ r.case.share_token }}" target="_blank" rel="noopener">预览</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">当前条件下还没有访问记录。把分享链接发给客户后，这里会显示对方的打开情况。</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2 class="card-title">最近访问 <span class="muted small">最多 50 条</span></h2>
+  {% if recent %}
+  <table class="tight">
+    <thead>
+      <tr><th>时间</th><th>案例</th><th>来源</th><th>设备</th><th class="num">停留</th><th class="num">看图</th></tr>
+    </thead>
+    <tbody>
+    {% for v in recent %}
+      {% set visit = v.visit %}
+      <tr>
+        <td class="nowrap">{{ visit.visited_at|short_dt }}</td>
+        <td>{{ v.case.site_label or v.case.room_label }} <span class="muted small">{{ v.case.stage }}</span></td>
+        <td class="nowrap">
+          {% if visit.src == 'qr' %}扫码{% elif visit.src == 'link' %}链接{% else %}直接打开{% endif %}
+          {% if visit.is_wechat %}<span class="badge ok">微信</span>{% endif %}
+        </td>
+        <td class="nowrap">{{ {'mobile':'手机','tablet':'平板','desktop':'电脑'}.get(visit.device, visit.device or '-') }}{% if visit.os_name %} · {{ visit.os_name }}{% endif %}</td>
+        <td class="num nowrap">{{ visit.dwell_ms|duration }}</td>
+        <td class="num">{{ visit.viewed_images }}{% if visit.image_total %} / {{ visit.image_total }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">暂无访问记录。</p>
+  {% endif %}
+</section>
+{% endblock %}

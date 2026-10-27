@@ -659,3 +659,30 @@ tbody tr { transition: background-color 120ms ease; }
 .search-results li:last-child { border-bottom: none; }
 .search-results li:hover { background: var(--brand-50); }
 .search-results li .muted { font-size: .78rem; }
+
+/* ---------------------------------------------------------------- 分享页：工具条 + 二维码 */
+.share-tools { display: flex; gap: .45rem; justify-content: center; flex-wrap: wrap; margin: .2rem 0 .6rem; }
+.share-qr { display: flex; flex-direction: column; align-items: center; gap: .35rem; margin-bottom: .8rem; }
+.share-qr img { width: 180px; height: 180px; border-radius: var(--radius-sm); background: #fff; border: 1px solid var(--line); }
+.share-qr p { margin: 0; }
+
+/* ---------------------------------------------------------------- 分享统计 */
+.card-title { font-size: 1rem; font-weight: 600; margin: 0 0 .7rem; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card-title .muted { font-weight: 400; }
+th.num, td.num { text-align: right; white-space: nowrap; }
+.stats-table td:first-child { font-weight: 600; }
+
+/* 近 14 天柱状趋势（纯 CSS，无图表库） */
+.trend-bars { display: flex; align-items: flex-end; gap: .35rem; height: 8.5rem; padding-top: .4rem; }
+.trend-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: .15rem; }
+.trend-bar { width: 100%; max-width: 2.2rem; min-height: 2px; background: var(--brand); border-radius: var(--radius-sm) var(--radius-sm) 0 0; opacity: .85; transition: opacity .15s ease; }
+.trend-col:hover .trend-bar { opacity: 1; }
+.trend-num { font-size: .68rem; color: var(--muted); line-height: 1; }
+.trend-day { font-size: .66rem; color: var(--muted); white-space: nowrap; line-height: 1; }
+
+@media (max-width: 780px) {
+  .trend-bars { height: 6.5rem; gap: .2rem; }
+  .trend-day { font-size: .6rem; }
+  .trend-num { font-size: .6rem; }
+  .share-tools .btn { flex: 1 1 auto; }
+}

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#3a3f47">
-  <title>{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}</title>
+  <title>{% block head_title %}{% block title %}看板{% endblock %} · {{ settings.app_name_en }} {{ settings.app_name }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css?v={{ version }}">
   <script src="/static/htmx.min.js" defer></script>
   <!-- PWA -->
@@ -38,6 +38,7 @@
       } catch (e) {}
     })();
   </script>
+  {% block head %}{% endblock %}
 </head>
 <body class="{{ 'has-sidebar' if user else 'login-page' }}">
 {% if user %}

@@ -1,5 +1,18 @@
 {% extends "layout.html" %}
-{% block title %}案例分享{% endblock %}
+{% block head_title %}{{ og_title }}{% endblock %}
+{% block head %}
+<meta name="description" content="{{ og_desc }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ settings.app_name_en }}">
+<meta property="og:title" content="{{ og_title }}">
+<meta property="og:description" content="{{ og_desc }}">
+<meta property="og:url" content="{{ share_url }}">
+{% if og_image %}<meta property="og:image" content="{{ og_image }}">
+<meta name="twitter:image" content="{{ og_image }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ og_title }}">
+<meta name="twitter:description" content="{{ og_desc }}">
+{% endblock %}
 {% block content %}
 <div class="share-wrap">
   <div class="card share-card">
@@ -19,8 +32,91 @@
       </a>
       {% endfor %}
     </div>
+    {% else %}
+    <p class="muted small">暂无展示图。</p>
     {% endif %}
+
+    <div class="share-tools">
+      <button type="button" class="btn ghost small js-copy" data-url="{{ share_url }}">复制链接</button>
+      <button type="button" class="btn ghost small js-qr-toggle">二维码</button>
+    </div>
+    <div class="share-qr" id="share-qr" hidden>
+      <img src="/cases/share/{{ case.share_token }}/qrcode.svg" alt="分享二维码" width="180" height="180" loading="lazy">
+      <p class="muted small">让对方用微信扫一扫打开</p>
+    </div>
+
     <p class="muted small share-foot">由 {{ settings.app_name_en }} 生成 · 仅作展示参考</p>
   </div>
 </div>
+
+<script>
+(function () {
+  // ---- 复制链接 / 二维码 ----
+  document.querySelectorAll('.js-copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.dataset.url || location.href;
+      var done = function () {
+        var old = btn.textContent;
+        btn.textContent = '已复制';
+        setTimeout(function () { btn.textContent = old; }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { window.prompt('复制链接', text); });
+      } else {
+        window.prompt('复制链接', text);
+      }
+    });
+  });
+  var qrBtn = document.querySelector('.js-qr-toggle');
+  if (qrBtn) {
+    qrBtn.addEventListener('click', function () {
+      var box = document.getElementById('share-qr');
+      if (!box) return;
+      box.hidden = !box.hidden;
+      qrBtn.textContent = box.hidden ? '二维码' : '收起二维码';
+    });
+  }
+
+  // ---- 统计埋点：停留时长 + 图片曝光（重复上报，服务端取最大值）----
+  var TOKEN = {{ case.share_token|tojson }};
+  var VISIT = {{ visit_id or 0 }};
+  var TOTAL = {{ images|length }};
+  if (!VISIT) return;
+  var start = Date.now();
+  var seen = {};
+  if (window.IntersectionObserver) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) seen[e.target.getAttribute('data-idx')] = 1;
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.share-gallery img').forEach(function (img, i) {
+      img.setAttribute('data-idx', i);
+      io.observe(img);
+    });
+  }
+  function send() {
+    var body = JSON.stringify({
+      visit: VISIT,
+      dwell: Date.now() - start,
+      imgs: Object.keys(seen).length,
+      total: TOTAL
+    });
+    var url = '/cases/share/' + TOKEN + '/ping';
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+        return;
+      }
+    } catch (e) {}
+    try {
+      fetch(url, { method: 'POST', body: body, headers: { 'Content-Type': 'application/json' }, keepalive: true });
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', send);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') send();
+  });
+})();
+</script>
 {% endblock %}

@@ -510,6 +510,36 @@ class CaseImage(Base):
 Index("ix_case_images_case", CaseImage.case_id)
 
 
+class ShareVisit(Base):
+    """对外分享页的一次访问（匿名，不含任何客户信息）。
+
+    用途：回答「我发出去的案例，客户到底看了没、看了多久、看了几张图」。
+    每打开一次分享页记一行；停留时长与图片曝光由前端 beacon 回填（取最大值，幂等）。
+    """
+
+    __tablename__ = "share_visits"
+
+    id = Column(Integer, primary_key=True)
+    case_id = Column(Integer, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    visitor_id = Column(String(24))  # 匿名访客标识（cookie），仅用于去重统计 UV
+    visited_at = Column(String, nullable=False, default=now_iso)
+    src = Column(String(16), default="direct")  # 来源：qr / link / direct
+    referer_host = Column(String(120))
+    ip_hash = Column(String(16))  # sha256(ip + 应用密钥) 前 16 位，不存原始 IP
+    is_wechat = Column(Integer, default=0)
+    device = Column(String(12))  # mobile / tablet / desktop
+    os_name = Column(String(20))
+    ua = Column(String(300))
+    dwell_ms = Column(Integer, default=0)  # 停留毫秒（前端上报，取最大值）
+    viewed_images = Column(Integer, default=0)  # 实际进入视口的图片数
+    image_total = Column(Integer, default=0)  # 该案例图片总数（算浏览完成度）
+
+
+Index("ix_share_visits_case", ShareVisit.case_id)
+Index("ix_share_visits_time", ShareVisit.visited_at)
+Index("ix_share_visits_visitor", ShareVisit.visitor_id)
+
+
 # ------------------------------------------------------------ 照片
 class Photo(Base):
     __tablename__ = "photos"

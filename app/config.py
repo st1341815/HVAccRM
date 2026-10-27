@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     session_cookie: str = "crm_session"
     session_max_age: int = 12 * 3600
 
+    # 对外可访问的站点根地址（如 https://crm.example.com:8443）。
+    # 空 = 用请求自身推断；反代终止 TLS 后推断可能得到 http，建议在反代场景显式设置。
+    public_base_url: str = ""
+
     thumb_max_edge: int = 480
     thumb_quality: int = 80
 

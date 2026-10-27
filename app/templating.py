@@ -35,9 +35,28 @@ def short_dt(v: Any) -> str:
     return str(v)[:16] if v else ""
 
 
+def duration(v: Any) -> str:
+    """毫秒 → 人话时长（统计页用）：83000 → 「1 分 23 秒」；0/空 → 「-」。"""
+    try:
+        ms = int(float(v or 0))
+    except (TypeError, ValueError):
+        return "-"
+    if ms <= 0:
+        return "-"
+    sec = int(round(ms / 1000))
+    if sec < 60:
+        return f"{sec} 秒"
+    minutes, sec = divmod(sec, 60)
+    if minutes < 60:
+        return f"{minutes} 分 {sec} 秒" if sec else f"{minutes} 分"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} 时 {minutes} 分" if minutes else f"{hours} 时"
+
+
 templates.env.filters["money"] = money
 templates.env.filters["number"] = number
 templates.env.filters["short_dt"] = short_dt
+templates.env.filters["duration"] = duration
 templates.env.globals["role_labels"] = permissions.ROLE_LABELS
 templates.env.globals["all_permissions"] = permissions.ALL_PERMISSIONS
 templates.env.globals["role_perms"] = permissions.ROLE_PERMS
