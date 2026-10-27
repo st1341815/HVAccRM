@@ -5,6 +5,14 @@
    - 移动端：顶栏导航横向滚动、筛选条整行堆叠、KPI 两列、
      宽表格由 layout 里的脚本打上 .js-stack 后变成「标签+值」卡片
 */
+
+/* ⚠️ 全局兜底：让 HTML 的 hidden 属性真正生效。
+   浏览器默认的 [hidden]{display:none} 属于 **UA 样式表**，任何作者样式里的
+   `.foo { display: flex }` 都能盖过它 —— 结果就是「el.hidden = true 没反应」。
+   （本项目已两次踩这个坑：灯箱 .lightbox 一次、分享页 .share-qr 一次。）
+   以后凡是「设置 display 又被 hidden 控制的元素」都不用再单独写 .x[hidden]。 */
+[hidden] { display: none !important; }
+
 :root {
   /* 莫兰迪色系：低饱和、暖灰基调（安静工具台方向）
      命名分层：paper=暖纸灰阶 / brand=灰蓝品牌 / *-ink=语义文字深档 / sidebar=深色侧栏
