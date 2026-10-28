@@ -17,13 +17,25 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# 搜索结果与仓库卡片上显示的短描述（Docker Hub 限 100 字符）
-SHORT_DESC = (
-    "暖通空调客户管理系统：楼盘房号·合同收款·成本利润·施工工序·对外案例。"
-    "FastAPI + SQLite，自托管，PWA。"
-)[:100]
-
 DEFAULT_DOC = "docs/DockerHub-Overview.md"
+
+
+def _clip_bytes(text: str, limit: int) -> str:
+    """按 **UTF-8 字节数** 截断（Docker Hub 的 100 是字节，不是字符）。
+
+    直接 `text[:100]` 对中文毫无意义：100 个汉字 = 300 字节，仍会 400。
+    """
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
+        return text
+    return encoded[:limit].decode("utf-8", "ignore")
+
+
+# 搜索结果与仓库卡片上显示的短描述。
+# ⚠️ Docker Hub 限制的是 **100 字节**（不是 100 字符）——中文 3 字节/字，所以只能放 ~33 个汉字。
+# 超限时报错：{"fielderrors":{"description":"Exceeded max number of bytes 100 - actual 141"}}
+SHORT_DESC_LIMIT = 100
+SHORT_DESC = _clip_bytes("暖通空调客户管理系统：房号·合同·收款·成本·施工·案例·自托管", SHORT_DESC_LIMIT)
 
 
 def _post_json(url: str, payload: dict, headers: dict | None = None, method: str = "POST") -> dict:

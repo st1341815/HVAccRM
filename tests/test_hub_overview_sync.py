@@ -66,7 +66,8 @@ def test_patches_full_and_short_description(calls, monkeypatch):
     assert patch.headers["Authorization"] == "JWT JWT.FAKE"
     body = json.loads(patch.data)
     assert body["full_description"].startswith("<p align=\"center\">")
-    assert len(body["description"]) <= 100  # Docker Hub 短描述上限
+    assert len(body["description"].encode("utf-8")) <= 100  # ⚠️ Docker Hub 按字节限 100
+    assert mod.SHORT_DESC == body["description"]
 
 
 def test_missing_doc_does_not_crash(calls, monkeypatch, capsys):
@@ -91,3 +92,12 @@ def test_http_error_is_swallowed(calls, monkeypatch, capsys):
     monkeypatch.setenv("DH_TOKEN", "tok")
     assert mod.main(["prog"]) == 0
     assert "登录 Docker Hub 失败" in capsys.readouterr().out
+
+
+def test_short_desc_is_clipped_by_bytes():
+    """Docker Hub 的 100 是字节：中文 100 字 = 300 字节，必须按字节截断。"""
+    mod = _load_module()
+    assert len(mod.SHORT_DESC.encode("utf-8")) <= mod.SHORT_DESC_LIMIT
+    clipped = mod._clip_bytes("暖" * 200, 100)
+    assert len(clipped.encode("utf-8")) <= 100
+    assert clipped  # 不会切出空串
