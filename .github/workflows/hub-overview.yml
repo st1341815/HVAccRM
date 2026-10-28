@@ -1,0 +1,30 @@
+name: Sync Docker Hub overview
+
+# 只同步 Docker Hub 仓库页正文（不重建镜像）。
+# 触发：手动 / docs/DockerHub-Overview.md 变更 / 本 workflow 变更。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "docs/DockerHub-Overview.md"
+      - "scripts/sync_hub_overview.py"
+      - ".github/workflows/hub-overview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync overview
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: python3 scripts/sync_hub_overview.py docs/DockerHub-Overview.md

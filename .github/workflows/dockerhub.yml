@@ -78,33 +78,4 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import urllib.request
-
-          user = os.environ["DH_USER"].strip()
-          token = os.environ["DH_TOKEN"].strip()
-          overview = open("docs/DockerHub-Overview.md", encoding="utf-8").read()
-
-          # 搜索结果里显示的短描述（Docker Hub 限 100 字符）
-          short = "暖通空调客户管理系统：楼盘房号·合同收款·成本利润·施工工序·对外案例。FastAPI + SQLite，自托管，PWA。"[:100]
-
-          login = urllib.request.Request(
-              "https://hub.docker.com/v2/users/login/",
-              data=json.dumps({"username": user, "password": token}).encode(),
-              headers={"Content-Type": "application/json"},
-              method="POST",
-          )
-          jwt = json.loads(urllib.request.urlopen(login, timeout=30).read())["token"]
-
-          patch = urllib.request.Request(
-              f"https://hub.docker.com/v2/repositories/{user}/hvaccrm/",
-              data=json.dumps({"full_description": overview, "description": short}).encode(),
-              headers={"Authorization": f"JWT {jwt}", "Content-Type": "application/json"},
-              method="PATCH",
-          )
-          with urllib.request.urlopen(patch, timeout=30) as resp:
-              print(f"overview synced: HTTP {resp.status}, {len(overview)} chars")
-          PY
+        run: python3 scripts/sync_hub_overview.py docs/DockerHub-Overview.md

@@ -1,0 +1,75 @@
+"""把 docs/DockerHub-Overview.md 同步到 Docker Hub 仓库页（Overview / 短描述）。
+
+用法（CI 里用 secrets 注入环境变量；本地临时用也行，但别把 token 写进命令历史）：
+    DH_USER=xxx DH_TOKEN=<PAT> python3 scripts/sync_hub_overview.py [markdown 文件]
+
+为什么需要它：Docker Hub 仓库页的 Description **不会**自动跟随 GitHub README，
+只有走 Docker Hub 的 Autobuild 才会；本项目用 GitHub Actions 构建推镜像，所以在这里显式同步。
+
+失败策略：拿不到凭证 / 网络不通 → 打印原因并以 0 退出（发镜像不该被"写简介"拖垮）。
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+# 搜索结果与仓库卡片上显示的短描述（Docker Hub 限 100 字符）
+SHORT_DESC = (
+    "暖通空调客户管理系统：楼盘房号·合同收款·成本利润·施工工序·对外案例。"
+    "FastAPI + SQLite，自托管，PWA。"
+)[:100]
+
+DEFAULT_DOC = "docs/DockerHub-Overview.md"
+
+
+def _post_json(url: str, payload: dict, headers: dict | None = None, method: str = "POST") -> dict:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode(),
+        headers={"Content-Type": "application/json", **(headers or {})},
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 - 固定 https 端点
+        return json.loads(resp.read() or b"{}")
+
+
+def main(argv: list[str]) -> int:
+    user = (os.environ.get("DH_USER") or "").strip()
+    token = (os.environ.get("DH_TOKEN") or "").strip()
+    doc = Path(argv[1] if len(argv) > 1 else DEFAULT_DOC)
+
+    if not user or not token:
+        print("跳过：未提供 DH_USER / DH_TOKEN")
+        return 0
+    if not doc.is_file():
+        print(f"跳过：找不到 {doc}")
+        return 0
+
+    overview = doc.read_text(encoding="utf-8")
+    try:
+        jwt = _post_json(
+            "https://hub.docker.com/v2/users/login/", {"username": user, "password": token}
+        )["token"]
+        _post_json(
+            f"https://hub.docker.com/v2/repositories/{user}/hvaccrm/",
+            {"full_description": overview, "description": SHORT_DESC},
+            headers={"Authorization": f"JWT {jwt}"},
+            method="PATCH",
+        )
+    except urllib.error.HTTPError as exc:  # 凭证没写权限 / 仓库不存在
+        print(f"同步失败：HTTP {exc.code} {exc.reason}")
+        return 0
+    except Exception as exc:  # noqa: BLE001 - 网络抖动不该让发版流程变红
+        print(f"同步失败：{type(exc).__name__}: {exc}")
+        return 0
+
+    print(f"已同步 {doc} → {user}/hvaccrm（正文 {len(overview)} 字，短描述 {len(SHORT_DESC)} 字）")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
