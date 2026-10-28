@@ -97,6 +97,22 @@ def main(argv: list[str]) -> int:
         return 0
 
     print(f"已同步 {doc} → {user}/hvaccrm（正文 {len(overview)} 字，短描述 {len(SHORT_DESC)} 字）")
+
+    # 回读一次：PATCH 返回 200 不等于真的生效（例如被服务端截断/忽略）
+    try:
+        req = urllib.request.Request(
+            f"https://hub.docker.com/v2/repositories/{user}/hvaccrm/",
+            headers={"Authorization": f"JWT {jwt}"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            stored = json.loads(resp.read() or b"{}")
+        got_len = len(stored.get("full_description") or "")
+        print(f"回读校验：Hub 上正文 {got_len} 字，短描述 {len(stored.get('description') or '')} 字")
+        if got_len != len(overview):
+            print("警告：回读字数与本地不一致（可能被截断）")
+    except Exception as exc:  # noqa: BLE001 - 校验失败不算同步失败
+        print(f"回读校验失败（不影响已写入的内容）：{type(exc).__name__}: {exc}")
+
     return 0
 
 
