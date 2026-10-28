@@ -55,9 +55,12 @@ def test_patches_full_and_short_description(calls, monkeypatch):
     monkeypatch.setenv("DH_TOKEN", "tok")
 
     assert mod.main(["prog", str(ROOT / "docs" / "DockerHub-Overview.md")]) == 0
-    assert len(seen) == 2
+    # 三次请求：登录 → PATCH → 回读校验
+    assert len(seen) == 3
 
-    login, patch = seen
+    login, patch, readback = seen
+    assert readback.full_url == "https://hub.docker.com/v2/repositories/13uncle/hvaccrm/"
+    assert readback.get_method() == "GET"
     assert login.full_url == "https://hub.docker.com/v2/users/login/"
     assert json.loads(login.data) == {"username": "13uncle", "password": "tok"}
 
