@@ -37,6 +37,15 @@ def _post_json(url: str, payload: dict, headers: dict | None = None, method: str
         return json.loads(resp.read() or b"{}")
 
 
+def _describe_http_error(exc: urllib.error.HTTPError) -> str:
+    """把 Docker Hub 的报错正文带出来，否则 400 无法定位（凭证错？字段超长？无权限？）。"""
+    try:
+        body = exc.read().decode("utf-8", "replace")[:300]
+    except Exception:  # noqa: BLE001
+        body = "<无正文>"
+    return f"HTTP {exc.code} {exc.reason} | {body}"
+
+
 def main(argv: list[str]) -> int:
     user = (os.environ.get("DH_USER") or "").strip()
     token = (os.environ.get("DH_TOKEN") or "").strip()
@@ -54,17 +63,25 @@ def main(argv: list[str]) -> int:
         jwt = _post_json(
             "https://hub.docker.com/v2/users/login/", {"username": user, "password": token}
         )["token"]
+    except urllib.error.HTTPError as exc:
+        print(f"登录 Docker Hub 失败：{_describe_http_error(exc)}")
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        print(f"登录 Docker Hub 失败：{type(exc).__name__}: {exc}")
+        return 0
+
+    try:
         _post_json(
             f"https://hub.docker.com/v2/repositories/{user}/hvaccrm/",
             {"full_description": overview, "description": SHORT_DESC},
             headers={"Authorization": f"JWT {jwt}"},
             method="PATCH",
         )
-    except urllib.error.HTTPError as exc:  # 凭证没写权限 / 仓库不存在
-        print(f"同步失败：HTTP {exc.code} {exc.reason}")
+    except urllib.error.HTTPError as exc:  # 无写权限 / 字段不合法
+        print(f"更新仓库描述失败：{_describe_http_error(exc)}")
         return 0
     except Exception as exc:  # noqa: BLE001 - 网络抖动不该让发版流程变红
-        print(f"同步失败：{type(exc).__name__}: {exc}")
+        print(f"更新仓库描述失败：{type(exc).__name__}: {exc}")
         return 0
 
     print(f"已同步 {doc} → {user}/hvaccrm（正文 {len(overview)} 字，短描述 {len(SHORT_DESC)} 字）")

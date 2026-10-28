@@ -90,4 +90,4 @@ def test_http_error_is_swallowed(calls, monkeypatch, capsys):
     monkeypatch.setenv("DH_USER", "13uncle")
     monkeypatch.setenv("DH_TOKEN", "tok")
     assert mod.main(["prog"]) == 0
-    assert "同步失败" in capsys.readouterr().out
+    assert "登录 Docker Hub 失败" in capsys.readouterr().out
