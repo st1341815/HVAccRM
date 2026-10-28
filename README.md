@@ -16,6 +16,8 @@ APScheduler · SQLite FTS5 · 本地文件系统 · Docker Compose · PWA（Serv
 > 🐳 **Docker 部署指南**（面向运维：镜像/编排/配置/备份/升级/反代/排障）：
 > 见 [`docs/Docker部署指南.md`](docs/Docker部署指南.md)。
 > 📦 **预构建镜像**（Docker Hub `13uncle/hvaccrm` / GHCR `ghcr.io/st1341815/hvaccrm`，免构建），用法见下文 §2.1。
+> 🐳 **Docker Hub 仓库页正文**（Overview，发版时由 Actions 自动同步）：
+> 见 [`docs/DockerHub-Overview.md`](docs/DockerHub-Overview.md)。
 > 📱 **微信小程序案例分享方案**（把案例同步到小程序、用微信卡片发给客户）：
 > 见 [`docs/微信小程序案例同步方案.md`](docs/微信小程序案例同步方案.md)。
 > 本文档面向开发者，讲的是环境搭建、部署与实现细节。
