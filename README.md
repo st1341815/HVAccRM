@@ -231,6 +231,8 @@ BASE_URL=http://127.0.0.1:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test
 
 当前版本 **v1.7.0**（2026-10-28，安全加固版：登录开放重定向 / CSRF / 异常脱敏 / 密钥与初始口令随机化 / Cookie Secure / 依赖升级 / CI 门禁）；预构建镜像 **Docker Hub** `13uncle/hvaccrm:1.7.0`（含 `:latest`），与源码 Release 同版本。
 
+**发版命名约定**：git tag `vX.Y.Z`；GitHub Release 标题固定 `HVAccRM vX.Y.Z`（主题只写在正文）；Docker 镜像 `<用户>/hvaccrm:X.Y.Z` + `:latest`；本地回滚 tag `hvaccrm:pre-X.Y.Z`。完整规则见 [`docs/版本更新记录.md`](docs/版本更新记录.md) §二。
+
 > 更早的版本说明见 `docs/版本更新记录.md`；`v1.4.1`（2026-10-20）为「简化部署：默认密码 `admin888`、`APP_SECRET_KEY` 不再必填」。
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：

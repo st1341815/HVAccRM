@@ -47,6 +47,26 @@ python scripts/bump_version.py            # 一致性检查（部署前跑一次
 > 历史教训：v0.14.34~v0.14.59 期间「未 commit 直接 file upload 部署」导致内容丢失，
 > 自那以后强制「改完即 commit」。
 
+### 4.1 打标签与发 Release（命名规则固定，别自创）
+
+```bash
+python scripts/bump_version.py 1.7.1          # 版本号两处同步
+git commit -am "fix(crm): …"
+git tag -a v1.7.1 -m "v1.7.1 …"               # tag 只有 vX.Y.Z
+git push origin main refs/tags/v1.7.1         # 打 tag 会自动触发 Docker Hub 发布 workflow
+```
+
+| 对象 | 规则 |
+| --- | --- |
+| git tag | `vX.Y.Z` |
+| **GitHub Release 标题** | **`HVAccRM vX.Y.Z`**（前缀固定 `HVAccRM `，**不追加主题**） |
+| Release 正文首行 | `## vX.Y.Z · 主题`（主题放正文，不放标题） |
+| Docker 镜像 | `13uncle/hvaccrm:X.Y.Z` + `:latest`（Actions 自动发布） |
+| 本地回滚 tag | `hvaccrm:pre-X.Y.Z` |
+
+> 原因：Release 列表里标题要能一眼按版本号对齐；主题属于「这一版做了什么」，放正文更合适。
+> 完整规则见 `docs/版本更新记录.md` §二。
+
 ## 5. 提交规范
 
 - 前缀：`feat:` / `fix:` / `style:` / `perf:` / `chore:` / `docs:` / `test:`
