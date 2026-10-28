@@ -299,7 +299,7 @@ server {
 | `TZ` | `Asia/Shanghai` | 时区 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `APP_PORT` | `8000` | 容器内监听端口（改它需同步改 `ports` 映射） |
-| `THUMB_MAX_EDGE` | `1280` | 缩略图最长边（px） |
+| `THUMB_MAX_EDGE` | `480` | 缩略图最长边（px） |
 | `THUMB_QUALITY` | `80` | 缩略图 WebP 质量 |
 | `BACKUP_KEEP` | `30` | 每日自动备份保留份数 |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 登录失败次数上限 |
@@ -470,4 +470,5 @@ server {
 | `docs/使用手册.md` | 业务使用者（怎么用） |
 | `docs/Docker部署指南.md`（本文） | 部署/运维（怎么装怎么管） |
 | `README.md` | 开发者（架构、实现、本地跑） |
+| `docs/DockerHub-Overview.md` | Docker Hub 仓库页正文（Release 时由 Actions 自动同步） |
 | `DEPLOY_NAS.md` | 飞牛 NAS 特定踩坑记录 |
