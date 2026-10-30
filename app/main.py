@@ -87,18 +87,37 @@ static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+def _verify_file_path(name: str) -> Path | None:
+    """查找域名所有权验证文件（单段 .txt），返回真实路径或 None。
+
+    查找顺序：镜像内 `app/static/` → 数据卷 `data/verify/`。
+
+    为什么要有第二个位置：腾讯云/微信/ICP 备案这类平台会**周期性下发新的验证文件**
+    （文件名和内容每次都变）。放在 `data/verify/` 是容器卷挂载，直接把文件丢进去
+    就生效，不用为了一个 40 字节的 txt 重建镜像。`app/static/` 保持兼容旧用法。
+
+    安全：只接受单段、纯文件名的 `.txt`，挡掉 `../`、`a/b`、反斜杠与绝对路径。
+    """
+    if not name or not name.endswith(".txt"):
+        return None
+    if name != Path(name).name or "/" in name or "\\" in name:
+        return None
+    for base in (static_dir, settings.data_path / "verify"):
+        target = base / name
+        if target.is_file():
+            return target
+    return None
+
+
 def _is_exempt(path: str) -> bool:
     """判断请求路径是否免登录。
 
-    白名单之外，域名所有权验证文件（static 目录下真实存在的单段 .txt）
-    也需要免登录——腾讯云/DNSPod 等会直接 GET 根路径的随机文件名。
+    白名单之外，域名所有权验证文件（单段 .txt）也需要免登录——
+    腾讯云/DNSPod/微信等会直接 GET 根路径的随机文件名。
     """
     if any(path == p or path.startswith(p) for p in EXEMPT_PREFIXES):
         return True
-    name = path.lstrip("/")
-    if name.endswith(".txt") and "/" not in name and (static_dir / name).is_file():
-        return True
-    return False
+    return _verify_file_path(path.lstrip("/")) is not None
 
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
@@ -208,13 +227,9 @@ def health():
 
 @app.get("/{verify_file}", include_in_schema=False)
 def serve_verify_file(verify_file: str):
-    """域名所有权验证文件：仅服务 static 目录下真实存在的单段 .txt，免登录。"""
-    if not verify_file.endswith(".txt"):
-        raise HTTPException(status_code=404, detail="未找到")
-    if verify_file != Path(verify_file).name or "/" in verify_file:
-        raise HTTPException(status_code=404, detail="未找到")
-    target = static_dir / verify_file
-    if not target.is_file():
+    """域名所有权验证文件：仅服务单段 .txt（static 或 data/verify），免登录。"""
+    target = _verify_file_path(verify_file)
+    if target is None:
         raise HTTPException(status_code=404, detail="未找到")
     return Response(
         target.read_text(encoding="utf-8"),
