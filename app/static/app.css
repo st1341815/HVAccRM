@@ -143,6 +143,10 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 
 .wrap { flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto; padding: 1.2rem 1.5rem; }
 .foot { text-align: center; color: var(--muted); font-size: .78rem; padding: 1.5rem 0; }
+/* 对外分享页的版权/ICP 声明（两行居中，与内部版本页脚区分） */
+.foot-legal { padding: 1.1rem 0 1.6rem; font-size: .74rem; line-height: 1.9; }
+.foot-legal div { margin: 0; white-space: normal; }
+.foot-legal-icp { color: var(--muted); }
 
 .card {
   background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
