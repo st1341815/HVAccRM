@@ -74,7 +74,7 @@
   {% if flash %}<div class="flash {{ flash.level }}">{{ flash.message }}</div>{% endif %}
   {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
-  <footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }}</footer>
+  {% block footer %}<footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }}</footer>{% endblock %}
 </main>
 {% if user %}
 </div>
