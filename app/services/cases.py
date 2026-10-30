@@ -237,12 +237,19 @@ def save_case_image(
     rel_path = rel_dir / fname
     root = case_image_root()
     dest = root / rel_path
+    # 与读取侧 case_image_file() 的 resolve()+前缀校验对称：写入前确认仍在 cases 目录内
+    if not str(dest.resolve()).startswith(str(root.resolve())):
+        return None, "非法的存储路径"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(raw)
 
     thumb_rel = rel_dir / f"{fname.rsplit('.', 1)[0]}_thumb.webp"
     try:
-        _make_thumb(img, root / thumb_rel)
+        thumb_dest = root / thumb_rel
+        if str(thumb_dest.resolve()).startswith(str(root.resolve())):
+            _make_thumb(img, thumb_dest)
+        else:
+            thumb_rel = None
     except Exception:  # pragma: no cover
         thumb_rel = None
 

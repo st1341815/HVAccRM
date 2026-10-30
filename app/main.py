@@ -37,7 +37,7 @@ from .templating import flash_cookie_name, render, set_request_secure
 log = logging.getLogger("crm.main")
 settings = get_settings()
 
-_BASE_EXEMPT = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/cases/share")
+_BASE_EXEMPT = ("/static", "/login", "/logout", "/health", "/favicon.ico", "/manifest.webmanifest", "/service-worker.js", "/offline.html", "/cases/share", "/robots.txt")
 # API 文档默认只在显式开启时暴露（公开仓库 + 公网实例不该让任何人拉到完整接口清单）
 _DOCS_EXEMPT = ("/api/docs", "/api/openapi.json", "/redoc") if settings.api_docs else ()
 EXEMPT_PREFIXES = _BASE_EXEMPT + _DOCS_EXEMPT
@@ -126,6 +126,28 @@ def offline_page() -> Response:
     return Response(
         (static_dir / "offline.html").read_text(encoding="utf-8"),
         media_type="text/html; charset=utf-8",
+    )
+
+
+ROBOTS_TXT = """User-agent: *
+Disallow: /
+Allow: /cases/share/
+"""
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt() -> Response:
+    """全站禁止收录（内部业务系统），仅放行对外分享页。
+
+    存在的意义：给搜索引擎/社交平台的「安全扫描器」一个明确信号——
+    这是一套内部管理系统，不是面向公众的站点。没有它时扫描器会把登录页、
+    随机 token 的分享页一并当公开内容抓取，容易触发「安全性未知」类风控提示。
+    注意：robots 只约束守法爬虫，不构成访问控制，敏感路径仍靠登录鉴权。
+    """
+    return Response(
+        ROBOTS_TXT,
+        media_type="text/plain; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

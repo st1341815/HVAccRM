@@ -124,13 +124,23 @@ def _contract_no_for(
     return ""
 
 
+def _safe_segment(value: str | None, default: str = "other", limit: int = 32) -> str:
+    """把用户可控的字符串净化成「单层目录名」。
+
+    只保留字母/数字/中文与 `-_`，并剔除 `.`——这同时挡住：
+      `../../../etc`（路径遍历）、`a/b`（多级目录）、`.`/`..`（上级引用）、`C:x`（盘符）。
+    净化后为空则回落 default。写入侧必须与读取侧的 resolve()+前缀校验对称。
+    """
+    out = "".join(ch for ch in (value or "").strip() if ch.isalnum() or ch in "-_")
+    return (out[:limit] or default)
+
+
 def _storage_key(db: Session, customer_id: int, contract_id=None, payment_id=None, cost_id=None, task_id=None) -> str:
     """媒体目录名：合同编号优先，取不到合同则回落客户 ID；并做文件名安全过滤。"""
     no = _contract_no_for(
         db, customer_id, contract_id=contract_id, payment_id=payment_id, cost_id=cost_id, task_id=task_id
     )
-    safe = "".join(ch for ch in no if ch.isalnum() or ch in "-_")
-    return safe or str(customer_id)
+    return _safe_segment(no, str(customer_id))
 
 
 def find_by_hash(db: Session, sha: str) -> Photo | None:
@@ -199,7 +209,10 @@ def save_photo(
     if not raw:
         return None, "空文件"
     sha = _sha256_of(raw)
-    kind = (kind or "other").strip() or "other"
+    # ⚠️ kind 来自表单（用户可控），必须净化后才能拼进路径。
+    # 否则 kind="../../../etc" 会让文件写出 media 目录（路径遍历）。
+    # 与读取侧 photo_file() 的 resolve()+前缀校验对称：写入侧也要拦住。
+    kind = _safe_segment(kind, "other")
     root = media_root()
     existing = find_by_hash(db, sha)
 
@@ -244,12 +257,19 @@ def save_photo(
     fname = f"{uuid.uuid4().hex}{ext}"
     rel_path = rel_dir / fname
     dest = root / rel_path
+    # 最后一道兜底：写入前确认目标仍在 media 目录内（与读取侧 photo_file 对称）。
+    if not str(dest.resolve()).startswith(str(root.resolve())):
+        return None, "非法的存储路径"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(raw)
 
     thumb_rel = rel_dir / f"{fname.rsplit('.', 1)[0]}_thumb.webp"
     try:
-        _make_thumb(img, root / thumb_rel)
+        thumb_dest = root / thumb_rel
+        if str(thumb_dest.resolve()).startswith(str(root.resolve())):
+            _make_thumb(img, thumb_dest)
+        else:
+            thumb_rel = None
     except Exception as exc:  # pragma: no cover
         log.warning("缩略图生成失败 %s: %s", rel_path, exc)
         thumb_rel = None
