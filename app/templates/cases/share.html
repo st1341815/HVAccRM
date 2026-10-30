@@ -3,7 +3,7 @@
 {% block head %}
 <meta name="description" content="{{ og_desc }}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="{{ settings.app_name_en }}">
+<meta property="og:site_name" content="{{ share_cfg['share.brand'] or settings.app_name_en }}">
 <meta property="og:title" content="{{ og_title }}">
 <meta property="og:description" content="{{ og_desc }}">
 <meta property="og:url" content="{{ share_url }}">
@@ -16,8 +16,8 @@
 {% block content %}
 <div class="share-wrap">
   <div class="card share-card">
-    <div class="share-brand">🌡️ {{ settings.app_name_en }}</div>
-    <h1 class="share-title">施工案例</h1>
+    <div class="share-brand">{{ share_cfg['share.brand_icon'] }}{% if share_cfg['share.brand_icon'] %} {% endif %}{{ share_cfg['share.brand'] or settings.app_name_en }}</div>
+    <h1 class="share-title">{{ share_cfg['share.title'] or '施工案例' }}</h1>
     <table class="kv share-kv">
       <tr><th>工地位置</th><td>{{ case.site_label or '-' }}</td></tr>
       <tr><th>施工时间</th><td>{{ case.work_date or '-' }}</td></tr>
@@ -47,7 +47,7 @@
       <p class="muted small">让对方用微信扫一扫打开</p>
     </div>
 
-    <p class="muted small share-foot">由 {{ settings.app_name_en }} 生成 · 仅作展示参考</p>
+    {% if share_tail %}<p class="muted small share-foot">{{ share_tail }}</p>{% endif %}
   </div>
 </div>
 
@@ -118,8 +118,9 @@
 </script>
 {% endblock %}
 {% block footer %}
+{% if share_footer %}
 <footer class="foot foot-legal">
-  <div class="foot-legal-copy">Copyright © 2026 Uncle13. All Rights Reserved.</div>
-  <div class="foot-legal-icp">皖ICP备XXXXXXXX号-1 | 皖公网安备 XXXXXXXXXXXXX号</div>
+  {% for line in share_footer %}<div{% if loop.first %} class="foot-legal-copy"{% elif loop.last and loop.length > 1 %} class="foot-legal-icp"{% endif %}>{{ line }}</div>{% endfor %}
 </footer>
+{% endif %}
 {% endblock %}
