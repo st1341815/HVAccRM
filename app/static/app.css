@@ -417,11 +417,16 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
 /* 施工看板操作列（桌面端）：完工备注 4 字、施工日期 2 字/行、跳过原因与上排等宽 */
 @media (min-width: 781px) {
   table.tasks td.actions-cell .tc-done input[name="notes"] { width: 4.6rem; flex: 0 0 auto; }
-  table.tasks td.actions-cell .date-text { width: 2em; flex: 0 0 auto; line-height: 1.25; }
+  /* 「施工日期」= 2 行、每行 2 字。必须显式允许折行：.inline-label 的 white-space:nowrap 会继承下来，
+     文字不折行就撑出 2em 的盒子、被后面的日期控件盖住。2.1em 给字形舍入留 1 像素余量。 */
+  table.tasks td.actions-cell .date-text {
+    width: 2.1em; flex: 0 0 auto; line-height: 1.25;
+    white-space: normal; word-break: break-all;
+  }
   table.tasks td.actions-cell .tc-done input[type="date"] { width: 7.5rem; flex: 0 0 auto; }
   table.tasks td.actions-cell .tc-done .inline-label { flex: 0 0 auto; }
-  /* 跳过原因 = 完工备注(4.6rem) + 施工日期(2em) + 日期控件(7.5rem) + 两处 gap(0.6rem)，与上排按钮对齐 */
-  table.tasks td.actions-cell input[name="skip_reason"] { width: calc(4.6rem + 2em + 7.5rem + 0.6rem); flex: 0 0 auto; min-width: 0; }
+  /* 跳过原因 = 完工备注(4.6rem) + 施工日期(2.1em) + 日期控件(7.5rem) + 两处 gap(0.6rem)，与上排按钮对齐 */
+  table.tasks td.actions-cell input[name="skip_reason"] { width: calc(4.6rem + 2.1em + 7.5rem + 0.6rem); flex: 0 0 auto; min-width: 0; }
 }
 
 /* ================================================================ 手机端 */
