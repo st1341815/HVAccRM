@@ -14,10 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
+from ..csrf import csrf_protect
 from ..db import commit_retry, get_db
 from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso, today_str
 from ..permissions import has_perm, require
 from ..services import cases as cases_svc
+from ..services import share_custom as custom_svc
 from ..services import share_stats as stats_svc
 from ..templating import cookie_secure, redirect, render
 from ..utils import client_ip, get_or_404, parse_date, parse_int, return_path
@@ -307,16 +309,49 @@ def case_image_thumb(
 
 
 # ------------------------------------------------------------ 匿名分享
-def _og_title(case: Case) -> str:
+def _case_ph(case: Case) -> dict[str, str]:
+    """分享页文案占位符的取值（模板里用 {site} 这类写法）。"""
+    return {
+        "site": case.site_label or "",
+        "stage": case.stage or "",
+        "product": case.product_type or "",
+        "date": case.work_date or "",
+    }
+
+
+def _og_title(case: Case, cfg: dict[str, str]) -> str:
+    """分享卡片标题：自定义模板优先，清空则回落内置规则。"""
+    tpl = (cfg.get("share.meta_title") or "").strip()
+    if tpl:
+        out = custom_svc.render_text(tpl, _case_ph(case)).strip(" ·-|")
+        if out:
+            return out
     site = case.site_label or "施工案例"
     kind = f"{case.product_type}施工案例" if case.product_type else f"{case.stage}案例"
     return f"{kind} · {site}"
 
 
-def _og_desc(case: Case) -> str:
+def _og_desc(case: Case, cfg: dict[str, str]) -> str:
+    tpl = (cfg.get("share.meta_desc") or "").strip()
+    if tpl:
+        out = custom_svc.render_text(tpl, _case_ph(case)).strip()
+        if out:
+            return out
     bits = [b for b in (case.work_date, case.stage, case.product_type) if b]
     head = " · ".join(bits)
     return (head + " 现场施工实拍，仅作效果展示参考。") if head else "现场施工实拍，仅作效果展示参考。"
+
+
+def _share_custom_ctx(db: Session, case: Case | None = None) -> dict:
+    """分享页要用的自定义内容：原文 + 渲染后的最终值。"""
+    cfg = custom_svc.get_all(db)
+    footer = custom_svc.footer_lines(cfg.get("share.footer", ""))
+    tail = custom_svc.render_text(cfg.get("share.tail", ""), {"brand": cfg.get("share.brand") or ""}).strip()
+    return {
+        "share_cfg": cfg,
+        "share_footer": footer,
+        "share_tail": tail,
+    }
 
 
 @router.get("/share/{token}")
@@ -341,6 +376,7 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
 
     cover = stats_svc.ensure_cover(case, images[0] if images else None)
     base = stats_svc.public_base(request)
+    cust = _share_custom_ctx(db, case)
     response = render(
         request,
         "cases/share.html",
@@ -349,9 +385,10 @@ def share_case(request: Request, token: str, db: Session = Depends(get_db)):
         visit_id=visit.id,
         share_url=stats_svc.share_url(request, token),
         qr_url=stats_svc.share_url(request, token, "qr"),
-        og_title=_og_title(case),
-        og_desc=_og_desc(case),
+        og_title=_og_title(case, cust["share_cfg"]),
+        og_desc=_og_desc(case, cust["share_cfg"]),
         og_image=(f"{base}cases/share/{token}/cover.jpg?v={len(images)}" if cover else None),
+        **cust,
     )
     if need_cookie:
         response.set_cookie(
@@ -533,3 +570,119 @@ def share_stats_page(
         filters={"date_from": d_from, "date_to": d_to, "q": kw},
         truncated=len(rows) >= 200,
     )
+
+
+# ------------------------------------------------------------ 分享页自定义
+_SHARE_CUSTOM_FIELDS = (
+    "share.title",
+    "share.brand",
+    "share.brand_icon",
+    "share.meta_title",
+    "share.meta_desc",
+    "share.footer",
+    "share.tail",
+)
+
+
+def _share_custom_page(
+    request: Request,
+    db: Session,
+    notice: str = "",
+    errors: list[str] | None = None,
+    values: dict[str, str] | None = None,
+):
+    cfg = values if values is not None else custom_svc.get_all(db)
+    # 取一条真实案例做「效果预览」的样张（不用客户数据，只取可公开字段）
+    sample = db.scalars(
+        select(Case).where(Case.share_disabled == 0, Case.share_token.is_not(None))
+        .order_by(Case.work_date.desc(), Case.id.desc())
+    ).first()
+    preview = None
+    if sample is not None:
+        ph = _case_ph(sample)
+        preview = {
+            "title": (cfg.get("share.title") or "施工案例"),
+            "brand": cfg.get("share.brand") or "",
+            "icon": cfg.get("share.brand_icon") or "",
+            "meta_title": _og_title(sample, cfg),
+            "meta_desc": _og_desc(sample, cfg),
+            "footer": custom_svc.footer_lines(cfg.get("share.footer", "")),
+            "tail": custom_svc.render_text(cfg.get("share.tail", ""), {"brand": cfg.get("share.brand") or ""}),
+            "sample": sample,
+            "ph": ph,
+        }
+    return render(
+        request,
+        "cases/custom.html",
+        cfg=cfg,
+        preview=preview,
+        limits=custom_svc.LIMITS,
+        labels=custom_svc.FIELD_LABELS,
+        placeholders=custom_svc.PLACEHOLDERS,
+        notice=notice,
+        errors=errors or [],
+        can_edit=has_perm(request.state.user, "case:edit"),
+    )
+
+
+@router.get("/custom")
+def share_custom_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+):
+    """分享页自定义：网页标题、浏览器/分享卡片标题、品牌字样、页脚、图片下方说明。"""
+    return _share_custom_page(request, db)
+
+
+@router.post("/custom")
+def share_custom_save(
+    request: Request,
+    share_title: str = Form(""),
+    share_brand: str = Form(""),
+    share_brand_icon: str = Form(""),
+    share_meta_title: str = Form(""),
+    share_meta_desc: str = Form(""),
+    share_footer: str = Form(""),
+    share_tail: str = Form(""),
+    db: Session = Depends(get_db),
+    user=Depends(require("case:edit")),
+    _csrf: None = Depends(csrf_protect),
+):
+    raw = {
+        "share.title": share_title,
+        "share.brand": share_brand,
+        "share.brand_icon": share_brand_icon,
+        "share.meta_title": share_meta_title,
+        "share.meta_desc": share_meta_desc,
+        "share.footer": share_footer,
+        "share.tail": share_tail,
+    }
+    notes = custom_svc.save(db, raw)
+    log_action(
+        db,
+        user,
+        "share_custom_save",
+        "app_settings",
+        0,
+        detail={"keys": list(raw.keys()), "truncated": notes},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    msg = "已保存，分享页立即生效"
+    if notes:
+        msg += "（" + "；".join(notes) + "）"
+    return redirect("/cases/custom", msg)
+
+
+@router.post("/custom/reset")
+def share_custom_reset(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:edit")),
+    _csrf: None = Depends(csrf_protect),
+):
+    custom_svc.reset(db)
+    log_action(db, user, "share_custom_reset", "app_settings", 0, ip=client_ip(request))
+    commit_retry(db)
+    return redirect("/cases/custom", "已恢复默认样式")

@@ -1,0 +1,141 @@
+{% extends "layout.html" %}
+{% block title %}分享页自定义{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>分享页自定义</h1>
+  <nav class="tabs inline-tabs">
+    <a href="/cases">案例</a>
+    <a href="/cases/links">外链管理</a>
+    <a href="/cases/stats">统计</a>
+    <a href="/cases/custom" class="active">自定义</a>
+  </nav>
+</div>
+<p class="muted small">
+  这里改的内容<b>只作用于客户打开的案例分享页</b>（<code>/cases/share/…</code>），系统内部的案例列表、统计、登录页等一律不受影响。<br>
+  留空 = 使用默认值；改完立即对所有分享链接生效，无需重新生成链接。
+</p>
+
+{% for e in errors %}<div class="flash err">{{ e }}</div>{% endfor %}
+
+{% if not can_edit %}
+<div class="flash err">当前账号没有「案例编辑」权限，只能查看不能保存。</div>
+{% endif %}
+
+<form method="post" action="/cases/custom">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid2">
+    <section class="card">
+      <h2 class="card-title">文案</h2>
+      <p>
+        <label class="inline-label">页面标题语<br>
+          <input name="share_title" value="{{ cfg['share.title'] }}" maxlength="{{ limits['share.title'] }}" placeholder="施工案例">
+        </label>
+        <span class="muted small">分享页正文最上方的大标题。空 = 施工案例。</span>
+      </p>
+      <p>
+        <label class="inline-label">品牌图标<br>
+          <input name="share_brand_icon" value="{{ cfg['share.brand_icon'] }}" maxlength="{{ limits['share.brand_icon'] }}" placeholder="🌡️">
+        </label>
+        <span class="muted small">标题上方的小图标，可留空（支持 emoji 或单个字符）。</span>
+      </p>
+      <p>
+        <label class="inline-label">品牌字样<br>
+          <input name="share_brand" value="{{ cfg['share.brand'] }}" maxlength="{{ limits['share.brand'] }}" placeholder="HVAccRM">
+        </label>
+        <span class="muted small">显示在分享页顶部。空 = 跟随系统英文名。</span>
+      </p>
+      <p>
+        <label class="inline-label">图片下方说明<br>
+          <input name="share_tail" value="{{ cfg['share.tail'] }}" maxlength="{{ limits['share.tail'] }}" placeholder="由 {brand} 生成 · 仅作展示参考">
+        </label>
+        <span class="muted small">可用占位符 <code>{brand}</code>。空 = 不显示这一行。</span>
+      </p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">网页标题 / 分享卡片</h2>
+      <p>
+        <label class="inline-label">浏览器标签标题<br>
+          <input name="share_meta_title" value="{{ cfg['share.meta_title'] }}" maxlength="{{ limits['share.meta_title'] }}" placeholder="{product}施工案例 · {site}">
+        </label>
+        <span class="muted small">同时是微信、QQ 等转发卡片的标题。可用占位符：
+          {% for p in placeholders %}<code>{{ '{' }}{{ p }}{{ '}' }}</code>{% if not loop.last %} {% endif %}{% endfor %}
+          —— <code>{site}</code> 工地位置、<code>{stage}</code> 施工工序、<code>{product}</code> 产品类型、<code>{date}</code> 施工日期。<br>
+          空 = 自动拼成「地暖施工案例 · 某某小区 6#」这种。</span>
+      </p>
+      <p>
+        <label class="inline-label">分享卡片描述<br>
+          <textarea name="share_meta_desc" rows="3" maxlength="{{ limits['share.meta_desc'] }}" placeholder="现场施工实拍，仅作效果展示参考。">{{ cfg['share.meta_desc'] }}</textarea>
+        </label>
+        <span class="muted small">也用于搜索引擎的 description。同样支持上面的占位符。</span>
+      </p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2 class="card-title">页面底部</h2>
+    <p>
+      <label class="inline-label">页脚文字<br>
+        <textarea name="share_footer" rows="4" maxlength="{{ limits['share.footer'] }}" placeholder="Copyright © 2026 Uncle13. All Rights Reserved.&#10;皖ICP备XXXXXXXX号-1 | 皖公网安备 XXXXXXXXXXXXX号">{{ cfg['share.footer'] }}</textarea>
+      </label>
+      <span class="muted small"><b>一行一条</b>，会逐行居中显示（最多 {{ limits['share.footer'] }} 字）。全部清空 = 分享页不显示页脚。</span>
+    </p>
+  </section>
+
+  {% if can_edit %}
+  <div class="page-head">
+    <p>
+      <button type="submit">保存</button>
+      <span class="muted small">保存后立即生效。</span>
+    </p>
+  </div>
+  {% endif %}
+</form>
+
+{% if can_edit %}
+<form method="post" action="/cases/custom/reset" onsubmit="return confirm('恢复默认会清空上面所有自定义内容，确定？');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button class="btn ghost">恢复默认</button>
+</form>
+{% endif %}
+
+<section class="card">
+  <h2 class="card-title">效果预览</h2>
+  {% if preview %}
+  <p class="muted small">
+    用最近一条案例
+    {% if preview.sample.share_token %}<a href="/cases/share/{{ preview.sample.share_token }}" target="_blank" rel="noopener">{{ preview.sample.room_label or preview.sample.site_label }}</a>{% else %}{{ preview.sample.room_label or preview.sample.site_label }}{% endif %}
+    的真实数据渲染，占位符已替换。
+  </p>
+  <div class="preview-box">
+    <div class="preview-browser">
+      <span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-dot"></span>
+      <span class="preview-url">{{ preview.meta_title }}</span>
+    </div>
+    <div class="preview-body">
+      <div class="share-brand">{{ preview.icon }}{% if preview.icon %} {% endif %}{{ preview.brand or 'HVAccRM' }}</div>
+      <h1 class="share-title">{{ preview.title }}</h1>
+      <table class="kv share-kv">
+        <tr><th>工地位置</th><td>{{ preview.sample.site_label or '-' }}</td></tr>
+        <tr><th>施工时间</th><td>{{ preview.sample.work_date or '-' }}</td></tr>
+        <tr><th>施工工序</th><td>{{ preview.sample.stage }}</td></tr>
+        <tr><th>产品类型</th><td>{{ preview.sample.product_type or '-' }}</td></tr>
+      </table>
+      <div class="preview-card">
+        <strong>{{ preview.meta_title }}</strong>
+        <div class="muted small">{{ preview.meta_desc }}</div>
+      </div>
+      {% if preview.tail %}<p class="muted small share-foot">{{ preview.tail }}</p>{% endif %}
+    </div>
+    {% if preview.footer %}
+    <footer class="foot foot-legal">
+      {% for line in preview.footer %}<div{% if loop.first %} class="foot-legal-copy"{% elif loop.last and loop.length > 1 %} class="foot-legal-icp"{% endif %}>{{ line }}</div>{% endfor %}
+    </footer>
+    {% endif %}
+  </div>
+  <p class="muted small">上方「浏览器」栏显示的就是客户浏览器标签页 / 微信转发卡片里的标题；灰色小卡片是微信转发时的样式示意。</p>
+  {% else %}
+  <p class="muted">还没有可分享的案例，先到<a href="/cases">案例</a>页生成一条再来预览。</p>
+  {% endif %}
+</section>
+{% endblock %}

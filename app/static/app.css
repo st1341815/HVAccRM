@@ -725,3 +725,14 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 }
 .tip-line b { font-weight: 700; }
 @media (max-width: 780px) { .tip-line { margin-bottom: .75rem; } }
+
+/* ---------------- 分享页自定义：效果预览 ---------------- */
+.preview-box { border: 1px solid var(--card-border); border-radius: var(--radius-md); overflow: hidden; background: var(--paper-2); }
+.preview-browser { display: flex; align-items: center; gap: .4rem; padding: .45rem .7rem; background: var(--paper-3); border-bottom: 1px solid var(--card-border); }
+.preview-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--brand-200); flex: 0 0 auto; }
+.preview-url { margin-left: .4rem; font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-body { padding: 1.2rem 1.2rem .6rem; background: #fff; }
+.preview-body .share-title { font-size: 1.1rem; }
+.preview-card { margin-top: .9rem; padding: .6rem .7rem; border: 1px solid var(--card-border); border-left: 3px solid var(--brand); border-radius: var(--radius-sm); background: var(--paper-2); }
+.preview-card strong { display: block; font-size: .86rem; line-height: 1.5; }
+.preview-box .foot-legal { background: #fff; border-top: 1px solid var(--card-border); padding: .8rem 0; }
