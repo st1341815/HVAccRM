@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
+from ..config import get_settings
 from ..csrf import csrf_protect
 from ..db import commit_retry, get_db
 from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso, today_str
@@ -346,7 +347,9 @@ def _share_custom_ctx(db: Session, case: Case | None = None) -> dict:
     """分享页要用的自定义内容：原文 + 渲染后的最终值。"""
     cfg = custom_svc.get_all(db)
     footer = custom_svc.footer_lines(cfg.get("share.footer", ""))
-    tail = custom_svc.render_text(cfg.get("share.tail", ""), {"brand": cfg.get("share.brand") or ""}).strip()
+    # {brand} 空则回落系统英文名，否则默认文案会露出未替换的占位符
+    brand = (cfg.get("share.brand") or "").strip() or get_settings().app_name_en
+    tail = custom_svc.render_text(cfg.get("share.tail", ""), {"brand": brand}).strip()
     return {
         "share_cfg": cfg,
         "share_footer": footer,

@@ -77,3 +77,9 @@ def test_reset_removes_share_keys(db):
     cs.reset(db)
     db.commit()
     assert cs.get_all(db)["share.title"] == "施工案例"
+
+
+def test_brand_placeholder_is_supported():
+    """{brand} 必须在 PLACEHOLDERS 里——否则「图片下方说明」的默认文案会露出 {brand}。"""
+    assert "brand" in cs.PLACEHOLDERS
+    assert cs.render_text(cs.defaults()["share.tail"], {"brand": "HVAccRM"}) == "由 HVAccRM 生成 · 仅作展示参考"
