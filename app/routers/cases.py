@@ -668,7 +668,7 @@ def share_custom_save(
         "share_custom_save",
         "app_settings",
         0,
-        detail={"keys": list(raw.keys()), "truncated": notes},
+        new={"keys": sorted(raw.keys()), "truncated": notes},
         ip=client_ip(request),
     )
     commit_retry(db)
