@@ -225,9 +225,15 @@ def health():
     )
 
 
-@app.get("/{verify_file}", include_in_schema=False)
+@app.api_route("/{verify_file}", methods=["GET", "HEAD"], include_in_schema=False)
 def serve_verify_file(verify_file: str):
-    """域名所有权验证文件：仅服务单段 .txt（static 或 data/verify），免登录。"""
+    """域名所有权验证文件：仅服务单段 .txt（static 或 data/verify），免登录。
+
+    ⚠️ 必须同时接受 **HEAD**：FastAPI 的 `@app.get()` 不会像 Starlette 的
+    `Route` 那样自动补 HEAD，导致 HEAD 请求拿到 405。而微信/腾讯云的域名
+    验证器经常用 HEAD 探测文件是否存在，405 会被判成「访问文本资源失败」。
+    （2026-10-30 微信申诉踩过：GET 200 但 HEAD 405 → 验证不通过。）
+    """
     target = _verify_file_path(verify_file)
     if target is None:
         raise HTTPException(status_code=404, detail="未找到")

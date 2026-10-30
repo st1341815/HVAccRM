@@ -78,3 +78,32 @@ def test_is_exempt_covers_verify_file(dirs):
     # 原有白名单不受影响
     assert main._is_exempt("/health") is True
     assert main._is_exempt("/customers") is False
+
+
+def test_route_accepts_head():
+    """⚠️ 关键回归：路由必须同时接受 HEAD。
+
+    2026-10-30 微信申诉实测：GET 返回 200 且内容正确，但微信验证器用 HEAD
+    探测时拿到 **405**（FastAPI 的 `@app.get()` 不会自动补 HEAD，与 Starlette
+    的 Route 不同），于是报「访问文本资源失败，请调整后重试」。
+    改成 `@app.api_route(..., methods=["GET","HEAD"])` 才通过。
+    """
+    routes = [
+        r for r in main.app.routes
+        if getattr(r, "path", None) == "/{verify_file}"
+    ]
+    assert routes, "未找到验证文件路由"
+    methods = set(getattr(routes[0], "methods", set()) or set())
+    assert "GET" in methods, f"缺少 GET：{methods}"
+    assert "HEAD" in methods, f"缺少 HEAD（微信验证器会拿到 405）：{methods}"
+
+
+def test_head_and_get_share_implementation():
+    """HEAD 与 GET 用同一个处理函数（不另写一份逻辑，避免两条路径行为不一致）。"""
+    paths = {}
+    for r in main.app.routes:
+        p = getattr(r, "path", None)
+        if p == "/{verify_file}":
+            for m in getattr(r, "methods", set()) or set():
+                paths[m] = r.endpoint
+    assert paths.get("GET") is paths.get("HEAD"), "HEAD 与 GET 应指向同一 endpoint"
