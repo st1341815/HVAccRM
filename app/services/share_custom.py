@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from . import settings as settings_svc
 
-# 分享页「标题模板」支持的占位符：{site} 工地位置、{stage} 工序、{product} 产品类型、{date} 施工日期
-PLACEHOLDERS = ("site", "stage", "product", "date")
+# 分享页支持的占位符：{site} 工地位置、{stage} 工序、{product} 产品类型、{date} 施工日期、{brand} 品牌字样
+PLACEHOLDERS = ("site", "stage", "product", "date", "brand")
 
 # ------------------------------------------------------------- 默认值
 _DEFAULTS: dict[str, str] = {
