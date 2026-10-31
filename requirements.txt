@@ -10,3 +10,5 @@ pydantic==2.14.1
 pydantic-settings==2.7.0
 pillow==11.3.0
 segno==1.6.6
+# 公众号草稿同步：连容器内 Chromium 的 CDP 端口（图片上传必须走 DOM.setFileInputFiles）
+websocket-client==1.9.2

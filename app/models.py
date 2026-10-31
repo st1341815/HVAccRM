@@ -474,6 +474,10 @@ class Case(Base):
     share_max_views = Column(Integer)  # [废弃] 访问次数上限
     share_views = Column(Integer, default=0)  # [废弃] 已访问次数
     share_disabled = Column(Integer, default=0)  # 手动失效开关（1 = 已失效）
+    # 公众号草稿同步（v1.8.2）：把案例写成订阅号草稿，人工二次确认后才发表
+    wx_draft_status = Column(String, default="none")  # none / running / done / failed
+    wx_draft_at = Column(String)  # 最近一次成功同步时间
+    wx_draft_note = Column(String)  # 失败原因或提示（成功时为空）
     created_at = Column(String, nullable=False, default=now_iso)
 
     images = relationship(

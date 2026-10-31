@@ -36,7 +36,7 @@
 
 <section class="card">
   <table class="tight cases-table">
-    <thead><tr><th>展示图</th><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>安装师傅</th><th>产品类型</th><th>分享状态</th><th>分享</th></tr></thead>
+    <thead><tr><th>展示图</th><th>施工时间</th><th>房号信息</th><th>施工工序</th><th>安装师傅</th><th>产品类型</th><th>分享状态</th><th>分享</th><th>公众号</th></tr></thead>
     <tbody>
     {% for c in cases %}
       {% set imgs = case_images.get(c.id, []) %}
@@ -84,6 +84,19 @@
           <a class="btn ghost small" href="/cases/share/{{ c.share_token }}" target="_blank" rel="noopener">预览</a>
           <button type="button" class="btn ghost small js-copy" data-url="{{ share_url }}">复制链接</button>
         </td>
+        <td class="wxmp-cell">
+          {% if c.wx_draft_status == 'done' %}
+            <span class="badge ok" title="已同步到公众号草稿箱">已同步</span>
+            <button type="button" class="btn ghost small js-wxmp" data-case="{{ c.id }}">再发一次</button>
+          {% elif c.wx_draft_status == 'running' %}
+            <span class="badge" data-wxmp-status="{{ c.id }}">同步中…</span>
+          {% elif c.wx_draft_status == 'failed' %}
+            <span class="badge danger" title="{{ c.wx_draft_note or '' }}">失败</span>
+            <button type="button" class="btn ghost small js-wxmp" data-case="{{ c.id }}">重试</button>
+          {% else %}
+            <button type="button" class="btn ghost small js-wxmp" data-case="{{ c.id }}">发草稿</button>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
     </tbody>
@@ -101,6 +114,56 @@ document.addEventListener('click', function (e) {
     more.textContent = open ? '收起' : '+' + (total - 3) + ' 张';
     return;
   }
+
+  // 发公众号草稿：后台跑（可能几分钟），这里只负责发起 + 轮询状态
+  var wx = e.target.closest && e.target.closest('.js-wxmp');
+  if (!wx) return;
+  var caseId = wx.getAttribute('data-case');
+  if (!caseId) return;
+  if (!confirm('把这条例案写成公众号草稿？\n\n只会存草稿，不会自动发表。')) return;
+  wx.disabled = true;
+  wx.textContent = '提交中…';
+  fetch('/wxmp/cases/' + caseId, {method: 'POST'})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) {
+        alert(d.error || '发起失败');
+        wx.disabled = false;
+        wx.textContent = '发草稿';
+        return;
+      }
+      wx.textContent = '同步中…';
+      pollWxmp(caseId, wx, 0);
+    })
+    .catch(function () {
+      alert('网络错误');
+      wx.disabled = false;
+      wx.textContent = '发草稿';
+    });
 });
+
+function pollWxmp(caseId, btn, tries) {
+  if (tries > 240) { btn.textContent = '超时，请刷新'; return; }
+  setTimeout(function () {
+    fetch('/wxmp/status/' + caseId)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'done') {
+          btn.disabled = false;
+          btn.textContent = '已同步';
+          if (d.note) alert('草稿已保存，但有提示：' + d.note);
+          return;
+        }
+        if (d.status === 'failed') {
+          btn.disabled = false;
+          btn.textContent = '重试';
+          alert('同步失败：' + (d.note || '未知原因'));
+          return;
+        }
+        pollWxmp(caseId, btn, tries + 1);
+      })
+      .catch(function () { pollWxmp(caseId, btn, tries + 1); });
+  }, 2500);
+}
 </script>
 {% endblock %}

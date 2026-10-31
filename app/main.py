@@ -30,6 +30,7 @@ from .routers import (
     reports,
     tasks,
     ui,
+    wxmp,
 )
 from .scheduler import start_scheduler, stop_scheduler
 from .templating import flash_cookie_name, render, set_request_secure
@@ -213,6 +214,7 @@ app.include_router(tasks.router)
 app.include_router(cases.router)
 app.include_router(photos.router)
 app.include_router(reports.router)
+app.include_router(wxmp.router)
 app.include_router(admin.router)
 
 

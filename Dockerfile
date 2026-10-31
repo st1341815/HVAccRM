@@ -26,6 +26,18 @@ ENV PYTHONUNBUFFERED=1 \
 # sqlite3 已包含在官方 slim 镜像中；无额外系统依赖
 COPY --from=builder /install /usr/local
 
+# 公众号草稿同步要在容器内自己跑浏览器（迁移时不能依赖宿主/Octop 环境）。
+# 两个关键点，改之前先看：
+#   1. Debian 13(trixie) 才有原生 chromium 包，这里装的是 156.x；
+#   2. apt 必须带 -o APT::Key::UseSqv=false —— trixie 的 sqv 签名验证在无 tty
+#      的容器里会永久挂住（实测卡 20 分钟无输出）。
+# 换清华源否则下载慢到不可用。这一层放在 COPY 代码之前，改代码不会重装浏览器。
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get -o APT::Key::UseSqv=false update -qq \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o APT::Key::UseSqv=false install -y --no-install-recommends \
+        chromium fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY alembic.ini pyproject.toml ./
 COPY migrations ./migrations

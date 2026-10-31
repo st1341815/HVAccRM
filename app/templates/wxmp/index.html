@@ -1,0 +1,90 @@
+{% extends "layout.html" %}
+{% block title %}公众号草稿{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>公众号草稿 <span class="muted small">案例 → 订阅号草稿箱</span></h1>
+  <nav class="tabs inline-tabs">
+    <a href="/cases">案例</a>
+    <a href="/cases/links">外链管理</a>
+    <a href="/cases/stats">统计</a>
+    <a href="/cases/custom">自定义</a>
+    <a href="/wxmp" class="active">公众号草稿</a>
+  </nav>
+</div>
+<p class="muted small">
+  把案例写成公众号图文草稿（4 个字段 + 全部现场图）。<b>只存草稿，绝不自动发表</b>——发表由你在公众号后台人工确认。
+</p>
+
+{% if not available %}
+<section class="card">
+  <h2>未启用</h2>
+  <p class="muted">当前镜像未内置 Chromium，公众号同步功能不可用。</p>
+</section>
+{% else %}
+
+<section class="card">
+  <h2>公众号登录</h2>
+  {% if state.error %}
+    <p class="badge danger">浏览器异常：{{ state.error }}</p>
+  {% elif state.logged_in %}
+    <p><span class="badge ok">已登录</span>
+      <span class="muted small">token {{ state.token }}（登录态保存在 /data，容器重建不丢）</span></p>
+    <button type="button" class="btn ghost" onclick="wxmpRefresh()">重新检测</button>
+  {% else %}
+    <div class="wxmp-login">
+      {% if state.qr %}
+        <img id="wxmp-qr" src="/wxmp/qr.png?v={{ range(1, 99999) | random }}" alt="公众号登录二维码" width="220">
+        <div>
+          <p><b>用微信扫一扫，选择公众号并确认登录</b></p>
+          <p class="muted small">二维码约 5 分钟有效。过期了点「刷新二维码」。</p>
+          <button type="button" class="btn ghost" onclick="wxmpRefresh()">刷新二维码 / 检测登录</button>
+        </div>
+      {% else %}
+        <p class="muted">正在获取二维码，请稍候…</p>
+        <button type="button" class="btn ghost" onclick="wxmpRefresh()">刷新</button>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>最近同步</h2>
+  {% if recent %}
+  <table class="tight">
+    <thead><tr><th>案例</th><th>工序</th><th>产品</th><th>状态</th><th>时间</th><th>备注</th></tr></thead>
+    <tbody>
+    {% for c in recent %}
+      <tr>
+        <td>{{ c.site_label or c.room_label }}</td>
+        <td>{{ c.stage }}</td>
+        <td>{{ c.product_type or '-' }}</td>
+        <td>
+          {% if c.wx_draft_status == 'done' %}<span class="badge ok">已同步</span>
+          {% elif c.wx_draft_status == 'running' %}<span class="badge">进行中</span>
+          {% elif c.wx_draft_status == 'failed' %}<span class="badge danger">失败</span>
+          {% else %}-{% endif %}
+        </td>
+        <td class="nowrap">{{ c.wx_draft_at or '-' }}</td>
+        <td class="muted small">{{ c.wx_draft_note or '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">还没有同步过任何案例。去<a href="/cases">案例列表</a>点「发草稿」。</p>
+  {% endif %}
+</section>
+
+{% endif %}
+
+<script>
+async function wxmpRefresh() {
+  const r = await fetch('/wxmp/refresh', {method: 'POST'});
+  const d = await r.json();
+  if (d.logged_in) { location.reload(); return; }
+  const img = document.getElementById('wxmp-qr');
+  if (img) { img.src = '/wxmp/qr.png?t=' + Date.now(); }
+  else { location.reload(); }
+}
+</script>
+{% endblock %}
