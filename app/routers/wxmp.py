@@ -105,7 +105,12 @@ def wxmp_save_template(
         },
     )
     commit_retry(db)
-    log_action(db, user, "wxmp_template_save", "app_settings", None, ip=client_ip(request))
+    # commit=True：log_action 默认只 add() 不提交，而请求结束 get_db() 只 close 不 commit
+    # → 不显式提交的话这条审计会被静默丢弃（曾导致公众号发布动作零痕迹）。
+    log_action(
+        db, user, "wxmp_template_save", "app_settings", None,
+        ip=client_ip(request), commit=True,
+    )
     return redirect("/wxmp#template", "模板已保存", "ok")
 
 
@@ -118,7 +123,9 @@ def wxmp_preview(
 ):
     """正文预览：用真实案例（或示例数据）渲染当前模板，前端直接内嵌展示。
 
-    只返回 HTML 片段，不走完整页面——这样样式和最终塞进微信的那份完全一致。
+    ⚠️ 预览走 body_html()（富样式），而真实发布走 body_lines()（纯文本 + 逐行
+    insertText）。微信编辑器会剥掉程序注入的字号/颜色/粗体，所以**预览 ≠ 终稿**，
+    预览只是给用户看「字段开关/文案」效果，不代表草稿箱里的最终样式。
     """
     if case_id:
         case = db.get(Case, case_id)
@@ -166,7 +173,11 @@ def wxmp_publish(
     case.wx_draft_status = "running"
     case.wx_draft_note = ""
     commit_retry(db)
-    log_action(db, user, "wxmp_publish", "cases", case.id, ip=client_ip(request))
+    # commit=True：同上，不显式提交会被 get_db() 的 close 丢弃，导致发布零审计。
+    log_action(
+        db, user, "wxmp_publish", "cases", case.id,
+        ip=client_ip(request), commit=True,
+    )
 
     with _TASK_LOCK:
         _TASKS[case_id] = {"status": "running", "started": now_iso(), "user": user.display_name}

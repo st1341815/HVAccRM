@@ -98,12 +98,21 @@ def _values(case) -> dict:
     }
 
 
-def _items(t: dict, vals: dict) -> list[tuple[str, str]]:
+def _items(t: dict, vals: dict, escape_value: bool = True) -> list[tuple[str, str]]:
+    """收集要展示的字段（标签, 值）。
+
+    escape_value=True：对值做 HTML 转义 —— 只给 body_html()（预览，拼进 HTML）。
+    escape_value=False：保留原文 —— 给 body_lines()（发布，走 insertText 纯文本）。
+    ⚠️ 两者不能混用：纯文本路径若带 HTML 转义，案例字段含 & < > 时会发出
+    `&amp;` / `&lt;` 字面乱码（公众号是对外内容，属于用户可见错误）。
+    """
     out = []
     for key, label in FIELDS:
         if not t["show"].get(key):
             continue
-        out.append((label, escape(vals[key].strip()) or "—"))
+        raw = vals[key].strip()
+        value = (escape(raw) if escape_value else raw) or "—"
+        out.append((label, value))
     return out
 
 
@@ -118,7 +127,7 @@ def body_lines(case, template: dict | str | None = None) -> list[str]:
     微信编辑器会剥掉富样式，所以层次靠「▍ + 标签名 + 全角空格 + 值」的字面结构区分。
     """
     t = normalize(template)
-    items = _items(t, _values(case))
+    items = _items(t, _values(case), escape_value=False)  # 纯文本路径，不转义
     lines: list[str] = []
 
     # 品牌条 / 引导语
