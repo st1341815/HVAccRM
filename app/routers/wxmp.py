@@ -5,7 +5,9 @@
 """
 from __future__ import annotations
 
+import logging
 import threading
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -24,15 +26,37 @@ from ..templating import redirect, render
 from ..utils import client_ip, get_or_404
 
 router = APIRouter(prefix="/wxmp", tags=["wxmp"])
+log = logging.getLogger("crm.wxmp")
 
 # 进程内任务状态（单 worker 部署，够用；多 worker 需换共享存储）
 _TASKS: dict[int, dict] = {}
 _TASK_LOCK = threading.Lock()
 
+# 单次同步的僵死阈值（分钟）。超过即视为后台线程已卡死、允许抢占重发。
+# 依据：最坏情况 19 张图 × 90s 超时 ≈ 28.5 分钟，再留余量。
+STALE_TASK_MINUTES = 45
+
 
 def _task_of(case_id: int) -> dict | None:
     with _TASK_LOCK:
         return _TASKS.get(case_id)
+
+
+def _is_stale_task(task: dict) -> bool:
+    """进程内任务是否已僵死（running 但开始时间超过阈值）。
+
+    后台线程可能卡在 CDP 调用上不返回（renderer 僵死、网络挂起），此时
+    `_TASKS[case_id]` 会永远保持 running，防重会让用户永久 409 无法重试。
+    超过阈值就当成僵死，允许抢占。
+    """
+    if task.get("status") != "running":
+        return False
+    started = task.get("started") or ""
+    try:
+        began = datetime.strptime(started, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return True  # 时间戳坏了也当作僵死，避免永久卡住
+    return (datetime.now() - began).total_seconds() > STALE_TASK_MINUTES * 60
 
 
 @router.get("")
@@ -61,7 +85,10 @@ def wxmp_page(request: Request, db: Session = Depends(get_db), user=Depends(requ
         available=available,
         state=state,
         recent=recent,
-        running=[t for t in _TASKS.values() if t.get("status") == "running"],
+        running=[
+            t for t in _TASKS.values()
+            if t.get("status") == "running" and not _is_stale_task(t)
+        ],
         template=wxmp_svc.get_template(db),
         presets=wxmp_body.PRESETS,
         fields=wxmp_body.FIELDS,
@@ -168,7 +195,13 @@ def wxmp_publish(
 
     t = _task_of(case_id)
     if t and t.get("status") == "running":
-        return JSONResponse({"ok": False, "error": "该案例正在同步中"}, status_code=409)
+        if not _is_stale_task(t):
+            return JSONResponse({"ok": False, "error": "该案例正在同步中"}, status_code=409)
+        # 超时视为后台线程已僵死，允许抢占重发（否则用户会永久卡在 409）
+        log.warning(
+            "案例 %s 上次同步已超时（started=%s，阈值 %d 分钟），视为僵死，允许重新发布",
+            case_id, t.get("started"), STALE_TASK_MINUTES,
+        )
 
     case.wx_draft_status = "running"
     case.wx_draft_note = ""
@@ -244,6 +277,15 @@ def _run_publish(case_id: int) -> None:
 def wxmp_status(request: Request, case_id: int, db: Session = Depends(get_db), user=Depends(require("case:view"))):
     case = get_or_404(db, Case, case_id, "案例")
     t = _task_of(case_id) or {}
+
+    # 僵死自愈：后台线程卡死时 DB 会永远停在 running（前端刷新后仍显示「进行中」）。
+    # 这里顺手复位成 failed，让用户看到「失败·可重试」。只写一次（复位后不再是 running）。
+    if t.get("status") == "running" and _is_stale_task(t):
+        case.wx_draft_status = "failed"
+        case.wx_draft_note = f"同步超时（超过 {STALE_TASK_MINUTES} 分钟无响应），可重新同步"
+        commit_retry(db)
+        log.warning("案例 %s 同步僵死（started=%s），已在状态查询时复位为 failed", case_id, t.get("started"))
+
     return JSONResponse(
         {
             "status": case.wx_draft_status or "none",

@@ -73,6 +73,30 @@ def seed_stages() -> int:
     return added
 
 
+def reset_stale_wxmp_running() -> int:
+    """启动时复位「上次运行中断」的公众号同步状态，返回复位条数。
+
+    公众号发布走「后台线程 + 进程内 `_TASKS` 字典」。容器重启 / 进程退出后
+    `_TASKS` 清空，但 DB 里 `cases.wx_draft_status` 仍是 'running'：
+      - 前端「公众号」页永远显示「进行中」，实际什么都没在跑；
+      - `wxmp_publish` 的防重只查 `_TASKS`（重启后为空）→ 放行重复发布 →
+        草稿箱里堆出重复草稿。
+    所以在启动链（迁移之后、对外服务之前）统一把这些僵尸状态复位成 failed。
+    """
+    from sqlalchemy import update
+
+    from .models import Case
+
+    with SessionLocal() as db:
+        res = db.execute(
+            update(Case)
+            .where(Case.wx_draft_status == "running")
+            .values(wx_draft_status="failed", wx_draft_note="服务重启中断，可重新同步")
+        )
+        db.commit()
+        return res.rowcount or 0
+
+
 def _write_initial_credentials(username: str, password: str) -> Path | None:
     """把首次启动生成的随机管理员密码写进 `DATA_DIR/first_boot.txt`（0600）。"""
     path = get_settings().data_path / "first_boot.txt"
@@ -198,11 +222,13 @@ def main() -> None:
     ensure_fts()
     stages = seed_stages()
     created = seed_admin()
+    stale_wxmp = reset_stale_wxmp_running()
     log.info(
-        "bootstrap 完成：迁移=%s 新增工序模板=%d admin新建=%s db=%s",
+        "bootstrap 完成：迁移=%s 新增工序模板=%d admin新建=%s 复位中断同步=%d db=%s",
         backend,
         stages,
         created,
+        stale_wxmp,
         s.db_path,
     )
 
