@@ -114,7 +114,9 @@ def _items(t: dict, vals: dict) -> list[tuple[str, str]]:
 def body_lines(case, template: dict | str | None = None) -> list[str]:
     """返回正文的**行列表**（纯文本，发布用）。
 
-    每行一个内容块；空字符串行 = 空行。发布时逐行 insertText，行间回车。
+    每行一个内容块，行间靠模拟回车分段。**不加空行**——微信编辑器里空段落
+    的视觉间距很大（段落上下边距），空行会让「字段之间」看起来间隔巨大。
+    层次感靠「▍标签行 + 值行」的字面结构区分，字段间紧挨即可。
     """
     t = normalize(template)
     items = _items(t, _values(case))
@@ -129,22 +131,17 @@ def body_lines(case, template: dict | str | None = None) -> list[str]:
     # 字段（text/card：标签行 + 值行；plain/compact：标签 值 单行）
     two_line = t["preset"] in ("text", "card")
     for label, value in items:
-        value_plain = value  # 已经是 escape 过的文本
         if two_line:
             lines.append(f"▍{label}")
-            lines.append(value_plain)
-            lines.append("")  # 字段间空行
+            lines.append(value)
         else:
-            lines.append(f"{label}　{value_plain}")
+            lines.append(f"{label}　{value}")
 
     # 落款
     if t["tail"]:
         lines.append("────────────")
         lines.append(t["tail"])
 
-    # 去掉末尾多余的空行（保持整洁）
-    while lines and lines[-1] == "":
-        lines.pop()
     return lines
 
 
