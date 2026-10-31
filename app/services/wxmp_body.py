@@ -114,9 +114,8 @@ def _items(t: dict, vals: dict) -> list[tuple[str, str]]:
 def body_lines(case, template: dict | str | None = None) -> list[str]:
     """返回正文的**行列表**（纯文本，发布用）。
 
-    每行一个内容块，行间靠模拟回车分段。**不加空行**——微信编辑器里空段落
-    的视觉间距很大（段落上下边距），空行会让「字段之间」看起来间隔巨大。
-    层次感靠「▍标签行 + 值行」的字面结构区分，字段间紧挨即可。
+    紧凑单行排版：每个字段一行「▍标签　值」，字段间紧挨，不加空行。
+    微信编辑器会剥掉富样式，所以层次靠「▍ + 标签名 + 全角空格 + 值」的字面结构区分。
     """
     t = normalize(template)
     items = _items(t, _values(case))
@@ -128,14 +127,9 @@ def body_lines(case, template: dict | str | None = None) -> list[str]:
     if t["lead"]:
         lines.append(t["lead"])
 
-    # 字段（text/card：标签行 + 值行；plain/compact：标签 值 单行）
-    two_line = t["preset"] in ("text", "card")
+    # 字段：单行「▍标签　值」
     for label, value in items:
-        if two_line:
-            lines.append(f"▍{label}")
-            lines.append(value)
-        else:
-            lines.append(f"{label}　{value}")
+        lines.append(f"▍{label}　{value}")
 
     # 落款
     if t["tail"]:
