@@ -163,6 +163,8 @@ def ensure_browser(wait: float = 25.0) -> None:
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-extensions",
+        "--disable-quic",            # 飞牛 Fake-IP 转发层不通 UDP/QUIC，强制走 TCP/TLS
+        "--disable-http2",           # 同上，规避中间层对 HTTP/2 的兼容问题
         f"--remote-debugging-port={PORT}",
         f"--user-data-dir={profile_dir()}",
         "about:blank",
@@ -340,16 +342,40 @@ def _set_title(c: cdp_mod.CDP, text: str) -> None:
         raise RuntimeError(f"标题写入失败：期望 {text!r} 实得 {got!r}")
 
 
-def _set_body(c: cdp_mod.CDP, html: str) -> None:
+def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
+    """逐行写入正文：每行 insertText，行间用模拟回车分段。
+
+    为什么不用 insertHTML：微信编辑器会把 insertHTML 注入的 style 全剥掉、
+    相邻块级元素合并成一段、<br> 保存时吞成 &nbsp;（见 wxmp_body.py 顶部实测）。
+    只有「insertText + 回车」能产生微信原生的 <section> 段落、保存后可靠保留换行。
+    """
     if c.js(JS_FOCUS_BODY) != "ok":
         raise RuntimeError("找不到正文编辑器")
-    if not c.js(f"document.execCommand('insertHTML', false, {json.dumps(html)})"):
-        raise RuntimeError("正文写入失败（insertHTML 返回 false）")
+
+    def _press_enter() -> None:
+        c.call("Input.dispatchKeyEvent", type="keyDown", key="Enter",
+               code="Enter", windowsVirtualKeyCode=13, nativeVirtualKeyCode=13)
+        c.call("Input.dispatchKeyEvent", type="keyUp", key="Enter",
+               code="Enter", windowsVirtualKeyCode=13, nativeVirtualKeyCode=13)
+
+    # 行间用回车分段；空行 = 连续两个回车（造一个空段落）
+    for i, line in enumerate(lines):
+        if i > 0:
+            _press_enter()
+            if line == "" or lines[i - 1] == "":
+                # 空行：再补一个回车，形成真正的段落间隔
+                _press_enter()
+        if line:
+            ok = c.js(f"document.execCommand('insertText', false, {json.dumps(line)})")
+            if ok is False:
+                raise RuntimeError("正文写入失败（insertText 返回 false）")
 
 
 def _insert_images(c: cdp_mod.CDP, files: list[str], per_image_timeout: float = 90) -> dict:
+    # 只聚焦一次正文（在循环外）。逐个 set_files 上传时，正文里已有多张 <img>，
+    # 若每次循环都重新 selectNodeContents+collapse，会导致渲染问题累积、renderer 僵死。
+    c.js(JS_FOCUS_BODY)
     for i, path in enumerate(files, start=1):
-        c.js(JS_FOCUS_BODY)
         c.set_files("input[type=file]", [path])
         deadline = time.time() + per_image_timeout
         while time.time() < deadline:
@@ -381,8 +407,11 @@ def _saved_ok(c: cdp_mod.CDP) -> bool:
     return "action=edit" in url and "isNew=1" not in url
 
 
-def publish_case(db, case, image_files: list[str], html: str, title: str) -> dict:
-    """发布一篇草稿。调用方负责取数、生成 html、解析标题。"""
+def publish_case(db, case, image_files: list[str], lines: list[str], title: str) -> dict:
+    """发布一篇草稿。调用方负责取数、生成正文行列表、解析标题。
+
+    lines 是纯文本行列表（见 wxmp_body.body_lines），逐行 insertText + 回车分段。
+    """
     with _LOCK:
         if not is_available():
             return {"ok": False, "error": "容器内没有 Chromium"}
@@ -397,7 +426,7 @@ def publish_case(db, case, image_files: list[str], html: str, title: str) -> dic
             _wait_editor(c)
 
             _set_title(c, title)
-            _set_body(c, html)
+            _set_body(c, lines)
             st = _insert_images(c, image_files)
 
             miss = len(image_files) - int(st.get("cdn", 0))

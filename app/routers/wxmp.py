@@ -202,9 +202,9 @@ def _run_publish(case_id: int) -> None:
 
         cfg = custom_svc.get_all(db)
         title = wxmp_body.title_of(wxmp_body.og_title(case, cfg), case)
-        html = wxmp_body.body_html(case, wxmp_svc.get_template(db))
+        lines = wxmp_body.body_lines(case, wxmp_svc.get_template(db))
 
-        result = wxmp_svc.publish_case(db, case, files, html, title)
+        result = wxmp_svc.publish_case(db, case, files, lines, title)
 
         case.wx_draft_status = "done" if result.get("ok") else "failed"
         if result.get("ok"):
