@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,7 +20,7 @@ from ..services import cases as cases_svc
 from ..services import share_custom as custom_svc
 from ..services import wxmp as wxmp_svc
 from ..services import wxmp_body
-from ..templating import render
+from ..templating import redirect, render
 from ..utils import client_ip, get_or_404
 
 router = APIRouter(prefix="/wxmp", tags=["wxmp"])
@@ -62,7 +62,72 @@ def wxmp_page(request: Request, db: Session = Depends(get_db), user=Depends(requ
         state=state,
         recent=recent,
         running=[t for t in _TASKS.values() if t.get("status") == "running"],
+        template=wxmp_svc.get_template(db),
+        presets=wxmp_body.PRESETS,
+        fields=wxmp_body.FIELDS,
     )
+
+
+@router.post("/template")
+def wxmp_save_template(
+    request: Request,
+    preset: str = Form("card"),
+    brand: str = Form(""),
+    lead: str = Form(""),
+    tail: str = Form(""),
+    accent: str = Form("#6c7f91"),
+    font_size: int = Form(15),
+    line_height: float = Form(1.9),
+    show_site: str = Form(""),
+    show_date: str = Form(""),
+    show_stage: str = Form(""),
+    show_product: str = Form(""),
+    db: Session = Depends(get_db),
+    user=Depends(require("case:edit")),
+):
+    """保存正文模板。字段勾选用 checkbox（未勾选则不出现在请求里）。"""
+    t = wxmp_svc.save_template(
+        db,
+        {
+            "preset": preset,
+            "brand": brand,
+            "lead": lead,
+            "tail": tail,
+            "accent": accent,
+            "font_size": font_size,
+            "line_height": line_height,
+            "show": {
+                "site": bool(show_site),
+                "date": bool(show_date),
+                "stage": bool(show_stage),
+                "product": bool(show_product),
+            },
+        },
+    )
+    commit_retry(db)
+    log_action(db, user, "wxmp_template_save", "app_settings", None, ip=client_ip(request))
+    return redirect("/wxmp#template", "模板已保存", "ok")
+
+
+@router.get("/preview")
+def wxmp_preview(
+    request: Request,
+    case_id: int = 0,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+):
+    """正文预览：用真实案例（或示例数据）渲染当前模板，前端直接内嵌展示。
+
+    只返回 HTML 片段，不走完整页面——这样样式和最终塞进微信的那份完全一致。
+    """
+    if case_id:
+        case = db.get(Case, case_id)
+    else:
+        case = db.scalars(select(Case).order_by(Case.id.desc())).first()
+    if case is None:
+        return JSONResponse({"html": "<p style='color:#999'>暂无案例可预览</p>"})
+    html = wxmp_body.body_html(case, wxmp_svc.get_template(db))
+    return JSONResponse({"html": html, "title": wxmp_body.title_of("", case)})
 
 
 @router.get("/qr.png")
@@ -137,7 +202,7 @@ def _run_publish(case_id: int) -> None:
 
         cfg = custom_svc.get_all(db)
         title = wxmp_body.title_of(wxmp_body.og_title(case, cfg), case)
-        html = wxmp_body.body_html(case)
+        html = wxmp_body.body_html(case, wxmp_svc.get_template(db))
 
         result = wxmp_svc.publish_case(db, case, files, html, title)
 

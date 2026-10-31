@@ -28,7 +28,7 @@
     <p class="badge danger">浏览器异常：{{ state.error }}</p>
   {% elif state.logged_in %}
     <p><span class="badge ok">已登录</span>
-      <span class="muted small">token {{ state.token }}（登录态保存在 /data，容器重建不丢）</span></p>
+      <span class="muted small">登录态保存在 /data，容器重建不丢</span></p>
     <button type="button" class="btn ghost" onclick="wxmpRefresh()">重新检测</button>
   {% else %}
     <div class="wxmp-login">
@@ -45,6 +45,64 @@
       {% endif %}
     </div>
   {% endif %}
+</section>
+
+<section class="card" id="template">
+  <h2>正文模板 <span class="muted small">同步时套用</span></h2>
+  <form method="post" action="/wxmp/template" class="wxmp-tpl">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="tpl-row">
+      <span class="tpl-label">版式</span>
+      <div class="tpl-presets">
+        <label class="tpl-chip"><input type="radio" name="preset" value="plain" {{ 'checked' if template.preset == 'plain' else '' }}><span>简约<small>单行，最素</small></span></label>
+        <label class="tpl-chip"><input type="radio" name="preset" value="card" {{ 'checked' if template.preset == 'card' else '' }}><span>卡片<small>标签/值分层，推荐</small></span></label>
+        <label class="tpl-chip"><input type="radio" name="preset" value="compact" {{ 'checked' if template.preset == 'compact' else '' }}><span>紧凑<small>图多时用</small></span></label>
+      </div>
+    </div>
+
+    <div class="tpl-row">
+      <span class="tpl-label">显示字段</span>
+      <div class="tpl-checks">
+        <label class="checkline"><input type="checkbox" name="show_site" {{ 'checked' if template.show.site else '' }}> 工地位置</label>
+        <label class="checkline"><input type="checkbox" name="show_date" {{ 'checked' if template.show.date else '' }}> 施工时间</label>
+        <label class="checkline"><input type="checkbox" name="show_stage" {{ 'checked' if template.show.stage else '' }}> 施工工序</label>
+        <label class="checkline"><input type="checkbox" name="show_product" {{ 'checked' if template.show.product else '' }}> 产品类型</label>
+      </div>
+    </div>
+
+    <div class="tpl-row">
+      <span class="tpl-label">顶部标签</span>
+      <input name="brand" value="{{ template.brand }}" placeholder="如：施工案例 / 冷暖视点（留空不显示）" maxlength="20">
+    </div>
+    <div class="tpl-row">
+      <span class="tpl-label">开头引导语</span>
+      <input name="lead" value="{{ template.lead }}" placeholder="留空不显示" maxlength="60">
+    </div>
+    <div class="tpl-row">
+      <span class="tpl-label">结尾落款</span>
+      <input name="tail" value="{{ template.tail }}" placeholder="如：冷暖视点 · 专业暖通施工（留空不显示）" maxlength="60">
+    </div>
+
+    <div class="tpl-row">
+      <span class="tpl-label">主色 / 字号 / 行距</span>
+      <span class="tpl-inline">
+        <input type="color" name="accent" value="{{ template.accent }}" title="主色">
+        <input type="number" name="font_size" value="{{ template.font_size }}" min="12" max="20" step="1" class="num"> px
+        <input type="number" name="line_height" value="{{ template.line_height }}" min="1.4" max="2.4" step="0.05" class="num"> 行距
+      </span>
+    </div>
+
+    <div class="tpl-actions">
+      <button type="submit">保存模板</button>
+      <button type="button" class="btn ghost" onclick="wxmpPreview()">刷新预览</button>
+    </div>
+  </form>
+
+  <div class="tpl-preview">
+    <div class="tpl-preview-head muted small">预览（同一份 HTML，与塞进微信的完全一致）</div>
+    <div class="tpl-preview-body" id="wxmp-preview">加载中…</div>
+  </div>
 </section>
 
 <section class="card">
@@ -77,6 +135,28 @@
 
 {% endif %}
 
+<style>
+.wxmp-tpl { max-width: 720px; }
+.tpl-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.tpl-label { flex: 0 0 96px; color: var(--muted); font-size: .85rem; white-space: nowrap; padding-top: 6px; }
+.tpl-row input[type=text], .tpl-row input:not([type]) { flex: 1 1 320px; }
+.tpl-presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.tpl-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); cursor: pointer; }
+.tpl-chip:has(input:checked) { border-color: var(--brand); background: var(--brand-50); }
+.tpl-chip small { color: var(--muted); font-size: .75rem; margin-left: 4px; }
+.tpl-checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.tpl-inline { display: inline-flex; align-items: center; gap: 8px; }
+.tpl-inline .num { width: 68px; }
+.tpl-actions { display: flex; gap: 10px; margin: 16px 0 0 108px; }
+.tpl-preview { margin-top: 20px; border-top: 1px solid var(--card-border); padding-top: 14px; }
+.tpl-preview-head { margin-bottom: 8px; }
+.tpl-preview-body { max-width: 420px; padding: 20px 18px; background: #fff; border: 1px solid var(--card-border); border-radius: var(--radius-md); }
+@media (max-width: 780px) {
+  .tpl-label { flex-basis: 100%; padding-top: 0; }
+  .tpl-actions { margin-left: 0; }
+}
+</style>
+
 <script>
 async function wxmpRefresh() {
   const r = await fetch('/wxmp/refresh', {method: 'POST'});
@@ -86,5 +166,19 @@ async function wxmpRefresh() {
   if (img) { img.src = '/wxmp/qr.png?t=' + Date.now(); }
   else { location.reload(); }
 }
+
+async function wxmpPreview() {
+  const box = document.getElementById('wxmp-preview');
+  if (!box) return;
+  try {
+    const r = await fetch('/wxmp/preview');
+    const d = await r.json();
+    box.innerHTML = d.html || '<p class="muted">无内容</p>';
+  } catch (e) {
+    box.textContent = '预览失败';
+  }
+}
+// 保存后带着新配置刷新预览
+document.addEventListener('DOMContentLoaded', function () { wxmpPreview(); });
 </script>
 {% endblock %}

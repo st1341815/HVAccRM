@@ -1,45 +1,187 @@
-"""公众号正文 HTML 生成。
+"""公众号正文生成：支持多套模板 + 自定义。
 
-微信编辑器只认内联 style，class 会被全部丢弃——所以不能复用 app.css，
-这里单独产一份纯内联样式片段。
+关于「换行」的实测结论（2026-10-31）：
+  用 `<p>` 排 4 行，微信编辑器里 tops=[272,315,357,400]，行距 43px —— **换行本身没问题**。
+  用户觉得「没有换行」，实际是 4 行 15px 文字挤在一起**没有层次**。
+  所以这一版的重点是排版层次（标签/值分离、卡片底色、间距），不是加 <br>。
 
-内容口径（用户 2026-10-31 定稿）：
-  **只放 4 个字段 + 全部现场图，不加任何营销文案/二维码/引导语。**
+三套预设（都只用内联 style，class 会被微信丢弃）：
+  plain   —— 单行「标签：值」，间距宽松，最素
+  card    —— 浅底色卡片，标签在上（小灰字）、值在下（大字），层次最清楚
+  compact —— 单行紧凑，适合图多的案例（正文短一点，图片占主体）
+
+自定义项（存 app_settings 的 wxmp.template）：品牌条、引导语、落款、字段开关、主色、字号、行距。
 """
 from __future__ import annotations
 
+import json
 from html import escape
 
-# 15px/1.9 是公众号图文里最稳的阅读密度（微信默认字号偏大）
-P_STYLE = "margin:0 0 14px;font-size:15px;line-height:1.9;color:#333;"
-P_LAST = "margin:0 0 26px;font-size:15px;line-height:1.9;color:#333;"
-SECTION_STYLE = "margin:0;padding:0;"
+PRESETS = ("plain", "card", "compact")
+
+FIELDS = (
+    ("site", "工地位置"),
+    ("date", "施工时间"),
+    ("stage", "施工工序"),
+    ("product", "产品类型"),
+)
+
+DEFAULT_TEMPLATE: dict = {
+    "preset": "card",
+    "brand": "",       # 顶部品牌条，空则不显示
+    "lead": "",        # 头部引导语，空则不显示
+    "tail": "",        # 尾部落款，空则不显示
+    "show": {k: True for k, _ in FIELDS},
+    "accent": "#6c7f91",
+    "font_size": 15,
+    "line_height": 1.9,
+}
 
 
-def _line(label: str, value: str, last: bool = False) -> str:
-    style = P_LAST if last else P_STYLE
-    val = escape(str(value or "").strip()) or "-"
-    return f'<p style="{style}">{escape(label)}：{val}</p>'
+def normalize(raw: dict | str | None) -> dict:
+    """把存库的（可能是半截/脏的）配置收敛成完整模板。"""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            raw = {}
+    raw = raw if isinstance(raw, dict) else {}
+    t = json.loads(json.dumps(DEFAULT_TEMPLATE))  # 深拷贝
+
+    preset = str(raw.get("preset") or "").strip()
+    if preset in PRESETS:
+        t["preset"] = preset
+    for k in ("brand", "lead", "tail"):
+        t[k] = str(raw.get(k) or "").strip()
+    show = raw.get("show")
+    if isinstance(show, dict):
+        for k, _ in FIELDS:
+            t["show"][k] = bool(show.get(k, True))
+    accent = str(raw.get("accent") or "").strip()
+    if accent.startswith("#") and len(accent) in (4, 7):
+        t["accent"] = accent
+    try:
+        fs = int(raw.get("font_size") or 0)
+        t["font_size"] = fs if 12 <= fs <= 20 else DEFAULT_TEMPLATE["font_size"]
+    except (TypeError, ValueError):
+        pass
+    try:
+        lh = float(raw.get("line_height") or 0)
+        t["line_height"] = round(lh, 2) if 1.4 <= lh <= 2.4 else DEFAULT_TEMPLATE["line_height"]
+    except (TypeError, ValueError):
+        pass
+    return t
 
 
-def body_html(case) -> str:
-    """4 行字段。图片由调用方逐张插入（正文末尾）。"""
-    lines = [
-        _line("工地位置", case.site_label),
-        _line("施工时间", case.work_date),
-        _line("施工工序", case.stage),
-        _line("产品类型", case.product_type, last=True),
-    ]
-    return f'<section style="{SECTION_STYLE}">' + "".join(lines) + "</section>"
+def _values(case) -> dict:
+    return {
+        "site": case.site_label or "",
+        "date": case.work_date or "",
+        "stage": case.stage or "",
+        "product": case.product_type or "",
+    }
+
+
+def _brand_bar(text: str, accent: str) -> str:
+    """顶部小标签条：底色 + 白字的胶囊，视觉锚点。"""
+    return (
+        f'<section style="margin:0 0 18px;padding:0;">'
+        f'<section style="display:inline-block;padding:4px 12px;background:{accent};'
+        f'border-radius:3px;">'
+        f'<span style="font-size:12px;line-height:1.4;color:#ffffff;letter-spacing:1px;">'
+        f"{escape(text)}</span></section></section>"
+    )
+
+
+def _divider(accent: str) -> str:
+    return (
+        f'<section style="margin:26px 0;padding:0;">'
+        f'<section style="height:1px;background:#e5e0d8;"></section></section>'
+    )
+
+
+def _plain(t: dict, vals: dict) -> str:
+    fs, lh = t["font_size"], t["line_height"]
+    out = []
+    for key, label in FIELDS:
+        if not t["show"].get(key):
+            continue
+        v = escape(vals[key].strip()) or "—"
+        out.append(
+            f'<p style="margin:0 0 16px;font-size:{fs}px;line-height:{lh};color:#333;">'
+            f'<span style="color:#8a8a8a;">{escape(label)}</span>'
+            f'<span style="color:#d8d2c8;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>'
+            f"{v}</p>"
+        )
+    return "".join(out)
+
+
+def _card(t: dict, vals: dict) -> str:
+    """卡片式：浅底色块里，每项「小灰标签 / 大字值」，层次最清楚。"""
+    fs, lh, accent = t["font_size"], t["line_height"], t["accent"]
+    rows = []
+    items = [(k, l) for k, l in FIELDS if t["show"].get(k)]
+    for i, (key, label) in enumerate(items):
+        last = i == len(items) - 1
+        v = escape(vals[key].strip()) or "—"
+        mb = "0" if last else "14px"
+        rows.append(
+            f'<p style="margin:0 0 3px;font-size:12px;line-height:1.5;color:#9a958c;'
+            f'letter-spacing:0.5px;">{escape(label)}</p>'
+            f'<p style="margin:0 0 {mb};font-size:{fs + 1}px;line-height:{lh - 0.2};'
+            f'color:#2f2f2f;font-weight:600;">{v}</p>'
+        )
+    return (
+        f'<section style="margin:0 0 24px;padding:18px 20px;background:#f7f4ee;'
+        f'border-radius:8px;border-left:3px solid {accent};">' + "".join(rows) + "</section>"
+    )
+
+
+def _compact(t: dict, vals: dict) -> str:
+    fs = max(13, t["font_size"] - 1)
+    rows = []
+    for key, label in FIELDS:
+        if not t["show"].get(key):
+            continue
+        v = escape(vals[key].strip()) or "—"
+        rows.append(
+            f'<p style="margin:0 0 6px;font-size:{fs}px;line-height:1.7;color:#444;">'
+            f'<span style="color:#9a958c;">{escape(label)}</span>&nbsp;&nbsp;{v}</p>'
+        )
+    return f'<section style="margin:0 0 18px;">' + "".join(rows) + "</section>"
+
+
+_RENDERERS = {"plain": _plain, "card": _card, "compact": _compact}
+
+
+def body_html(case, template: dict | str | None = None) -> str:
+    """生成正文（图片由调用方逐张插到末尾）。"""
+    t = normalize(template)
+    vals = _values(case)
+    parts: list[str] = []
+
+    if t["brand"]:
+        parts.append(_brand_bar(t["brand"], t["accent"]))
+    if t["lead"]:
+        parts.append(
+            f'<p style="margin:0 0 18px;font-size:14px;line-height:1.8;color:#666;">'
+            f'{escape(t["lead"])}</p>'
+        )
+
+    parts.append(_RENDERERS[t["preset"]](t, vals))
+
+    if t["tail"]:
+        parts.append(_divider(t["accent"]))
+        parts.append(
+            f'<p style="margin:0;font-size:13px;line-height:1.8;color:#9a958c;'
+            f'text-align:center;">{escape(t["tail"])}</p>'
+        )
+    return "".join(parts)
 
 
 def og_title(case, cfg: dict) -> str:
-    """与案例分享页同源的标题规则（含「自定义 → 分享页文案」里的 meta_title 模板）。
-
-    刻意在这里复刻一份、而不是 import routers/cases.py 的私有函数——
-    路由之间互相 import 容易踩循环引用，且这两处语义本来就该同步演进。
-    """
-    from ..services import share_custom as custom_svc
+    """与案例分享页同源的标题规则（含「自定义 → 分享页文案」里的 meta_title 模板）。"""
+    from . import share_custom as custom_svc
 
     tpl = (cfg.get("share.meta_title") or "").strip()
     if tpl:
@@ -58,7 +200,7 @@ def og_title(case, cfg: dict) -> str:
 
 
 def title_of(og_title: str, case, max_len: int = 64) -> str:
-    """标题：优先用案例页已算好的（含「自定义 → 分享页文案」模板），超 64 字截断。"""
+    """标题：优先用案例页已算好的，超 64 字截断。"""
     t = (og_title or "").strip()
     if not t:
         bits = [b for b in (case.site_label, case.product_type, case.stage) if b]

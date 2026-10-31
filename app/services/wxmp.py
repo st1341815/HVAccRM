@@ -39,6 +39,26 @@ _LOCK = threading.Lock()
 
 BRAND_FALLBACK = "HVAccRM"
 
+# 模板配置存 app_settings（JSON 字符串）
+TEMPLATE_KEY = "wxmp.template"
+
+
+# ------------------------------------------------------------------ 模板配置
+def get_template(db) -> dict:
+    from . import wxmp_body as body_mod
+    from . import settings as settings_svc
+
+    return body_mod.normalize(settings_svc.get(db, TEMPLATE_KEY, ""))
+
+
+def save_template(db, raw: dict | str | None) -> dict:
+    from . import wxmp_body as body_mod
+    from . import settings as settings_svc
+
+    t = body_mod.normalize(raw)
+    settings_svc.set_(db, TEMPLATE_KEY, json.dumps(t, ensure_ascii=False))
+    return t
+
 
 # ------------------------------------------------------------------ 路径
 def _data_dir() -> Path:
