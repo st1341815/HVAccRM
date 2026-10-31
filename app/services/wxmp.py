@@ -371,19 +371,33 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
                 raise RuntimeError("正文写入失败（insertText 返回 false）")
 
 
-def _insert_images(c: cdp_mod.CDP, files: list[str], per_image_timeout: float = 90) -> dict:
-    # 只聚焦一次正文（在循环外）。逐个 set_files 上传时，正文里已有多张 <img>，
-    # 若每次循环都重新 selectNodeContents+collapse，会导致渲染问题累积、renderer 僵死。
+def _insert_images(
+    c: cdp_mod.CDP, files: list[str], per_image_timeout: float = 90, batch_size: int = 6
+) -> dict:
+    """分批上传图片：每批 batch_size 张，批间延时，避免一次性传太多导致 renderer 僵死。
+
+    2026-10-31 踩坑：微信编辑器一次性上传 16 张图会让 renderer 卡死（飞牛网络层对
+    Chromium 的 TLS 连接间歇性失败，图多时累积压力大）。实测 6~7 张一批能稳定成功。
+    用 input[type=file] 的 multiple 一次传一批，批间 sleep 让编辑器喘口气。
+    """
     c.js(JS_FOCUS_BODY)
-    for i, path in enumerate(files, start=1):
-        c.set_files("input[type=file]", [path])
+    total = len(files)
+    done = 0
+    for start in range(0, total, batch_size):
+        batch = files[start:start + batch_size]
+        c.set_files("input[type=file]", batch)
+        # 这一批的目标：累计 imgs/cdn 达到 start+len(batch)
+        target = start + len(batch)
         deadline = time.time() + per_image_timeout
         while time.time() < deadline:
             time.sleep(0.8)
             st = json.loads(c.js(JS_PROBE) or "{}")
-            # 总数和 CDN 数都达标才算这张传完，否则会把「最后一张还在传」误判成丢图
-            if st.get("imgs", 0) >= i and st.get("cdn", 0) >= i:
+            if st.get("imgs", 0) >= target and st.get("cdn", 0) >= target:
                 break
+        done = target
+        # 批间延时：给编辑器/网络留缓冲，避免下一批紧接着叠加压力
+        if done < total:
+            time.sleep(3.0)
     return json.loads(c.js(JS_PROBE) or "{}")
 
 
