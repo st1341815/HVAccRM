@@ -8,8 +8,10 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 
 WORKDIR /build
 # 只装运行依赖；测试依赖在 requirements-test.txt（不进生产镜像）
+# 用清华源：直连 files.pythonhosted.org 会偶发 ReadTimeout（实测构建中途挂掉）
 COPY requirements.txt .
-RUN pip install --prefix=/install --no-warn-script-location --retries 8 --timeout 60 -r requirements.txt
+RUN pip install --prefix=/install --no-warn-script-location --retries 8 --timeout 60 \
+        -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
 # ---------- 运行阶段 ----------
 FROM python:3.12-slim AS runtime

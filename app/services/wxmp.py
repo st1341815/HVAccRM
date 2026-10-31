@@ -349,7 +349,7 @@ def publish_case(db, case, image_files: list[str], html: str, title: str) -> dic
         c = _open(LOGIN_URL)
         try:
             if not _read_token(c):
-                return {"ok": False, "error": "公众号未登录，请先扫码"}
+                return {"ok": False, "need_login": True, "error": "公众号未登录，请先扫码登录"}
             token = _read_token(c)
             c.call("Page.navigate", url=EDITOR_URL.format(token=token))
             time.sleep(2.5)

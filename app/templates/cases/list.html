@@ -122,11 +122,31 @@ document.addEventListener('click', function (e) {
   if (!caseId) return;
   if (!confirm('把这条例案写成公众号草稿？\n\n只会存草稿，不会自动发表。')) return;
   wx.disabled = true;
+  wx.textContent = '检查登录…';
+  // 先确认公众号已登录，否则白跑一趟（发布要几分钟才报错）
+  fetch('/wxmp/refresh', {method: 'POST'})
+    .then(function (r) { return r.json(); })
+    .then(function (s) {
+      if (!s.logged_in) {
+        wx.disabled = false;
+        wx.textContent = '发草稿';
+        if (confirm('公众号还没登录。\n\n点「确定」去扫码登录（在「公众号」页面）。')) {
+          location.href = '/wxmp';
+        }
+        return;
+      }
+      submitWxmp(caseId, wx);
+    })
+    .catch(function () { submitWxmp(caseId, wx); });
+});
+
+function submitWxmp(caseId, wx) {
   wx.textContent = '提交中…';
   fetch('/wxmp/cases/' + caseId, {method: 'POST'})
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (!d.ok) {
+        if (d.need_login && confirm('公众号未登录，去扫码登录？')) { location.href = '/wxmp'; return; }
         alert(d.error || '发起失败');
         wx.disabled = false;
         wx.textContent = '发草稿';
@@ -140,7 +160,7 @@ document.addEventListener('click', function (e) {
       wx.disabled = false;
       wx.textContent = '发草稿';
     });
-});
+}
 
 function pollWxmp(caseId, btn, tries) {
   if (tries > 240) { btn.textContent = '超时，请刷新'; return; }
