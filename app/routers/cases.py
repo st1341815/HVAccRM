@@ -309,6 +309,102 @@ def case_image_thumb(
     return FileResponse(path, media_type="image/webp" if str(path).endswith(".webp") else "image/jpeg")
 
 
+# ------------------------------------------------------------ 对外只读接口
+@router.get("/api/{case_id}/draft")
+def case_draft_api(
+    request: Request,
+    case_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+):
+    """案例「公众号草稿素材」：给外部发布工具（如 wx-mp-draft skill）取数用。
+
+    只返回公开展示字段，**不含**客户姓名/手机/微信/合同金额等任何隐私。
+    图片给的是绝对 URL（跟随当前访问入口推断），调用方直接下载后喂给编辑器。
+
+    与 /cases/share/{token} 的区别：那个是给陌生人看的匿名页，这个是给内部工具用的
+    结构化 JSON——同一份数据两种出口，以后小程序也可以复用这个接口。
+    """
+    case = get_or_404(db, Case, case_id, "案例")
+    base = stats_svc.public_base(request)
+    images = list(
+        db.scalars(
+            select(CaseImage)
+            .where(CaseImage.case_id == case.id)
+            .order_by(CaseImage.sort_order, CaseImage.id)
+        ).all()
+    )
+    cfg = custom_svc.get_all(db)
+    return JSONResponse(
+        {
+            "id": case.id,
+            "title": _og_title(case, cfg),
+            "site": case.site_label or "",
+            "work_date": case.work_date or "",
+            "stage": case.stage or "",
+            "product_type": case.product_type or "",
+            "share_url": f"{base}cases/share/{case.share_token}",
+            "images": [
+                {
+                    "id": img.id,
+                    # 走原图而非缩略图：公众号正文按原图质量展示
+                    "url": f"{base}cases/share/{case.share_token}/image/{img.id}/file",
+                    "thumb_url": f"{base}cases/share/{case.share_token}/image/{img.id}/thumb",
+                }
+                for img in images
+            ],
+            "count": len(images),
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/api/{case_id}/draft/images.zip")
+def case_draft_images_zip(
+    request: Request,
+    case_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+):
+    """案例原图打包下载：发布工具一次拉全，省得逐张 HTTP。
+
+    只打包真实存在于磁盘的图；缺图的跳过而不是整包失败（图坏了不该阻断发稿）。
+    """
+    import io
+    import zipfile
+
+    case = get_or_404(db, Case, case_id, "案例")
+    images = list(
+        db.scalars(
+            select(CaseImage)
+            .where(CaseImage.case_id == case.id)
+            .order_by(CaseImage.sort_order, CaseImage.id)
+        ).all()
+    )
+    buf = io.BytesIO()
+    used = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        for idx, img in enumerate(images, start=1):
+            try:
+                path = cases_svc.case_image_file(img.path)
+            except ValueError:
+                continue
+            if not path.exists():
+                continue
+            zf.write(path, arcname=f"{idx:02d}{path.suffix or '.jpg'}")
+            used += 1
+    if not used:
+        return JSONResponse({"detail": "该案例没有可用原图"}, status_code=404)
+    return Response(
+        buf.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="case-{case.id}-images.zip"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 # ------------------------------------------------------------ 匿名分享
 def _case_ph(case: Case) -> dict[str, str]:
     """分享页文案占位符的取值（模板里用 {site} 这类写法）。"""
