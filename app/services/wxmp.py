@@ -124,6 +124,26 @@ def browser_ready(timeout: float = 1.0) -> bool:
         return False
 
 
+def _renderer_alive() -> bool:
+    """renderer 是否真的能执行 JS。
+
+    browser_ready() 只证明 CDP 端口能列 targets，但 renderer 可能已经僵死
+    （飞牛网络抖动导致微信页 JS 卡死时，browser 进程还活着、端口也通，但
+    任何 Runtime.evaluate 都会超时）。这时必须重启 Chromium，否则复用僵死实例
+    会让所有同步/登录操作都超时。
+    """
+    try:
+        ws = cdp_mod.page_ws(PORT, match="mp.weixin.qq.com")
+        if not ws:
+            return False
+        c = cdp_mod.CDP(ws)
+        ok = c.js("1+1") == 2
+        c.close()
+        return ok
+    except Exception:
+        return False
+
+
 def _clear_stale_singleton() -> None:
     """清掉 Chromium 的 profile 独占锁。
 
@@ -145,9 +165,18 @@ def _clear_stale_singleton() -> None:
 
 
 def ensure_browser(wait: float = 25.0) -> None:
-    """启动或复用 Chromium。已在跑就直接返回。"""
+    """启动或复用 Chromium。已在跑且 renderer 健康就直接返回。
+
+    关键：renderer 可能僵死而 CDP 端口仍通（见 _renderer_alive 说明），
+    这种情况必须杀掉重启，否则复用僵死实例会让所有操作超时。
+    """
     if browser_ready():
-        return
+        if _renderer_alive():
+            return
+        # renderer 僵死：杀掉现有实例，走下面的重启流程
+        stop_browser()
+        time.sleep(1.0)
+
     bin_path = chromium_bin()
     if not bin_path:
         raise RuntimeError("容器内没有 Chromium，无法使用公众号同步功能")
@@ -358,13 +387,10 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
         c.call("Input.dispatchKeyEvent", type="keyUp", key="Enter",
                code="Enter", windowsVirtualKeyCode=13, nativeVirtualKeyCode=13)
 
-    # 行间用回车分段；空行 = 连续两个回车（造一个空段落）
+    # 行间用回车分段。空串元素 = 一个空段落（只回车不输入文字）。
     for i, line in enumerate(lines):
         if i > 0:
             _press_enter()
-            if line == "" or lines[i - 1] == "":
-                # 空行：再补一个回车，形成真正的段落间隔
-                _press_enter()
         if line:
             ok = c.js(f"document.execCommand('insertText', false, {json.dumps(line)})")
             if ok is False:
@@ -374,29 +400,25 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
 def _insert_images(
     c: cdp_mod.CDP, files: list[str], per_image_timeout: float = 90, batch_size: int = 6
 ) -> dict:
-    """分批上传图片：每批 batch_size 张，批间延时，避免一次性传太多导致 renderer 僵死。
+    """逐张上传图片，每 batch_size 张之间加延时，避免 renderer 累积压力僵死。
 
-    2026-10-31 踩坑：微信编辑器一次性上传 16 张图会让 renderer 卡死（飞牛网络层对
-    Chromium 的 TLS 连接间歇性失败，图多时累积压力大）。实测 6~7 张一批能稳定成功。
-    用 input[type=file] 的 multiple 一次传一批，批间 sleep 让编辑器喘口气。
+    2026-10-31 踩坑：微信编辑器里「多段文字 + 多张图」叠加会让 renderer 卡死。
+    实测：一次 set_files 传多张（multiple）反而更容易触发僵死，逐张传 + 批间延时最稳。
+    这里保持「逐张 set_files（每张 1 个文件）」，只在每 batch_size 张后 sleep 缓冲。
     """
     c.js(JS_FOCUS_BODY)
     total = len(files)
-    done = 0
-    for start in range(0, total, batch_size):
-        batch = files[start:start + batch_size]
-        c.set_files("input[type=file]", batch)
-        # 这一批的目标：累计 imgs/cdn 达到 start+len(batch)
-        target = start + len(batch)
+    for i, path in enumerate(files, start=1):
+        c.set_files("input[type=file]", [path])
         deadline = time.time() + per_image_timeout
         while time.time() < deadline:
             time.sleep(0.8)
             st = json.loads(c.js(JS_PROBE) or "{}")
-            if st.get("imgs", 0) >= target and st.get("cdn", 0) >= target:
+            # 总数和 CDN 数都达标才算这张传完，否则会把「最后一张还在传」误判成丢图
+            if st.get("imgs", 0) >= i and st.get("cdn", 0) >= i:
                 break
-        done = target
-        # 批间延时：给编辑器/网络留缓冲，避免下一批紧接着叠加压力
-        if done < total:
+        # 每 batch_size 张后给编辑器/网络留缓冲
+        if i % batch_size == 0 and i < total:
             time.sleep(3.0)
     return json.loads(c.js(JS_PROBE) or "{}")
 
