@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from html import escape
 
-PRESETS = ("plain", "card", "compact")
+PRESETS = ("card", "plain", "compact", "text")
 
 FIELDS = (
     ("site", "工地位置"),
@@ -117,24 +117,49 @@ def _plain(t: dict, vals: dict) -> str:
 
 
 def _card(t: dict, vals: dict) -> str:
-    """卡片式：浅底色块里，每项「小灰标签 / 大字值」，层次最清楚。"""
+    """卡片式：浅底色块 + 标签（小灰字）/ 值（大字）。
+
+    2026-10-31 加固：**不再只靠 CSS 造层次**。标签前加 `▍` 字符、值与标签字号拉开，
+    即使微信保存草稿时剥掉 background/border-radius，符号和字号差仍能撑住结构。
+    """
     fs, lh, accent = t["font_size"], t["line_height"], t["accent"]
     rows = []
     items = [(k, l) for k, l in FIELDS if t["show"].get(k)]
     for i, (key, label) in enumerate(items):
         last = i == len(items) - 1
         v = escape(vals[key].strip()) or "—"
-        mb = "0" if last else "14px"
+        mb = "0" if last else "16px"
         rows.append(
-            f'<p style="margin:0 0 3px;font-size:12px;line-height:1.5;color:#9a958c;'
-            f'letter-spacing:0.5px;">{escape(label)}</p>'
-            f'<p style="margin:0 0 {mb};font-size:{fs + 1}px;line-height:{lh - 0.2};'
-            f'color:#2f2f2f;font-weight:600;">{v}</p>'
+            f'<p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#9a958c;'
+            f'letter-spacing:0.5px;"><span style="color:{accent};">▍</span>{escape(label)}</p>'
+            f'<p style="margin:0 0 {mb};font-size:{fs + 2}px;line-height:{lh - 0.2};'
+            f'color:#2f2f2f;font-weight:bold;">{v}</p>'
         )
     return (
         f'<section style="margin:0 0 24px;padding:18px 20px;background:#f7f4ee;'
         f'border-radius:8px;border-left:3px solid {accent};">' + "".join(rows) + "</section>"
     )
+
+
+def _text(t: dict, vals: dict) -> str:
+    """零 CSS 依赖版（防剥落）。
+
+    只依赖两样微信几乎不会过滤的东西：**换行**和**字符本身**。
+    每项用 `▍标签` + 值 + 空行，即使颜色/字号/背景全丢，排版依然是分明的四块。
+    """
+    fs = t["font_size"]
+    rows = []
+    for key, label in FIELDS:
+        if not t["show"].get(key):
+            continue
+        v = escape(vals[key].strip()) or "—"
+        rows.append(
+            f'<p style="margin:0 0 6px;font-size:{max(13, fs - 2)}px;line-height:1.6;color:#999;">'
+            f'▍{escape(label)}</p>'
+            f'<p style="margin:0 0 20px;font-size:{fs + 2}px;line-height:1.7;color:#222;">'
+            f"{v}</p>"
+        )
+    return "".join(rows)
 
 
 def _compact(t: dict, vals: dict) -> str:
@@ -151,7 +176,7 @@ def _compact(t: dict, vals: dict) -> str:
     return f'<section style="margin:0 0 18px;">' + "".join(rows) + "</section>"
 
 
-_RENDERERS = {"plain": _plain, "card": _card, "compact": _compact}
+_RENDERERS = {"plain": _plain, "card": _card, "compact": _compact, "text": _text}
 
 
 def body_html(case, template: dict | str | None = None) -> str:
