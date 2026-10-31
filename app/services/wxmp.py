@@ -104,6 +104,26 @@ def browser_ready(timeout: float = 1.0) -> bool:
         return False
 
 
+def _clear_stale_singleton() -> None:
+    """清掉 Chromium 的 profile 独占锁。
+
+    容器化必踩：profile 在 /data（跨容器保留），而 SingletonLock 里记着
+    「hostname-pid」。容器一重建 hostname 就变，Chromium 便认为 profile
+    「被另一台机器上的进程占用」而拒绝启动：
+        The profile appears to be in use by another Chromium process (50)
+        on another computer (d617285a5ae5).
+    只有在确认当前没有可用实例时才调用（调用方已先查 browser_ready）。
+    """
+    d = profile_dir()
+    for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        p = d / name
+        try:
+            if p.is_symlink() or p.exists():
+                p.unlink()
+        except OSError:
+            pass
+
+
 def ensure_browser(wait: float = 25.0) -> None:
     """启动或复用 Chromium。已在跑就直接返回。"""
     if browser_ready():
@@ -113,6 +133,7 @@ def ensure_browser(wait: float = 25.0) -> None:
         raise RuntimeError("容器内没有 Chromium，无法使用公众号同步功能")
 
     profile_dir().mkdir(parents=True, exist_ok=True)
+    _clear_stale_singleton()
     args = [
         bin_path,
         "--no-sandbox",              # 容器内以 root 跑，必须关沙箱
