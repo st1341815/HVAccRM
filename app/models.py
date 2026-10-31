@@ -43,6 +43,7 @@ class User(Base):
     session_version = Column(Integer, default=1)
     totp_enabled = Column(Integer, default=0)
     totp_secret = Column(String)
+    mobile = Column(String)  # 手机号（外网短信验证用；未绑定则外网登录被拒）
     is_active = Column(Integer, default=1)
     last_login_at = Column(String)
     created_at = Column(String, nullable=False, default=now_iso)
@@ -598,6 +599,7 @@ class AppSetting(Base):
 
     key-value 存库、后台可改、重启即读；避免为了改一个设置去动 .env 并重建容器。
     仅存「非框架级」可变配置，密钥等仍走环境变量。
+    （短信服务商与密钥是例外：13叔要求后台可切换——密钥类键由备份流程剔除。）
     """
 
     __tablename__ = "app_settings"
@@ -605,6 +607,28 @@ class AppSetting(Base):
     key = Column(String, primary_key=True)
     value = Column(String)
     updated_at = Column(String, default=now_iso, onupdate=now_iso)
+
+
+# ------------------------------------------------------------ 短信验证码
+class SmsCode(Base):
+    """登录短信验证码（外网双因素）。
+
+    只存 HMAC-SHA256 哈希（随机盐前置），不存明文——库文件/备份泄露也拿不到码。
+    验证码与 user_id 绑定：A 账号的码不能登 B 账号；一次性（used_at 置位后作废）。
+    """
+
+    __tablename__ = "sms_codes"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    mobile = Column(String, nullable=False)  # 快照：发送时的手机号
+    code_hash = Column(String, nullable=False)  # "<salt>:<hmac_sha256>"
+    scene = Column(String, nullable=False, default="login")
+    attempts = Column(Integer, default=0)
+    used_at = Column(String)
+    expires_at = Column(String, nullable=False)
+    created_ip = Column(String)
+    created_at = Column(String, nullable=False, default=now_iso)
 
 
 # 标准 9 个施工工序（文档 6.5）

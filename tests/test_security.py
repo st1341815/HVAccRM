@@ -155,13 +155,24 @@ def _fake_request(xff: str | None, host: str = "192.0.2.10"):
 def test_client_ip_accepts_valid_xff():
     from app.auth import get_client_ip
 
-    assert get_client_ip(_fake_request("203.0.113.7, 10.0.0.1")) == "203.0.113.7"
+    # 可信代理（Lucky 所在地址 192.168.1.6 在白名单）→ 采信 XFF 首段
+    trusted = SimpleNamespace(headers={"x-forwarded-for": "203.0.113.7, 10.0.0.1"}, client=SimpleNamespace(host="192.168.1.6"))
+    assert get_client_ip(trusted) == "203.0.113.7"
 
 
 def test_client_ip_ignores_garbage_xff():
     from app.auth import get_client_ip
 
-    assert get_client_ip(_fake_request("not-an-ip")) == "192.0.2.10"
+    # 可信来源 + 垃圾 XFF → 跳过垃圾段，无合法段则回落直连来源
+    trusted = SimpleNamespace(headers={"x-forwarded-for": "not-an-ip"}, client=SimpleNamespace(host="192.168.1.6"))
+    assert get_client_ip(trusted) == "192.168.1.6"
+
+
+def test_client_ip_ignores_xff_from_untrusted_source():
+    from app.auth import get_client_ip
+
+    # 不可信直连来源（公网 192.0.2.10 不在白名单）→ XFF 一律不采信（防伪造）
+    assert get_client_ip(_fake_request("203.0.113.7, 10.0.0.1")) == "192.0.2.10"
     assert get_client_ip(_fake_request("'; DROP TABLE users; --")) == "192.0.2.10"
     assert get_client_ip(_fake_request(None)) == "192.0.2.10"
 

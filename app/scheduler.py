@@ -15,6 +15,7 @@ from .db import session_scope
 from .services import backup as backup_svc
 from .services import finance as finance_svc
 from .services import settings as settings_svc
+from .services import sms as sms_svc
 
 log = logging.getLogger("crm.scheduler")
 _scheduler: BackgroundScheduler | None = None
@@ -41,6 +42,17 @@ def backup_job() -> None:
         log.info("自动备份完成：%s", result)
     except Exception as exc:  # pragma: no cover
         log.error("自动备份失败：%s", exc)
+
+
+def sms_cleanup_job() -> None:
+    """每日清理过期短信验证码（表本身很小，纯卫生任务）。"""
+    try:
+        with session_scope() as db:
+            removed = sms_svc.cleanup_expired(db)
+        if removed:
+            log.info("已清理 %s 条过期短信验证码", removed)
+    except Exception as exc:  # pragma: no cover
+        log.error("短信验证码清理失败：%s", exc)
 
 
 def _configure_backup_jobs(sched: BackgroundScheduler, db=None) -> None:
@@ -84,6 +96,10 @@ def start_scheduler() -> BackgroundScheduler:
     sched.add_job(
         refresh_overdue_job, CronTrigger(hour=0, minute=10),
         id="overdue_refresh", replace_existing=True,
+    )
+    sched.add_job(
+        sms_cleanup_job, CronTrigger(hour=3, minute=30),
+        id="sms_cleanup", replace_existing=True,
     )
     with session_scope() as db:
         _configure_backup_jobs(sched, db)

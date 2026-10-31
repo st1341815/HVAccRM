@@ -239,6 +239,12 @@ td.nowrap, th.nowrap { white-space: nowrap; }
 
 /* ---------------------------------------------------------------- 表单 */
 form.stack { display: flex; flex-direction: column; gap: .6rem; }
+
+/* 登录页短信验证码（外网）：输入框 + 获取按钮同一行，倒计时态按钮置灰 */
+.sms-row { display: flex; gap: .4rem; }
+.sms-row input { flex: 1 1 auto; min-width: 0; }
+.sms-row .sms-send { flex: 0 0 auto; white-space: nowrap; }
+.sms-row .sms-send:disabled { opacity: .55; cursor: not-allowed; }
 form.tight-stack { gap: .3rem; }
 form.inline { display: inline-flex; gap: .3rem; align-items: center; }
 label { display: block; font-size: .85rem; color: var(--ink); }

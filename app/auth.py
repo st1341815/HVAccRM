@@ -16,6 +16,7 @@ from .config import get_settings
 from .csrf import csrf_protect
 from .db import get_db
 from .models import User, now_iso
+from . import net
 from .security import (
     generate_totp_secret,
     hash_password,
@@ -27,6 +28,8 @@ from .security import (
     verify_password,
     verify_totp,
 )
+from .services import settings as settings_svc
+from .services import sms as sms_svc
 from .templating import cookie_secure, csrf_cookie_name, redirect, render
 from .utils import safe_next
 
@@ -50,17 +53,13 @@ def _looks_like_ip(value: str) -> bool:
 
 
 def get_client_ip(request: Request) -> str:
-    """取客户端 IP。
+    """取客户端 IP（可信代理感知版）。
 
-    `X-Forwarded-For` 只在**首段是合法 IP** 时才采纳（防伪造垃圾头污染审计与限速键）；
-    真正的防绕过不靠这里，而是靠 `login_max_attempts_account` —— 账号维度锁定与 IP 无关。
+    仅当 TCP 直连来源 ∈ TRUSTED_PROXIES（Lucky / 本机回环 / 容器网段）时才采信
+    X-Forwarded-For，防止「绕过反代直连 8090 + 伪造 XFF 冒充内网」。防绕过的第二道
+    闸门是 `login_max_attempts_account` —— 账号维度锁定与 IP 无关。
     """
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        first = fwd.split(",")[0].strip()
-        if _looks_like_ip(first):
-            return first
-    return request.client.host if request.client else "-"
+    return net.client_ip(request)
 
 
 def _lock_keys(ip: str, username: str) -> list[str]:
@@ -142,12 +141,21 @@ def clear_session_cookie(response) -> None:
     response.delete_cookie(get_settings().session_cookie, path="/")
 
 
+def _sms_required(request: Request, db: Session) -> bool:
+    """短信验证是否适用本次请求：总开关开启 + 请求判定为外网。
+
+    判定逻辑见 app/net.py（IP 优先 / Host 兜底 / fail-safe）。
+    """
+    cfg = settings_svc.get_sms_config(db)
+    return cfg["enabled"] and net.is_external(request, cfg["external_domains"])
+
+
 @router.get("/login")
-def login_page(request: Request, next: str = "/"):
+def login_page(request: Request, next: str = "/", db: Session = Depends(get_db)):
     if getattr(request.state, "user", None):
         # 已登录再访问 /login：落点同样必须净化，否则 //evil.com 这类会变成开放重定向
         return RedirectResponse(safe_next(next, "/"), status_code=303)
-    return render(request, "login.html", next=next)
+    return render(request, "login.html", next=next, need_sms=_sms_required(request, db))
 
 
 @router.post("/login")
@@ -156,6 +164,7 @@ def login_submit(
     username: str = Form(...),
     password: str = Form(...),
     totp: str = Form(""),
+    sms_code: str = Form(""),
     next: str = Form("/"),
     csrf_token: str = Form(""),
     db: Session = Depends(get_db),
@@ -213,6 +222,48 @@ def login_submit(
                 need_totp=True,
             )
 
+    # ---- 外网短信验证（内网路径不进入此分支，体验与现状完全一致）----
+    if _sms_required(request, db):
+        if user.totp_enabled:
+            pass  # D3 决策：TOTP 已作为第二因素通过，替代短信（省短信费）
+        elif not (user.mobile or "").strip():
+            log_action(db, user, "sms_login_blocked", "users", user.id, ip=ip, commit=True)
+            return render(
+                request,
+                "login.html",
+                status_code=403,
+                next=next,
+                error="该账号未绑定手机号，外网登录需短信验证，请联系管理员在内网登录后绑定",
+                username=username,
+                need_sms=True,
+            )
+        elif not sms_code.strip():
+            return render(
+                request,
+                "login.html",
+                status_code=401,
+                next=next,
+                error="请输入短信验证码",
+                username=username,
+                need_sms=True,
+            )
+        else:
+            ok, err = sms_svc.verify_code(db, user, sms_code.strip())
+            if not ok:
+                _record_failure(ip, username)
+                log_action(db, user, "sms_failed", "users", user.id, ip=ip, commit=True)
+                log.warning("短信验证码校验失败 user=%s ip=%s", username, ip)
+                return render(
+                    request,
+                    "login.html",
+                    status_code=401,
+                    next=next,
+                    error=err,
+                    username=username,
+                    need_sms=True,
+                )
+            log_action(db, user, "sms_login", "users", user.id, ip=ip, commit=True)
+
     _clear_failures(ip, username)
     user.last_login_at = now_iso()
     log_action(db, user, "login", "users", user.id, ip=ip, commit=True)
@@ -224,6 +275,73 @@ def login_submit(
     response = RedirectResponse(target, status_code=303)
     set_session_cookie(response, user)
     return response
+
+
+@router.post("/login/sms/send")
+def login_sms_send(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    totp: str = Form(""),
+    next: str = Form("/"),
+    csrf_token: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """外网登录的「获取验证码」入口：先过密码（+TOTP），再发码。
+
+    - 密码即第一道门——不向通过不了密码的请求发短信（防轰炸、防用户名枚举、省成本）；
+    - 发码失败的请求与登录失败同样计入锁定（该入口不能当爆破跳板）；
+    - 渲染而非重定向（与登录失败路径一致）：保留已输入的账号，避免重输。
+    """
+    username = username.strip()
+    ip = get_client_ip(request)
+    if not _sms_required(request, db):
+        return render(
+            request, "login.html", next=next, username=username,
+            error="当前为内网访问，无需短信验证码",
+        )
+    if not verify_csrf(request.cookies.get(csrf_cookie_name()), csrf_token):
+        return render(
+            request, "login.html", status_code=400, next=next, need_sms=True,
+            error="页面已过期，请刷新后重新登录", username=username,
+        )
+    wait = _wait_seconds(ip, username)
+    if wait:
+        return render(
+            request, "login.html", status_code=429, next=next, need_sms=True,
+            error=f"失败次数过多，请 {wait} 秒后重试", username=username,
+        )
+    user = db.scalars(select(User).where(User.username == username)).first()
+    if not user or not user.is_active or not verify_password(password, user.password_hash):
+        _record_failure(ip, username)
+        if user:
+            log_action(db, user, "login_failed", "users", user.id, ip=ip, commit=True)
+        log.warning("发送验证码前密码校验失败 user=%s ip=%s", username, ip)
+        return render(
+            request, "login.html", status_code=401, next=next, need_sms=True,
+            error="账号或密码错误", username=username,
+        )
+    if user.totp_enabled:
+        if not totp:
+            return render(
+                request, "login.html", status_code=401, next=next, need_sms=True,
+                error="请输入动态验证码", username=username, need_totp=True,
+            )
+        if not verify_totp(user.totp_secret or "", totp):
+            _record_failure(ip, username)
+            log_action(db, user, "totp_failed", "users", user.id, ip=ip, commit=True)
+            return render(
+                request, "login.html", status_code=401, next=next, need_sms=True,
+                error="动态验证码不正确", username=username, need_totp=True,
+            )
+    ok, err = sms_svc.issue_code(db, user, ip)
+    if not ok:
+        return render(request, "login.html", status_code=429, next=next, need_sms=True, error=err, username=username)
+    log_action(db, user, "sms_send", "users", user.id, ip=ip, commit=True)
+    return render(
+        request, "login.html", next=next, need_sms=True, username=username,
+        flash={"level": "ok", "message": f"验证码已发送至 {sms_svc.mask_mobile(user.mobile or '')}，5 分钟内有效"},
+    )
 
 
 @router.post("/logout")

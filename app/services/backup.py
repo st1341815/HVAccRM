@@ -74,6 +74,28 @@ def _db_snapshot(dest: Path) -> None:
 
 
 # ------------------------------------------------------------------ 备份
+def _scrub_secrets(db_file: Path) -> None:
+    """从备份副本的 app_settings 里删除短信密钥类键（fail-closed：删不动就抛）。"""
+    from .sms import SECRET_SETTING_KEYS
+
+    con = sqlite3.connect(db_file, timeout=30)
+    try:
+        has_table = con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_settings'"
+        ).fetchone()
+        if not has_table:
+            return  # 无 app_settings 表（老库/测试桩），无密钥可剔
+        cur = con.execute(
+            "DELETE FROM app_settings WHERE \"key\" IN (%s)" % ",".join("?" * len(SECRET_SETTING_KEYS)),
+            SECRET_SETTING_KEYS,
+        )
+        con.commit()
+        if cur.rowcount:
+            log.info("备份副本已剔除 %s 条短信密钥设置", cur.rowcount)
+    finally:
+        con.close()
+
+
 def make_full_backup(db=None) -> Path:
     """生成全量 zip（db + media + config），返回 zip 路径。"""
     s = get_settings()
@@ -83,6 +105,13 @@ def make_full_backup(db=None) -> Path:
     dest = backup_dir / f"{ARCHIVE_PREFIX}{stamp}.zip"
 
     _db_snapshot(tmp_db)
+    # 备份副本剔除短信密钥（13叔定案：服务商/密钥后台可改，但备份 zip 不携带）
+    try:
+        _scrub_secrets(tmp_db)
+    except Exception:
+        log.exception("备份剔除短信密钥失败——本次备份中止（宁可失败也不带密钥出库）")
+        tmp_db.unlink(missing_ok=True)
+        raise
     media_count = 0
     media_bytes = 0
     has_config = False

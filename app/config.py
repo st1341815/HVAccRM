@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # 阈值取得比 IP 维度高，避免别人连错几次就把你的账号锁死。
     login_max_attempts_account: int = 20
     login_lock_seconds: int = 300
+    # 可信代理（逗号分隔，支持 CIDR）：只有这些来源的 X-Forwarded-For 才被采信。
+    # 默认含 Lucky 所在地址；Lucky 搬家 / 换反代时改这里。
+    trusted_proxies: str = "127.0.0.1,::1,172.16.0.0/12,192.168.1.6"
     write_retry_attempts: int = 3
 
     # 进程内标记：本次启动是否自动生成了 APP_SECRET_KEY（后台页面据此提示）

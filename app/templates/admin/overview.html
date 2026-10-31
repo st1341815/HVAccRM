@@ -47,6 +47,63 @@
   </section>
 </div>
 
+<section class="card" id="sms">
+  <h2>短信验证（外网登录）</h2>
+  <form method="post" action="/admin/sms/settings" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="checkline"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}> 启用（仅外网访问要求短信验证码，内网登录不受影响）</label>
+    <div class="inline-group">
+      <span class="inline-label">服务商</span>
+      <select name="provider" id="smsProvider">
+        {% for key, label in sms_provider_labels.items() %}
+        <option value="{{ key }}" {{ 'selected' if sms_cfg.provider == key else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <label>外网域名（逗号分隔，支持 *.xx 通配；IP 判定为主信号，此为兜底）
+      <input name="external_domains" value="{{ sms_cfg.external_domains | join(', ') }}" placeholder="crm.example.com">
+    </label>
+    <p class="muted small">判定规则：真实客户端 IP 为公网 → 外网（需验证码）；私网/回环/VPN 隧道 → 内网。人在内网用域名访问（NAT 回流）按内网处理。</p>
+
+    <div class="sms-provider-fields" data-provider="zhenzi" {{ '' if sms_cfg.provider == 'zhenzi' else 'hidden' }}>
+      <label>榛子云 appId<input name="zhenzi_appid" value="{{ sms_cfg.creds.zhenzi_appid }}"></label>
+      <label>榛子云 appSecret<input name="zhenzi_secret" placeholder="{{ sms_masked.zhenzi_secret or '未设置（留空保持不变）' }}"></label>
+      <label>榛子云 模板ID（可选，留空用默认文案）<input name="zhenzi_tpl" value="{{ sms_cfg.creds.zhenzi_tpl }}"></label>
+    </div>
+    <div class="sms-provider-fields" data-provider="tencent" {{ '' if sms_cfg.provider == 'tencent' else 'hidden' }}>
+      <label>SecretId<input name="tencent_sid" value="{{ sms_cfg.creds.tencent_sid }}"></label>
+      <label>SecretKey<input name="tencent_skey" placeholder="{{ sms_masked.tencent_skey or '未设置（留空保持不变）' }}"></label>
+      <label>SdkAppId<input name="tencent_appid" value="{{ sms_cfg.creds.tencent_appid }}"></label>
+      <label>短信签名<input name="tencent_sign" value="{{ sms_cfg.creds.tencent_sign }}"></label>
+      <label>模板ID<input name="tencent_tpl" value="{{ sms_cfg.creds.tencent_tpl }}"></label>
+    </div>
+    <div class="sms-provider-fields" data-provider="aliyun" {{ '' if sms_cfg.provider == 'aliyun' else 'hidden' }}>
+      <label>AccessKeyId<input name="aliyun_ak" value="{{ sms_cfg.creds.aliyun_ak }}"></label>
+      <label>AccessKeySecret<input name="aliyun_sk" placeholder="{{ sms_masked.aliyun_sk or '未设置（留空保持不变）' }}"></label>
+      <label>短信签名<input name="aliyun_sign" value="{{ sms_cfg.creds.aliyun_sign }}"></label>
+      <label>模板Code<input name="aliyun_tpl" value="{{ sms_cfg.creds.aliyun_tpl }}"></label>
+    </div>
+
+    <details class="ms">
+      <summary>限流与有效期</summary>
+      <div class="ms-panel stack">
+        <label>验证码有效期（秒，60–3600）<input name="code_ttl_seconds" value="{{ sms_cfg.code_ttl_seconds }}" inputmode="numeric"></label>
+        <label>发送冷却（秒，30–3600）<input name="send_cooldown" value="{{ sms_cfg.send_cooldown }}" inputmode="numeric"></label>
+        <label>单账号日上限<input name="daily_limit_per_user" value="{{ sms_cfg.daily_limit_per_user }}" inputmode="numeric"></label>
+        <label>单 IP 日上限<input name="daily_limit_per_ip" value="{{ sms_cfg.daily_limit_per_ip }}" inputmode="numeric"></label>
+        <label>全局日上限（保险丝）<input name="daily_cap_total" value="{{ sms_cfg.daily_cap_total }}" inputmode="numeric"></label>
+      </div>
+    </details>
+    <button type="submit">保存设置</button>
+  </form>
+  <form method="post" action="/admin/sms/test" class="filterbar" onsubmit="return confirm('发送一条测试短信（按当前服务商配置）？');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="test_mobile" placeholder="测试手机号（如 13900000000）" required>
+    <button type="submit" class="ghost">发送测试短信</button>
+  </form>
+  <p class="muted small">密钥保存后只回显尾 4 位，留空提交保持不变；备份包不含短信密钥。调试模式下验证码写入运行日志（docker logs 可见），不实际发送。切换服务商即时生效，无需重启。</p>
+</section>
+
 <section class="card">
   <h2>最近备份</h2>
   <table class="tight">
@@ -59,4 +116,18 @@
   </table>
   <p><a href="/admin/backups">备份管理 →</a></p>
 </section>
+<script>
+(function () {
+  var sel = document.getElementById('smsProvider');
+  if (!sel) return;
+  var fields = document.querySelectorAll('.sms-provider-fields[data-provider]');
+  function sync() {
+    fields.forEach(function (el) {
+      el.hidden = el.dataset.provider !== sel.value;
+    });
+  }
+  sel.addEventListener('change', sync);
+  sync();
+})();
+</script>
 {% endblock %}

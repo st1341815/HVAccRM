@@ -40,6 +40,25 @@ _STATIC_DEFAULTS: dict[str, str] = {
     "backup.weekly.enabled": "1",
     "backup.weekly.dow": "0",     # 0=周一 … 6=周日（APScheduler day_of_week）
     "backup.weekly.hour": "4",    # 0-23
+    # ---- 短信验证（外网登录双因素）----
+    "sms.enabled": "0",           # 总开关：关 = 功能完全回到现状（内网外网都不要求验证码）
+    "sms.provider": "console",    # console(调试模式) | zhenzi | tencent | aliyun
+    "sms.external_domains": "crm.example.com",  # Host 兜底信号：这些域名视为外网（支持 *.xx 通配）
+    "sms.code_ttl_seconds": "300",         # 验证码有效期
+    "sms.send_cooldown": "60",             # 同一账号两条验证码最小间隔
+    "sms.daily_limit_per_user": "20",      # 单账号日发送上限
+    "sms.daily_limit_per_ip": "30",        # 单 IP 日发送上限
+    "sms.daily_cap_total": "100",          # 全局日发送保险丝（防异常烧钱）
+    # 服务商参数（非密钥部分；密钥类键 zhenzi_secret/tencent_skey/aliyun_sk 不设默认，且不入备份）
+    "sms.zhenzi_appid": "",
+    "sms.zhenzi_tpl": "",
+    "sms.tencent_sid": "",
+    "sms.tencent_appid": "",
+    "sms.tencent_sign": "",
+    "sms.tencent_tpl": "",
+    "sms.aliyun_ak": "",
+    "sms.aliyun_sign": "",
+    "sms.aliyun_tpl": "",
 }
 
 
@@ -99,4 +118,50 @@ def get_backup_config(db: Session) -> dict:
         "weekly_enabled": raw.get("backup.weekly.enabled", "1") == "1",
         "weekly_dow": _int("backup.weekly.dow", 0, 6, 0),
         "weekly_hour": _int("backup.weekly.hour", 0, 23, 4),
+    }
+
+
+def get_sms_config(db: Session) -> dict:
+    """短信验证配置（类型化）。密钥类键原文返回，仅供发送路径使用；
+    展示层一律用 sms.mask_secret 脱敏。"""
+    raw = all_settings(db)
+
+    def _int(key: str, lo: int, hi: int, fallback: int) -> int:
+        try:
+            v = int(raw.get(key, fallback))
+        except (TypeError, ValueError):
+            return fallback
+        return max(lo, min(hi, v))
+
+    def _str(key: str) -> str:
+        return (raw.get(key) or "").strip()
+
+    domains = [d for d in _str("sms.external_domains").replace(";", ",").split(",") if d.strip()]
+    provider = _str("sms.provider") or "console"
+    if provider not in ("console", "zhenzi", "tencent", "aliyun"):
+        provider = "console"
+    return {
+        "enabled": raw.get("sms.enabled", "0") == "1",
+        "provider": provider,
+        "external_domains": domains,
+        "code_ttl_seconds": _int("sms.code_ttl_seconds", 60, 3600, 300),
+        "send_cooldown": _int("sms.send_cooldown", 30, 3600, 60),
+        "daily_limit_per_user": _int("sms.daily_limit_per_user", 1, 1000, 20),
+        "daily_limit_per_ip": _int("sms.daily_limit_per_ip", 1, 1000, 30),
+        "daily_cap_total": _int("sms.daily_cap_total", 1, 10000, 100),
+        # 服务商参数（密钥单独放一个子 dict，方便整体脱敏）
+        "creds": {
+            "zhenzi_appid": _str("sms.zhenzi_appid"),
+            "zhenzi_secret": _str("sms.zhenzi_secret"),
+            "zhenzi_tpl": _str("sms.zhenzi_tpl"),
+            "tencent_sid": _str("sms.tencent_sid"),
+            "tencent_skey": _str("sms.tencent_skey"),
+            "tencent_appid": _str("sms.tencent_appid"),
+            "tencent_sign": _str("sms.tencent_sign"),
+            "tencent_tpl": _str("sms.tencent_tpl"),
+            "aliyun_ak": _str("sms.aliyun_ak"),
+            "aliyun_sk": _str("sms.aliyun_sk"),
+            "aliyun_sign": _str("sms.aliyun_sign"),
+            "aliyun_tpl": _str("sms.aliyun_tpl"),
+        },
     }
