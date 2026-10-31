@@ -1,23 +1,29 @@
-"""公众号正文生成：支持多套模板 + 自定义。
+"""公众号正文生成：多套预设 + 自定义。
 
-关于「换行」的实测结论（2026-10-31）：
-  用 `<p>` 排 4 行，微信编辑器里 tops=[272,315,357,400]，行距 43px —— **换行本身没问题**。
-  用户觉得「没有换行」，实际是 4 行 15px 文字挤在一起**没有层次**。
-  所以这一版的重点是排版层次（标签/值分离、卡片底色、间距），不是加 <br>。
+═══ 核心约束（2026-10-31 实测踩出来的，改之前务必读） ═══
 
-三套预设（都只用内联 style，class 会被微信丢弃）：
-  plain   —— 单行「标签：值」，间距宽松，最素
-  card    —— 浅底色卡片，标签在上（小灰字）、值在下（大字），层次最清楚
-  compact —— 单行紧凑，适合图多的案例（正文短一点，图片占主体）
+微信保存草稿时会**把多个块级元素（<p>/<section>）压平成一个段落**。
+实测证据：用 4 个独立 <p> 排 4 行，编辑器里 tops=[272,315,357,400] 是分开的，
+但存成草稿后用户在公众号里看到的是：
+    ▍工地位置颐园清苑 6栋▍施工时间2026-09-14▍施工工序后期施工▍产品类型暖气片
+—— 字符全在，**段落分隔全丢**。
 
-自定义项（存 app_settings 的 wxmp.template）：品牌条、引导语、落款、字段开关、主色、字号、行距。
+所以这里的排版策略只有一条：
+    **把所有内容塞进【一个】块级元素，用 <br>（行内换行）分段。**
+<br> 属于行内元素，不受「块合并」影响，是最可靠的换行方式。
+
+预设：
+  text    —— 零装饰，纯 ▍ + 字号差，最保险
+  card    —— 浅底色块（inline 背景 + 边框），带 ▍ 标签
+  plain   —— 单行「标签 | 值」
+  compact —— 紧凑型
 """
 from __future__ import annotations
 
 import json
 from html import escape
 
-PRESETS = ("card", "plain", "compact", "text")
+PRESETS = ("text", "card", "plain", "compact")
 
 FIELDS = (
     ("site", "工地位置"),
@@ -27,26 +33,30 @@ FIELDS = (
 )
 
 DEFAULT_TEMPLATE: dict = {
-    "preset": "card",
-    "brand": "",       # 顶部品牌条，空则不显示
-    "lead": "",        # 头部引导语，空则不显示
-    "tail": "",        # 尾部落款，空则不显示
+    "preset": "text",   # 默认用最保险的纯文字
+    "brand": "",
+    "lead": "",
+    "tail": "",
     "show": {k: True for k, _ in FIELDS},
     "accent": "#6c7f91",
     "font_size": 15,
     "line_height": 1.9,
 }
 
+# 段与段之间的空行：两个 <br> = 一个空行
+_BR = "<br>"
+_GAP = "<br><br>"
+
 
 def normalize(raw: dict | str | None) -> dict:
-    """把存库的（可能是半截/脏的）配置收敛成完整模板。"""
+    """把存库的（可能半截/脏的）配置收敛成完整模板。"""
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
         except (ValueError, TypeError):
             raw = {}
     raw = raw if isinstance(raw, dict) else {}
-    t = json.loads(json.dumps(DEFAULT_TEMPLATE))  # 深拷贝
+    t = json.loads(json.dumps(DEFAULT_TEMPLATE))
 
     preset = str(raw.get("preset") or "").strip()
     if preset in PRESETS:
@@ -82,130 +92,116 @@ def _values(case) -> dict:
     }
 
 
-def _brand_bar(text: str, accent: str) -> str:
-    """顶部小标签条：底色 + 白字的胶囊，视觉锚点。"""
-    return (
-        f'<section style="margin:0 0 18px;padding:0;">'
-        f'<section style="display:inline-block;padding:4px 12px;background:{accent};'
-        f'border-radius:3px;">'
-        f'<span style="font-size:12px;line-height:1.4;color:#ffffff;letter-spacing:1px;">'
-        f"{escape(text)}</span></section></section>"
-    )
-
-
-def _divider(accent: str) -> str:
-    return (
-        f'<section style="margin:26px 0;padding:0;">'
-        f'<section style="height:1px;background:#e5e0d8;"></section></section>'
-    )
-
-
-def _plain(t: dict, vals: dict) -> str:
-    fs, lh = t["font_size"], t["line_height"]
+def _items(t: dict, vals: dict) -> list[tuple[str, str]]:
     out = []
     for key, label in FIELDS:
         if not t["show"].get(key):
             continue
-        v = escape(vals[key].strip()) or "—"
-        out.append(
-            f'<p style="margin:0 0 16px;font-size:{fs}px;line-height:{lh};color:#333;">'
-            f'<span style="color:#8a8a8a;">{escape(label)}</span>'
-            f'<span style="color:#d8d2c8;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>'
-            f"{v}</p>"
+        out.append((label, escape(vals[key].strip()) or "—"))
+    return out
+
+
+def _head_html(t: dict) -> str:
+    """品牌条 + 引导语（都在同一个段落里，用 <br> 接）。"""
+    parts = []
+    if t["brand"]:
+        # 用 inline 的 background/padding 做胶囊：inline 元素的背景比 block 更容易保留
+        parts.append(
+            f'<span style="background:{t["accent"]};color:#ffffff;'
+            f'padding:3px 10px;border-radius:3px;font-size:12px;letter-spacing:1px;">'
+            f"{escape(t['brand'])}</span>"
         )
-    return "".join(out)
+    if t["lead"]:
+        parts.append(f'<span style="color:#666;font-size:14px;">{escape(t["lead"])}</span>')
+    return (_GAP.join(parts) + _GAP) if parts else ""
 
 
-def _card(t: dict, vals: dict) -> str:
-    """卡片式：浅底色块 + 标签（小灰字）/ 值（大字）。
+def _tail_html(t: dict) -> str:
+    if not t["tail"]:
+        return ""
+    sep = '<span style="color:#d8d2c8;">────────────</span>'
+    return _GAP + sep + _GAP + f'<span style="color:#9a958c;font-size:13px;">{escape(t["tail"])}</span>'
 
-    2026-10-31 加固：**不再只靠 CSS 造层次**。标签前加 `▍` 字符、值与标签字号拉开，
-    即使微信保存草稿时剥掉 background/border-radius，符号和字号差仍能撑住结构。
-    """
-    fs, lh, accent = t["font_size"], t["line_height"], t["accent"]
-    rows = []
-    items = [(k, l) for k, l in FIELDS if t["show"].get(k)]
-    for i, (key, label) in enumerate(items):
-        last = i == len(items) - 1
-        v = escape(vals[key].strip()) or "—"
-        mb = "0" if last else "16px"
-        rows.append(
-            f'<p style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#9a958c;'
-            f'letter-spacing:0.5px;"><span style="color:{accent};">▍</span>{escape(label)}</p>'
-            f'<p style="margin:0 0 {mb};font-size:{fs + 2}px;line-height:{lh - 0.2};'
-            f'color:#2f2f2f;font-weight:bold;">{v}</p>'
+
+# ---------------------------------------------------------------- 预设渲染
+def _render_text(t: dict, items: list[tuple[str, str]]) -> str:
+    """纯文字：▍标签 + 换行 + 值 + 空行。零依赖。"""
+    fs = t["font_size"]
+    blocks = []
+    for label, value in items:
+        blocks.append(
+            f'<span style="color:#9a958c;font-size:{max(13, fs - 2)}px;">▍{label}</span>{_BR}'
+            f'<span style="color:#222;font-size:{fs + 2}px;font-weight:bold;">{value}</span>'
         )
+    return _GAP.join(blocks)
+
+
+def _render_card(t: dict, items: list[tuple[str, str]]) -> str:
+    """卡片：外层 section 带底色/圆角（若被剥，里面的 ▍+字号差仍撑得住）。"""
+    fs, accent = t["font_size"], t["accent"]
+    blocks = []
+    for label, value in items:
+        blocks.append(
+            f'<span style="color:{accent};font-size:12px;">▍</span>'
+            f'<span style="color:#9a958c;font-size:12px;">{label}</span>{_BR}'
+            f'<span style="color:#2f2f2f;font-size:{fs + 2}px;font-weight:bold;">{value}</span>'
+        )
+    inner = _GAP.join(blocks)
     return (
-        f'<section style="margin:0 0 24px;padding:18px 20px;background:#f7f4ee;'
-        f'border-radius:8px;border-left:3px solid {accent};">' + "".join(rows) + "</section>"
+        f'<section style="padding:18px 20px;background:#f7f4ee;border-radius:8px;'
+        f'border-left:3px solid {accent};">{inner}</section>'
     )
 
 
-def _text(t: dict, vals: dict) -> str:
-    """零 CSS 依赖版（防剥落）。
-
-    只依赖两样微信几乎不会过滤的东西：**换行**和**字符本身**。
-    每项用 `▍标签` + 值 + 空行，即使颜色/字号/背景全丢，排版依然是分明的四块。
-    """
+def _render_plain(t: dict, items: list[tuple[str, str]]) -> str:
+    """单行：标签 | 值。"""
     fs = t["font_size"]
-    rows = []
-    for key, label in FIELDS:
-        if not t["show"].get(key):
-            continue
-        v = escape(vals[key].strip()) or "—"
-        rows.append(
-            f'<p style="margin:0 0 6px;font-size:{max(13, fs - 2)}px;line-height:1.6;color:#999;">'
-            f'▍{escape(label)}</p>'
-            f'<p style="margin:0 0 20px;font-size:{fs + 2}px;line-height:1.7;color:#222;">'
-            f"{v}</p>"
+    blocks = []
+    for label, value in items:
+        blocks.append(
+            f'<span style="color:#8a8a8a;font-size:{fs}px;">{label}</span>'
+            f'<span style="color:#d8d2c8;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>'
+            f'<span style="color:#333;font-size:{fs}px;">{value}</span>'
         )
-    return "".join(rows)
+    return _GAP.join(blocks)
 
 
-def _compact(t: dict, vals: dict) -> str:
+def _render_compact(t: dict, items: list[tuple[str, str]]) -> str:
     fs = max(13, t["font_size"] - 1)
-    rows = []
-    for key, label in FIELDS:
-        if not t["show"].get(key):
-            continue
-        v = escape(vals[key].strip()) or "—"
-        rows.append(
-            f'<p style="margin:0 0 6px;font-size:{fs}px;line-height:1.7;color:#444;">'
-            f'<span style="color:#9a958c;">{escape(label)}</span>&nbsp;&nbsp;{v}</p>'
+    blocks = []
+    for label, value in items:
+        blocks.append(
+            f'<span style="color:#9a958c;font-size:{fs}px;">{label}</span>'
+            f'<span style="color:#444;font-size:{fs}px;">&nbsp;&nbsp;{value}</span>'
         )
-    return f'<section style="margin:0 0 18px;">' + "".join(rows) + "</section>"
+    return _BR.join(blocks)
 
 
-_RENDERERS = {"plain": _plain, "card": _card, "compact": _compact, "text": _text}
+_RENDERERS = {
+    "text": _render_text,
+    "card": _render_card,
+    "plain": _render_plain,
+    "compact": _render_compact,
+}
 
 
 def body_html(case, template: dict | str | None = None) -> str:
-    """生成正文（图片由调用方逐张插到末尾）。"""
+    """生成正文。**整体只有一个块级元素**，内部靠 <br> 分段（见模块顶部说明）。"""
     t = normalize(template)
-    vals = _values(case)
-    parts: list[str] = []
+    items = _items(t, _values(case))
+    body = _RENDERERS[t["preset"]](t, items)
+    head = _head_html(t)
+    tail = _tail_html(t)
 
-    if t["brand"]:
-        parts.append(_brand_bar(t["brand"], t["accent"]))
-    if t["lead"]:
-        parts.append(
-            f'<p style="margin:0 0 18px;font-size:14px;line-height:1.8;color:#666;">'
-            f'{escape(t["lead"])}</p>'
-        )
-
-    parts.append(_RENDERERS[t["preset"]](t, vals))
-
-    if t["tail"]:
-        parts.append(_divider(t["accent"]))
-        parts.append(
-            f'<p style="margin:0;font-size:13px;line-height:1.8;color:#9a958c;'
-            f'text-align:center;">{escape(t["tail"])}</p>'
-        )
-    return "".join(parts)
+    base = (
+        f'font-size:{t["font_size"]}px;line-height:{t["line_height"]};color:#333;'
+    )
+    # 统一包一层：即便这一层被微信拆掉，内部的 <br> 也仍然是行内换行
+    return f'<p style="margin:0;{base}">{head}{body}{tail}</p>'
 
 
 def og_title(case, cfg: dict) -> str:
-    """与案例分享页同源的标题规则（含「自定义 → 分享页文案」里的 meta_title 模板）。"""
+    """与案例分享页同源的标题规则。"""
     from . import share_custom as custom_svc
 
     tpl = (cfg.get("share.meta_title") or "").strip()
@@ -225,7 +221,6 @@ def og_title(case, cfg: dict) -> str:
 
 
 def title_of(og_title: str, case, max_len: int = 64) -> str:
-    """标题：优先用案例页已算好的，超 64 字截断。"""
     t = (og_title or "").strip()
     if not t:
         bits = [b for b in (case.site_label, case.product_type, case.stage) if b]
