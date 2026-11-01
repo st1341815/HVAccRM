@@ -400,6 +400,37 @@ def _wait_editor(c: cdp_mod.CDP, timeout: float = 30.0) -> None:
     raise RuntimeError("图文编辑页加载超时")
 
 
+# 正文回读探针：返回段落行列表（与写入时的 lines 一一对应，用于回读校验）
+JS_BODY_LINES = """(()=>{
+  const eds=[...document.querySelectorAll('div.ProseMirror')];
+  if(!eds.length) return null;
+  const ed=eds[eds.length-1];
+  // 段落在微信编辑器里是 <section>（或 <p>）块；取其 innerText 并去掉纯图片块
+  const blocks=[...ed.querySelectorAll('section, p')].filter(b=>{
+    // 只要「最内层的文字块」——避免父 section 把子内容重复算一遍
+    return !b.querySelector('section, p') && (b.innerText||'').trim() !== '';
+  });
+  const rows = blocks.map(b => (b.innerText||'').replace(/\\u00a0/g,' ').trim());
+  return JSON.stringify(rows);
+})()"""
+
+
+def _norm_line(s: str) -> str:
+    """比对用的归一化：去首尾空白、全角空格转半角、去掉全角空格差异。"""
+    return (s or "").replace("\u3000", " ").strip()
+
+
+def _read_body_lines(c: cdp_mod.CDP) -> list[str]:
+    raw = c.js(JS_BODY_LINES)
+    if not raw:
+        return []
+    try:
+        rows = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return rows if isinstance(rows, list) else []
+
+
 def _set_title(c: cdp_mod.CDP, text: str) -> None:
     if c.js(JS_FOCUS_TITLE) != "ok":
         raise RuntimeError("找不到标题输入框")
@@ -415,6 +446,11 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
     为什么不用 insertHTML：微信编辑器会把 insertHTML 注入的 style 全剥掉、
     相邻块级元素合并成一段、<br> 保存时吞成 &nbsp;（见 wxmp_body.py 顶部实测）。
     只有「insertText + 回车」能产生微信原生的 <section> 段落、保存后可靠保留换行。
+
+    写完做**回读校验**（2026-11-01 修 P1-7）：标题一直有回读校验、正文却没有，
+    而正文恰恰最容易出问题（分段丢失、行数不对、内容被吞）。这里比对
+    「写入的非空行 是否全都出现在回读结果里」，缺一行就报错，避免发出一篇
+    内容残缺却标记成功的草稿。
     """
     if c.js(JS_FOCUS_BODY) != "ok":
         raise RuntimeError("找不到正文编辑器")
@@ -433,6 +469,20 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
             ok = c.js(f"document.execCommand('insertText', false, {json.dumps(line)})")
             if ok is False:
                 raise RuntimeError("正文写入失败（insertText 返回 false）")
+
+    # ── 回读校验 ──────────────────────────────────────────────
+    expected = [_norm_line(x) for x in lines if _norm_line(x)]
+    if not expected:
+        return
+    got = [_norm_line(x) for x in _read_body_lines(c)]
+    got_join = "\n".join(got)
+    missing = [e for e in expected if e and e not in got_join]
+    if missing:
+        head = "、".join(repr(m) for m in missing[:3])
+        raise RuntimeError(
+            f"正文回读校验失败：应有 {len(expected)} 行，回读缺 {len(missing)} 行（{head}"
+            f"{'…' if len(missing) > 3 else ''}）。为避免发出残缺草稿，已中止。"
+        )
 
 
 def _insert_images(
@@ -523,9 +573,42 @@ def _save_draft(c: cdp_mod.CDP) -> dict:
     return json.loads(raw or '{"ok":false}')
 
 
-def _saved_ok(c: cdp_mod.CDP) -> bool:
-    url = c.js("location.href") or ""
-    return "action=edit" in url and "isNew=1" not in url
+def _saved_ok(c: cdp_mod.CDP, expect_title: str = "") -> bool:
+    """判断草稿是否真的保存成功。
+
+    2026-11-01 修 P1-7：旧的判定只有「URL 含 action=edit 且不含 isNew=1」，
+    太弱——URL 规则一变就失效；反过来「已保存但 URL 未及时更新」会误报失败，
+    用户重试又可能产生重复草稿。
+
+    现在做三重佐证，任一条强证据成立即视为成功：
+      1. URL 变化：仍停在编辑页但已不带 isNew=1（原有逻辑）；
+      2. URL 带 appmsgid（已生成草稿 id）；
+      3. 页面出现「已保存/保存成功」类提示，且标题仍在（说明内容没被丢）。
+    """
+    info = c.js("""(()=>{
+      const body = (document.body ? document.body.innerText : '') || '';
+      const eds=[...document.querySelectorAll('div.ProseMirror')];
+      const titleEd=eds[0];
+      return JSON.stringify({
+        url: location.href,
+        hasMsg: /已保存|保存成功|保存中/.test(body),
+        title: titleEd ? (titleEd.innerText||'').trim() : ''
+      });
+    })()""")
+    try:
+        d = json.loads(info or "{}")
+    except (TypeError, ValueError):
+        d = {}
+    url = d.get("url") or ""
+
+    if "action=edit" in url and "isNew=1" not in url:
+        return True
+    if "appmsgid=" in url:
+        return True
+    # 提示文案 + 标题仍在（内容没丢）→ 视为已保存
+    if d.get("hasMsg") and (not expect_title or _norm_line(d.get("title", "")) == _norm_line(expect_title)):
+        return True
+    return False
 
 
 def publish_case(db, case, image_files: list[str], lines: list[str], title: str) -> dict:
@@ -555,7 +638,7 @@ def publish_case(db, case, image_files: list[str], lines: list[str], title: str)
             # 图缺了仍标 done，用户拿到一篇裂图草稿还以为成功了）。
             res = _save_draft(c)
             time.sleep(2.5)
-            saved = bool(res.get("ok")) and _saved_ok(c)
+            saved = bool(res.get("ok")) and _saved_ok(c, expect_title=title)
 
             if missing:
                 idx = "、".join(str(m["index"]) for m in missing[:10])
