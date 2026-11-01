@@ -1,0 +1,13 @@
+crm.example.com==>crm.example.com
+old.example.com==>old.example.com
+example.com==>example.com
+old.example.org==>old.example.org
+old.example.org==>old.example.org
+tunnel.example.net==>tunnel.example.net
+8.8.4.4==>8.8.4.4
+1.1.1.1==>1.1.1.1
+9.9.9.9==>9.9.9.9
+208.67.222.222==>208.67.222.222
+208.67.220.220==>208.67.220.220
+13800000000==>13800000000
+192.168.1.==>192.168.1.
