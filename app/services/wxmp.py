@@ -398,29 +398,76 @@ def _set_body(c: cdp_mod.CDP, lines: list[str]) -> None:
 
 
 def _insert_images(
-    c: cdp_mod.CDP, files: list[str], per_image_timeout: float = 90, batch_size: int = 6
-) -> dict:
-    """逐张上传图片，每 batch_size 张之间加延时，避免 renderer 累积压力僵死。
+    c: cdp_mod.CDP,
+    files: list[str],
+    per_image_timeout: float = 90,
+    batch_size: int = 6,
+    max_consecutive_failures: int = 2,
+) -> tuple[dict, list[dict]]:
+    """逐张上传图片，返回 (最终探针结果, 失败清单)。
 
-    2026-10-31 踩坑：微信编辑器里「多段文字 + 多张图」叠加会让 renderer 卡死。
-    实测：一次 set_files 传多张（multiple）反而更容易触发僵死，逐张传 + 批间延时最稳。
-    这里保持「逐张 set_files（每张 1 个文件）」，只在每 batch_size 张后 sleep 缓冲。
+    为什么逐张（而不是一次 set_files 传多张）：实测一次传多张更容易让微信
+    编辑器 renderer 卡死；逐张 + 每 batch_size 张缓冲最稳。
+
+    失败处理（2026-11-01 修 P1-2）：
+      - **逐张用「增量」判定**：只看这张上传后 imgs/cdn 是否比上传前**涨了**，
+        绝不用「累计数 >= i」。旧实现用累计数，第 k 张一失败 imgs 就永远落后 1，
+        后面每张都追不上 target、白跑满 90s（19 图最坏 ≈ 28.5 分钟，全程占着
+        _LOCK，其他人同步/登录全被阻塞）。
+      - **连续 max_consecutive_failures 张失败即中止**，剩余标记 skipped。把「一次
+        失败」从半小时压到几分钟，且不会把 19 张全试一遍。
     """
     c.js(JS_FOCUS_BODY)
     total = len(files)
+    st: dict = json.loads(c.js(JS_PROBE) or "{}")
+
+    missing: list[dict] = []
+    consecutive = 0
+
     for i, path in enumerate(files, start=1):
+        # 本张的基线（上传前已有的图数 / 已转存数）
+        before_imgs = int(st.get("imgs", 0) or 0)
+        before_cdn = int(st.get("cdn", 0) or 0)
+
         c.set_files("input[type=file]", [path])
         deadline = time.time() + per_image_timeout
+        done = False
         while time.time() < deadline:
             time.sleep(0.8)
             st = json.loads(c.js(JS_PROBE) or "{}")
-            # 总数和 CDN 数都达标才算这张传完，否则会把「最后一张还在传」误判成丢图
-            if st.get("imgs", 0) >= i and st.get("cdn", 0) >= i:
+            # 增量判定：imgs 与 cdn 都比上传前多，才算这张传完
+            # （只看 cdn 会把「还在传」误判成丢图；看累计数会被前面的失败拖死）
+            if (
+                int(st.get("imgs", 0)) > before_imgs
+                and int(st.get("cdn", 0)) > before_cdn
+            ):
+                done = True
                 break
+
+        if done:
+            consecutive = 0
+        else:
+            consecutive += 1
+            missing.append(
+                {"index": i, "name": os.path.basename(path), "reason": "upload_timeout"}
+            )
+            if consecutive >= max_consecutive_failures:
+                # 连续失败：判定网络/编辑器已坏，剩余不再尝试
+                for j in range(i + 1, total + 1):
+                    missing.append(
+                        {
+                            "index": j,
+                            "name": os.path.basename(files[j - 1]),
+                            "reason": "skipped_after_consecutive_failures",
+                        }
+                    )
+                break
+
         # 每 batch_size 张后给编辑器/网络留缓冲
         if i % batch_size == 0 and i < total:
             time.sleep(3.0)
-    return json.loads(c.js(JS_PROBE) or "{}")
+
+    return st, missing
 
 
 def _save_draft(c: cdp_mod.CDP) -> dict:
@@ -463,18 +510,43 @@ def publish_case(db, case, image_files: list[str], lines: list[str], title: str)
 
             _set_title(c, title)
             _set_body(c, lines)
-            st = _insert_images(c, image_files)
+            st, missing = _insert_images(c, image_files)
 
-            miss = len(image_files) - int(st.get("cdn", 0))
+            # 有图上传失败时也保存草稿：已传成功的图不浪费，用户可到后台补缺的几张。
+            # 但结论必须是 ok=False（2026-11-01 修 P1-1a：旧实现只看保存结果，
+            # 图缺了仍标 done，用户拿到一篇裂图草稿还以为成功了）。
             res = _save_draft(c)
             time.sleep(2.5)
-            ok = res.get("ok") and _saved_ok(c)
+            saved = bool(res.get("ok")) and _saved_ok(c)
+
+            if missing:
+                idx = "、".join(str(m["index"]) for m in missing[:10])
+                more = " 等" if len(missing) > 10 else ""
+                tail = "草稿已保存，请到公众号后台补齐这些图" if saved else "草稿也未能保存"
+                return {
+                    "ok": False,
+                    "partial": True,
+                    "images": int(st.get("imgs", 0)),
+                    "cdn": int(st.get("cdn", 0)),
+                    "missing": [m["index"] for m in missing],
+                    "error": f"{len(missing)} 张图上传失败（第 {idx}{more} 张），{tail}",
+                }
+
+            if not saved:
+                return {
+                    "ok": False,
+                    "images": int(st.get("imgs", 0)),
+                    "cdn": int(st.get("cdn", 0)),
+                    "missing": [],
+                    "error": "草稿保存失败（未检测到已保存状态），请重试",
+                }
+
             return {
-                "ok": bool(ok),
+                "ok": True,
                 "images": int(st.get("imgs", 0)),
                 "cdn": int(st.get("cdn", 0)),
-                "missing": max(0, miss),
-                "warn": f"{miss} 张图未转存，草稿可能裂图" if miss > 0 else "",
+                "missing": [],
+                "warn": "",
             }
         except Exception as e:
             return {"ok": False, "error": str(e)}

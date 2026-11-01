@@ -236,13 +236,34 @@ def _run_publish(case_id: int) -> None:
             ).all()
         )
         files: list[str] = []
-        for i, img in enumerate(images, start=1):
+        missing_on_disk: list[int] = []
+        for img in images:
             try:
                 p = cases_svc.case_image_file(img.path)
             except ValueError:
+                missing_on_disk.append(img.id)
                 continue
             if p.exists():
                 files.append(str(p))
+            else:
+                missing_on_disk.append(img.id)
+
+        # P1-1b：磁盘缺图必须先拦下。旧实现把缺图静默 continue，且 missing 用
+        # 「过滤后」的 len 计算 → 磁盘缺多少都不计入 missing，前端永远显示 0，
+        # 可能发出一篇零图/缺图草稿却毫无告警。
+        if missing_on_disk:
+            result = {
+                "ok": False,
+                "error": (
+                    f"图片文件缺失：数据库登记 {len(images)} 条，磁盘只找到 {len(files)} 张"
+                    f"（缺 id={missing_on_disk[:8]}{'…' if len(missing_on_disk) > 8 else ''}）。"
+                    "请先恢复图片文件再同步，避免发出缺图草稿。"
+                ),
+            }
+            case.wx_draft_status = "failed"
+            case.wx_draft_note = result["error"][:500]
+            commit_retry(db)
+            return
 
         cfg = custom_svc.get_all(db)
         title = wxmp_body.title_of(wxmp_body.og_title(case, cfg), case)
