@@ -16,14 +16,14 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..config import get_settings
 from ..csrf import csrf_protect
-from ..db import commit_retry, get_db
+from ..db import SessionLocal, commit_retry, get_db
 from ..models import PRODUCT_OPTIONS, Case, CaseImage, Task, now_iso, today_str
 from ..permissions import has_perm, require
 from ..services import cases as cases_svc
 from ..services import share_custom as custom_svc
 from ..services import share_stats as stats_svc
 from ..templating import cookie_secure, redirect, render
-from ..utils import client_ip, get_or_404, parse_date, parse_int, return_path
+from ..utils import cached_file_response, client_ip, get_or_404, parse_date, parse_int, return_path
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -280,33 +280,39 @@ def enable_share(
 
 
 # ------------------------------------------------------------ 图片读取
+# ⚠️ 图片路由一律用「短会话」：查完数据库立刻关闭连接，再返回 FileResponse。
+# 原因：FileResponse 是流式响应，而 `Depends(get_db)` 的会话要等整个文件传完才关闭；
+# 一个页面并发拉几十张缩略图时会瞬间吃干连接池（5+10=15），排队 30s 后抛
+# QueuePool TimeoutError —— 2026-11-01 线上事故（案例页整页图片 500）。
 @router.get("/images/{image_id}/file")
 def case_image_file(
     request: Request,
     image_id: int,
-    db: Session = Depends(get_db),
     user=Depends(require("case:view")),
 ):
-    image = get_or_404(db, CaseImage, image_id, "图片")
-    path = cases_svc.case_image_file(image.path)
+    with SessionLocal() as db:
+        image = get_or_404(db, CaseImage, image_id, "图片")
+        rel = image.path
+    path = cases_svc.case_image_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "文件已丢失"}, status_code=404)
-    return FileResponse(path)
+    return cached_file_response(path)
 
 
 @router.get("/images/{image_id}/thumb")
 def case_image_thumb(
     request: Request,
     image_id: int,
-    db: Session = Depends(get_db),
     user=Depends(require("case:view")),
 ):
-    image = get_or_404(db, CaseImage, image_id, "图片")
-    rel = image.thumb_path or image.path
+    with SessionLocal() as db:
+        image = get_or_404(db, CaseImage, image_id, "图片")
+        rel = image.thumb_path or image.path
     path = cases_svc.case_image_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "缩略图缺失"}, status_code=404)
-    return FileResponse(path, media_type="image/webp" if str(path).endswith(".webp") else "image/jpeg")
+    media = "image/webp" if str(path).endswith(".webp") else "image/jpeg"
+    return cached_file_response(path, media_type=media)
 
 
 # ------------------------------------------------------------ 对外只读接口
@@ -532,28 +538,26 @@ async def share_ping(request: Request, token: str, db: Session = Depends(get_db)
 
 
 @router.get("/share/{token}/cover.jpg")
-def share_cover(token: str, db: Session = Depends(get_db)):
+def share_cover(token: str):
     """分享封面图（1200×630 JPEG，按第一张展示图生成并缓存）——供社交平台抓取。"""
-    case = db.scalars(select(Case).where(Case.share_token == token)).first()
-    if case is None:
-        return JSONResponse({"detail": "分享链接无效"}, status_code=404)
-    valid, _reason = cases_svc.share_state(case)
-    if not valid:
-        return JSONResponse({"detail": "分享已失效"}, status_code=410)
-    first = db.scalars(
-        select(CaseImage)
-        .where(CaseImage.case_id == case.id)
-        .order_by(CaseImage.sort_order, CaseImage.id)
-        .limit(1)
-    ).first()
+    with SessionLocal() as db:
+        case = db.scalars(select(Case).where(Case.share_token == token)).first()
+        if case is None:
+            return JSONResponse({"detail": "分享链接无效"}, status_code=404)
+        valid, _reason = cases_svc.share_state(case)
+        if not valid:
+            return JSONResponse({"detail": "分享已失效"}, status_code=410)
+        first = db.scalars(
+            select(CaseImage)
+            .where(CaseImage.case_id == case.id)
+            .order_by(CaseImage.sort_order, CaseImage.id)
+            .limit(1)
+        ).first()
+    # 封面生成（Pillow 处理）放在会话之外，避免占着连接做 CPU 活
     path = stats_svc.ensure_cover(case, first)
     if path is None or not path.exists():
         return JSONResponse({"detail": "无封面图"}, status_code=404)
-    return FileResponse(
-        path,
-        media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
+    return cached_file_response(path, media_type="image/jpeg", public=True)
 
 
 @router.get("/share/{token}/qrcode.svg")
@@ -579,18 +583,21 @@ def share_qrcode(request: Request, token: str, base: str = "", db: Session = Dep
 
 
 @router.get("/share/{token}/image/{image_id}")
-def share_case_image(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
-    return _share_image_response(db, token, image_id)
+def share_case_image(request: Request, token: str, image_id: int):
+    with SessionLocal() as db:
+        return _share_image_response(db, token, image_id)
 
 
 @router.get("/share/{token}/image/{image_id}/file")
-def share_case_image_file(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
-    return _share_image_response(db, token, image_id)
+def share_case_image_file(request: Request, token: str, image_id: int):
+    with SessionLocal() as db:
+        return _share_image_response(db, token, image_id)
 
 
 @router.get("/share/{token}/image/{image_id}/thumb")
-def share_case_image_thumb(request: Request, token: str, image_id: int, db: Session = Depends(get_db)):
-    return _share_image_response(db, token, image_id, thumb=True)
+def share_case_image_thumb(request: Request, token: str, image_id: int):
+    with SessionLocal() as db:
+        return _share_image_response(db, token, image_id, thumb=True)
 
 
 def _share_image_response(db: Session, token: str, image_id: int, thumb: bool = False):
@@ -604,9 +611,8 @@ def _share_image_response(db: Session, token: str, image_id: int, thumb: bool = 
     path = cases_svc.case_image_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "文件已丢失"}, status_code=404)
-    if thumb and str(path).endswith(".webp"):
-        return FileResponse(path, media_type="image/webp")
-    return FileResponse(path)
+    media = "image/webp" if (thumb and str(path).endswith(".webp")) else None
+    return cached_file_response(path, media_type=media, public=True)
 
 
 # ------------------------------------------------------------ 分享统计

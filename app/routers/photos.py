@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..auth import current_user_or_redirect
-from ..db import commit_retry, get_db
+from ..db import SessionLocal, commit_retry, get_db
 from ..models import Customer, Photo, Task, User, today_str
 from ..permissions import has_perm, require, visible_customer_ids
 from ..services import photos as photo_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int, return_path, return_path
+from ..utils import cached_file_response, client_ip, get_or_404, parse_int, return_path
 
 router = APIRouter(tags=["photos"])
 
@@ -196,32 +196,37 @@ def photo_view(
 def photo_file(
     request: Request,
     photo_id: int,
-    db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
 ):
-    photo = get_or_404(db, Photo, photo_id, "照片")
-    customer = db.get(Customer, photo.customer_id)
-    if not customer or not _may_view(db, user, customer):
-        return render(request, "403.html", status_code=403)
-    path = photo_svc.photo_file(photo.path)
+    # 短会话：查完立刻关连接，FileResponse 传文件期间不再占数据库连接
+    # （相册页一次几十张图，用 Depends(get_db) 会把连接池吃干 —— 2026-11-01 事故）
+    with SessionLocal() as db:
+        photo = get_or_404(db, Photo, photo_id, "照片")
+        customer = db.get(Customer, photo.customer_id)
+        if not customer or not _may_view(db, user, customer):
+            return render(request, "403.html", status_code=403)
+        rel = photo.path
+        orig = photo.orig_name or photo.path.rsplit("/", 1)[-1]
+    path = photo_svc.photo_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "文件已丢失"}, status_code=404)
-    return FileResponse(path, filename=photo.orig_name or path.name)
+    return cached_file_response(path, max_age=3600, filename=orig)
 
 
 @router.get("/photos/{photo_id}/thumb")
 def photo_thumb(
     request: Request,
     photo_id: int,
-    db: Session = Depends(get_db),
     user: User = Depends(current_user_or_redirect),
 ):
-    photo = get_or_404(db, Photo, photo_id, "照片")
-    customer = db.get(Customer, photo.customer_id)
-    if not customer or not _may_view(db, user, customer):
-        return render(request, "403.html", status_code=403)
-    rel = photo.thumb_path or photo.path
+    with SessionLocal() as db:
+        photo = get_or_404(db, Photo, photo_id, "照片")
+        customer = db.get(Customer, photo.customer_id)
+        if not customer or not _may_view(db, user, customer):
+            return render(request, "403.html", status_code=403)
+        rel = photo.thumb_path or photo.path
     path = photo_svc.photo_file(rel)
     if not path.exists():
         return JSONResponse({"detail": "缩略图缺失"}, status_code=404)
-    return FileResponse(path, media_type="image/webp" if str(path).endswith(".webp") else "image/jpeg")
+    media = "image/webp" if str(path).endswith(".webp") else "image/jpeg"
+    return cached_file_response(path, media_type=media)

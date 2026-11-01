@@ -16,11 +16,48 @@ log = logging.getLogger("crm.db")
 
 settings = get_settings()
 
+# 连接池配置（抽成常量便于测试断言，别在 create_engine 调用里写死）
+POOL_SIZE = 15
+MAX_OVERFLOW = 30
+POOL_TIMEOUT = 10
+POOL_RECYCLE = 1800
+
+
+def _is_memory_sqlite(url: str) -> bool:
+    """内存库不能传 pool_size/max_overflow（SQLAlchemy 会用 SingletonThreadPool）。
+
+    测试与本地 `DB_PATH=:memory:` 走这条分支，生产是文件库走 QueuePool。
+    """
+    from sqlalchemy.engine import make_url
+
+    try:
+        u = make_url(url)
+    except Exception:  # noqa: BLE001 - 解析失败就当作非内存库，保持原行为
+        return False
+    return u.get_backend_name() == "sqlite" and u.database in (None, "", ":memory:")
+
+
+_POOL_KWARGS = (
+    {}
+    if _is_memory_sqlite(settings.database_url)
+    else {
+        # 连接池：默认 5+10=15 个连接在「图片并发」场景下会被打爆——
+        # 一个页面同时请求 30+ 张缩略图时，排队 30s 后抛 QueuePool TimeoutError（2026-11-01 线上事故）。
+        # SQLite 的读连接很轻（WAL 模式下并发读无锁），放宽到 15+30 足够；
+        # pool_timeout 收到 10s，宁可让个别请求快速失败也不要让整页卡 30 秒。
+        "pool_size": POOL_SIZE,
+        "max_overflow": MAX_OVERFLOW,
+        "pool_timeout": POOL_TIMEOUT,
+        "pool_recycle": POOL_RECYCLE,
+    }
+)
+
 engine = create_engine(
     settings.database_url,
     future=True,
     echo=False,
     connect_args={"check_same_thread": False, "timeout": 15},
+    **_POOL_KWARGS,
 )
 
 

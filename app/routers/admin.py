@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from ..audit import log_action
 from ..csrf import csrf_protect
 from ..config import get_settings
-from ..db import commit_retry, engine, get_db
+from ..db import SessionLocal, commit_retry, engine, get_db
 from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso, today_str
 from ..permissions import (
     DEFAULT_SCOPE,
@@ -408,15 +408,21 @@ def run_backup(
 def download_backup(
     request: Request,
     name: str = "",
-    db: Session = Depends(get_db),
     user: User = Depends(require("admin:setting")),
 ):
-    path = _safe_backup_file(db, name)
-    if path is None:
-        return redirect("/admin/backups", "备份文件不存在", "err")
-    log_action(db, user, "download", "backup", None, new={"file": name}, ip=client_ip(request))
-    commit_retry(db)
-    return FileResponse(path, filename=path.name, media_type="application/zip")
+    # 短会话：备份包动辄上百 MB，FileResponse 传输期间不能一直占着数据库连接
+    with SessionLocal() as db:
+        path = _safe_backup_file(db, name)
+        if path is None:
+            return redirect("/admin/backups", "备份文件不存在", "err")
+        log_action(db, user, "download", "backup", None, new={"file": name}, ip=client_ip(request))
+        commit_retry(db)
+    return FileResponse(
+        path,
+        filename=path.name,
+        media_type="application/zip",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/backups/delete")

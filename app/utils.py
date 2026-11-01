@@ -1,9 +1,11 @@
 """路由层通用小工具。"""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 
@@ -85,3 +87,29 @@ def safe_next(value: str | None, default: str = "/") -> str:
     所以统一走 `_to_local_path`（它唯一一处判断写对了，别在调用点重复实现）。
     """
     return _to_local_path(value) or default
+
+
+def cached_file_response(
+    path: Path,
+    media_type: str | None = None,
+    max_age: int = 86400,
+    public: bool = False,
+    filename: str | None = None,
+) -> FileResponse:
+    """带浏览器缓存的图片/文件响应。
+
+    为什么需要：一个页面就要拉几十张缩略图，全走网络既慢又占数据库连接。
+    加 `Cache-Control` 后同一浏览器再次打开直接命中本地缓存；304 协商由
+    Starlette FileResponse 自带的 ETag/Last-Modified 处理，无需手写。
+
+    private：默认不缓存到 CDN/代理（内部图片是鉴权资源，走 Cloudflare 时尤其重要）；
+    分享页那种公开图片传 public=True。传 filename 会变成「下载」语义（Content-Disposition）。
+    """
+    scope = "public" if public else "private"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=filename,
+        headers={"Cache-Control": f"{scope}, max-age={max_age}"},
+    )
+

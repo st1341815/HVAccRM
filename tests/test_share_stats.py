@@ -434,9 +434,20 @@ def test_cover_and_qrcode(monkeypatch, tmp_path, db):
     _make_image(db, case, 0, fake.media_dir)
     db.flush()
 
-    resp = cases_router.share_cover("tok123", db)
+    # share_cover 现在用短会话（SessionLocal），测试里换成当前内存库的 sessionmaker；
+    # 单元测试的 db 本身就在同一事务里，包一层 contextmanager 让它可被 with 使用
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _fake_session():
+        yield db
+
+    monkeypatch.setattr(cases_router, "SessionLocal", _fake_session)
+
+    resp = cases_router.share_cover("tok123")
     assert resp.status_code == 200
     assert resp.media_type == "image/jpeg"
+    assert resp.headers.get("cache-control", "").startswith("public")
     out = svc.cover_path(case.id)
     assert out.exists()
     with Image.open(out) as im:
@@ -457,7 +468,7 @@ def test_cover_and_qrcode(monkeypatch, tmp_path, db):
     bad = cases_router.share_qrcode(_request(), "tok123", base="javascript:alert(1)", db=db)
     assert bad.body == svg.body
 
-    assert cases_router.share_cover("nope", db).status_code == 404
+    assert cases_router.share_cover("nope").status_code == 404
 
 
 # ------------------------------------------------------------ 统计页
