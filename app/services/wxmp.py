@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import base64
 import io
 import json
 import os
@@ -285,6 +286,40 @@ def _open(page_url: str = LOGIN_URL) -> cdp_mod.CDP:
     return c
 
 
+JS_QR_EXPIRED = """(()=>document.body && document.body.innerText.includes('二维码已过期'))()"""
+
+JS_QR_FETCH = """(async()=>{
+  const i=document.querySelector('img[src*="scanloginqrcode"]');
+  if(!i) return 'NOIMG';
+  const r=await fetch(i.src);
+  if(!r.ok) return 'HTTP'+r.status;
+  const b=await r.blob();
+  return await new Promise(res=>{const fr=new FileReader();
+    fr.onload=()=>res(fr.result); fr.onerror=()=>res('READ_ERR');
+    fr.readAsDataURL(b)});
+})()"""
+
+
+def _fetch_qr(c: cdp_mod.CDP, dest: Path) -> bool:
+    """直接 fetch 微信二维码原图（同源 472x472 PNG）。
+
+    为什么弃用「整页截图 + rect 裁剪」作首选：那套依赖页面布局稳定，
+    v1.9.20 退出登录（重建 profile）后首次加载时布局未稳，rect 与截图错位，
+    裁出来的图上半截是两行 tofu 文字、二维码只露一部分（容器无 CJK 字体，
+    页面文字渲染成方框）。fetch 原图根本不碰布局，且比 4x 放大更清晰。
+    失败时仍回落 _crop_qr 截图裁剪。"""
+    try:
+        b64 = c.js(JS_QR_FETCH, await_promise=True)
+        if isinstance(b64, str) and b64.startswith("data:image"):
+            raw = base64.b64decode(b64.split(",", 1)[1])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(raw)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def login_state() -> dict:
     """未登录 → 返回二维码截图路径；已登录 → 返回 token。"""
     if not is_available():
@@ -294,9 +329,18 @@ def login_state() -> dict:
     try:
         has_qr = c.js("""(()=>!!document.querySelector('img[src*="scanloginqrcode"]'))()""")
         if has_qr:
-            shot = c.screenshot_png()
-            _crop_qr(c, shot, qr_path())
-            return {"ok": True, "logged_in": False, "qr": True}
+            # 二维码约 5 分钟过期；_open 因 URL 未变不会重新加载，过期后
+            # 不主动 reload 的话截图/抓图永远拿到旧的白图（v1.9.20 线上实测）
+            if c.js(JS_QR_EXPIRED):
+                c.call("Page.reload", ignoreCache=True)
+                time.sleep(3.0)
+                has_qr = c.js("""(()=>!!document.querySelector('img[src*="scanloginqrcode"]'))()""")
+            if has_qr:
+                if _fetch_qr(c, qr_path()):
+                    return {"ok": True, "logged_in": False, "qr": True}
+                shot = c.screenshot_png()
+                _crop_qr(c, shot, qr_path())
+                return {"ok": True, "logged_in": False, "qr": True}
         token = _read_token(c)
         if token:
             return {"ok": True, "logged_in": True, "token": token}
