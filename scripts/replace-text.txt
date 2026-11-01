@@ -1,9 +1,6 @@
 crm.example.com==>crm.example.com
 old.example.com==>old.example.com
 example.com==>example.com
-example.com==>example.com
-["example", "com"]==>["example", "com"]
-"example" + ".com"==>"example" + ".com"
 old.example.org==>old.example.org
 old.example.org==>old.example.org
 tunnel.example.net==>tunnel.example.net
@@ -15,3 +12,6 @@ example-net==>example-net
 208.67.220.220==>208.67.220.220
 13800000000==>13800000000
 192.168.1.==>192.168.1.
+example.com==>example.com
+["example", "com"]==>["example", "com"]
+EXAMPLE.COM==>EXAMPLE.COM
