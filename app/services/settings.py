@@ -138,7 +138,7 @@ def get_sms_config(db: Session) -> dict:
 
     domains = [d for d in _str("sms.external_domains").replace(";", ",").split(",") if d.strip()]
     provider = _str("sms.provider") or "console"
-    if provider not in ("console", "zhenzi", "tencent", "aliyun"):
+    if provider not in ("console", "multisms", "zhenzi", "tencent", "aliyun"):
         provider = "console"
     return {
         "enabled": raw.get("sms.enabled", "0") == "1",
@@ -163,5 +163,9 @@ def get_sms_config(db: Session) -> dict:
             "aliyun_sk": _str("sms.aliyun_sk"),
             "aliyun_sign": _str("sms.aliyun_sign"),
             "aliyun_tpl": _str("sms.aliyun_tpl"),
+            "multisms_base": _str("sms.multisms_base"),
+            "multisms_ak": _str("sms.multisms_ak"),
+            "multisms_sk": _str("sms.multisms_sk"),
+            "multisms_tpl": _str("sms.multisms_tpl"),
         },
     }

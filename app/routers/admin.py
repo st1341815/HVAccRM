@@ -556,12 +556,13 @@ _SMS_TEXT_KEYS = (
     "sms.zhenzi_appid", "sms.zhenzi_tpl",
     "sms.tencent_sid", "sms.tencent_appid", "sms.tencent_sign", "sms.tencent_tpl",
     "sms.aliyun_sign", "sms.aliyun_tpl",
+    "sms.multisms_base", "sms.multisms_ak", "sms.multisms_tpl",
 )
 _SMS_INT_KEYS = (
     "sms.code_ttl_seconds", "sms.send_cooldown",
     "sms.daily_limit_per_user", "sms.daily_limit_per_ip", "sms.daily_cap_total",
 )
-_SMS_SECRET_KEYS = ("sms.zhenzi_secret", "sms.tencent_skey", "sms.aliyun_sk")
+_SMS_SECRET_KEYS = ("sms.zhenzi_secret", "sms.tencent_skey", "sms.aliyun_sk", "sms.multisms_sk")
 
 
 @router.post("/sms/settings")
@@ -587,6 +588,10 @@ def save_sms_settings(
     aliyun_sk: str = Form(""),
     aliyun_sign: str = Form(""),
     aliyun_tpl: str = Form(""),
+    multisms_base: str = Form(""),
+    multisms_ak: str = Form(""),
+    multisms_sk: str = Form(""),
+    multisms_tpl: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require("admin:setting")),
     _csrf: None = Depends(csrf_protect),
@@ -601,6 +606,9 @@ def save_sms_settings(
         "sms.tencent_sid": tencent_sid, "sms.tencent_appid": tencent_appid,
         "sms.tencent_sign": tencent_sign, "sms.tencent_tpl": tencent_tpl,
         "sms.aliyun_sign": aliyun_sign, "sms.aliyun_tpl": aliyun_tpl,
+        "sms.multisms_base": multisms_base.strip(),
+        "sms.multisms_ak": multisms_ak.strip(),
+        "sms.multisms_tpl": multisms_tpl.strip(),
     }
     for k, v in form.items():
         settings_svc.set_(db, k, v.strip())
@@ -610,6 +618,7 @@ def save_sms_settings(
         ("sms.tencent_skey", tencent_skey),
         ("sms.aliyun_ak", aliyun_ak),
         ("sms.aliyun_sk", aliyun_sk),
+        ("sms.multisms_sk", multisms_sk),
     ):
         if (value or "").strip():
             settings_svc.set_(db, key, value.strip())

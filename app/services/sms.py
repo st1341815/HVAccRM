@@ -20,6 +20,7 @@ import json
 import logging
 import secrets
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -35,6 +36,7 @@ log = logging.getLogger("crm.sms")
 
 PROVIDER_LABELS = {
     "console": "调试模式（验证码写运行日志，不实际发送）",
+    "multisms": "自建短信网关（sms-multi）",
     "zhenzi": "榛子云",
     "tencent": "腾讯云短信",
     "aliyun": "阿里云短信",
@@ -45,6 +47,7 @@ SECRET_SETTING_KEYS = (
     "sms.zhenzi_secret",
     "sms.tencent_skey",
     "sms.aliyun_sk",
+    "sms.multisms_sk",
 )
 
 _FMT = "%Y-%m-%d %H:%M:%S"
@@ -233,6 +236,8 @@ def send_test(db: Session, mobile: str) -> tuple[bool, str]:
 # ------------------------------------------------------------------ Providers
 def _send(provider: str, creds: dict, mobile: str, code: str) -> tuple[bool, str]:
     try:
+        if provider == "multisms":
+            return _send_multisms(creds, mobile, code)
         if provider == "zhenzi":
             return _send_zhenzi(creds, mobile, code)
         if provider == "tencent":
@@ -372,3 +377,81 @@ def _send_aliyun(creds: dict, mobile: str, code: str) -> tuple[bool, str]:
     if payload.get("Code") == "OK":
         return True, ""
     return False, f"阿里云返回错误：{payload.get('Message') or payload}"
+
+
+# ------------------------------------------------------------------ 自建网关（sms-multi）
+def _send_multisms(creds: dict, mobile: str, code: str) -> tuple[bool, str]:
+    """自建短信网关（sms-multi）发送验证码。
+
+    协议：AK/SK + HMAC-SHA256 签名（与阿里云思路一致，参数更少）。
+
+        StringToSign = METHOD\\nPATH\\nSORTED_QUERY\\nSHA256(body)\\nTIMESTAMP\\nNONCE
+        Signature    = HMAC-SHA256(SecretKey, StringToSign) -> hex
+
+    请求头：X-Api-Key / X-Timestamp / X-Nonce / X-Signature
+
+    设计取舍：
+    - 纯标准库实现（urllib + hmac），与其它 provider 保持一致，不新增依赖；
+    - nonce 用 secrets.token_hex 保证唯一（网关侧做重放拦截）；
+    - 时间戳用当前秒级时间，网关允许 5 分钟偏差，避免机器时间轻微漂移就失败；
+    - 模板参数固定传 {"code": 验证码}，对应网关侧模板 `verify_code`。
+    """
+    base = (creds.get("multisms_base") or "").strip().rstrip("/")
+    ak = (creds.get("multisms_ak") or "").strip()
+    sk = (creds.get("multisms_sk") or "").strip()
+    tpl = (creds.get("multisms_tpl") or "").strip()
+
+    if not base or not ak or not sk:
+        return False, "自建短信网关未配置地址 / AccessKey / SecretKey"
+    if not tpl:
+        return False, "自建短信网关未配置模板编码（如 verify_code）"
+
+    path = "/openapi/v1/sms/send"
+    body = json.dumps(
+        {"phone": mobile, "template": tpl, "params": {"code": code}},
+        ensure_ascii=False, separators=(",", ":"),
+    ).encode("utf-8")
+
+    ts = str(int(time.time()))
+    nonce = secrets.token_hex(16)
+    body_hash = hashlib.sha256(body).hexdigest()
+    string_to_sign = "\n".join(["POST", path, "", body_hash, ts, nonce])
+    signature = hmac.new(sk.encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    req = urllib.request.Request(
+        base + path,
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Api-Key": ak,
+            "X-Timestamp": ts,
+            "X-Nonce": nonce,
+            "X-Signature": signature,
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            payload = json.loads(resp.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        # 网关对失败请求返回 4xx/5xx + JSON，尽量把业务错误信息带出来
+        detail = ""
+        try:
+            err_payload = json.loads(exc.read().decode("utf-8") or "{}")
+            detail = err_payload.get("message") or err_payload.get("error") or ""
+        except Exception:
+            pass
+        if exc.code == 429:
+            return False, f"短信发送过于频繁：{detail or '请稍后再试'}"
+        if exc.code == 401:
+            return False, f"短信网关鉴权失败（请检查 AK/SK 与 IP 白名单）：{detail or ''}".rstrip("：")
+        if exc.code == 503:
+            return False, "短信发送设备当前不可用，请稍后重试"
+        return False, f"短信网关返回错误：{detail or f'HTTP {exc.code}'}"
+    except urllib.error.URLError as exc:
+        return False, f"无法连接短信网关（{getattr(exc, 'reason', exc)}）"
+
+    if payload.get("success") is True:
+        return True, ""
+    return False, f"短信网关返回失败：{payload.get('message') or payload}"

@@ -65,6 +65,13 @@
     </label>
     <p class="muted small">判定规则：真实客户端 IP 为公网 → 外网（需验证码）；私网/回环/VPN 隧道 → 内网。人在内网用域名访问（NAT 回流）按内网处理。</p>
 
+    <div class="sms-provider-fields" data-provider="multisms" {{ '' if sms_cfg.provider == 'multisms' else 'hidden' }}>
+      <label>网关地址<input name="multisms_base" value="{{ sms_cfg.creds.multisms_base }}" placeholder="https://sms.example.com（不带末尾斜杠）"></label>
+      <label>AccessKey<input name="multisms_ak" value="{{ sms_cfg.creds.multisms_ak }}" placeholder="ak_..."></label>
+      <label>SecretKey<input name="multisms_sk" placeholder="{{ sms_masked.multisms_sk or '未设置（留空保持不变）' }}"></label>
+      <label>模板编码<input name="multisms_tpl" value="{{ sms_cfg.creds.multisms_tpl }}" placeholder="verify_code"></label>
+      <p class="muted small">调用本机或内网的 sms-multi 网关。网关侧需把本机出口 IP 加入该 Key 的 IP 白名单。验证码以模板变量 <code>{code}</code> 传入。</p>
+    </div>
     <div class="sms-provider-fields" data-provider="zhenzi" {{ '' if sms_cfg.provider == 'zhenzi' else 'hidden' }}>
       <label>榛子云 appId<input name="zhenzi_appid" value="{{ sms_cfg.creds.zhenzi_appid }}"></label>
       <label>榛子云 appSecret<input name="zhenzi_secret" placeholder="{{ sms_masked.zhenzi_secret or '未设置（留空保持不变）' }}"></label>
