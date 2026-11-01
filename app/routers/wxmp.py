@@ -9,24 +9,37 @@ import logging
 import threading
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
+from ..csrf import csrf_protect
 from ..db import SessionLocal, commit_retry, get_db
 from ..models import Case, CaseImage, now_iso
 from ..permissions import require
+from ..security import verify_csrf
 from ..services import cases as cases_svc
 from ..services import share_custom as custom_svc
 from ..services import wxmp as wxmp_svc
 from ..services import wxmp_body
-from ..templating import redirect, render
+from ..templating import csrf_cookie_name, redirect, render
 from ..utils import client_ip, get_or_404
 
 router = APIRouter(prefix="/wxmp", tags=["wxmp"])
 log = logging.getLogger("crm.wxmp")
+
+
+def _csrf_any(request: Request, csrf_token: str = Form("")) -> None:
+    """校验 CSRF：优先读 `X-CSRF-Token` 头，其次退回表单字段。
+
+    为什么不能直接用 csrf_protect：`/wxmp/cases/{id}` 和 `/wxmp/refresh` 是前端
+    fetch 发出的、无 body 的 POST，带不了表单字段，只能走自定义头。
+    """
+    token = request.headers.get("X-CSRF-Token") or csrf_token
+    if not verify_csrf(request.cookies.get(csrf_cookie_name()), token):
+        raise HTTPException(status_code=403, detail="页面已过期或来源不可信，请刷新后重试")
 
 # 进程内任务状态（单 worker 部署，够用；多 worker 需换共享存储）
 _TASKS: dict[int, dict] = {}
@@ -111,6 +124,7 @@ def wxmp_save_template(
     show_product: str = Form(""),
     db: Session = Depends(get_db),
     user=Depends(require("case:edit")),
+    _csrf: None = Depends(csrf_protect),
 ):
     """保存正文模板。字段勾选用 checkbox（未勾选则不出现在请求里）。"""
     t = wxmp_svc.save_template(
@@ -173,7 +187,12 @@ def wxmp_qr(request: Request, user=Depends(require("case:view"))):
 
 
 @router.post("/refresh")
-def wxmp_refresh(request: Request, db: Session = Depends(get_db), user=Depends(require("case:view"))):
+def wxmp_refresh(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:view")),
+    _csrf: None = Depends(_csrf_any),
+):
     """重新拉一次登录状态（新二维码 / 确认已登录）。"""
     try:
         state = wxmp_svc.login_state()
@@ -188,6 +207,7 @@ def wxmp_publish(
     case_id: int,
     db: Session = Depends(get_db),
     user=Depends(require("case:edit")),
+    _csrf: None = Depends(_csrf_any),
 ):
     case = get_or_404(db, Case, case_id, "案例")
     if not wxmp_svc.is_available():

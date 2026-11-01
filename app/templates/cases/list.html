@@ -105,6 +105,9 @@
 </section>
 
 <script>
+// CSRF token：/wxmp/cases/{id} 与 /wxmp/refresh 是 fetch 发的无 body POST，
+// 带不了表单字段，只能走自定义头（后端 _csrf_any 优先读这个头）。
+var WXMP_CSRF = {{ csrf_token|tojson }};
 document.addEventListener('click', function (e) {
   var more = e.target.closest && e.target.closest('.case-more');
   if (more) {
@@ -124,7 +127,7 @@ document.addEventListener('click', function (e) {
   wx.disabled = true;
   wx.textContent = '检查登录…';
   // 先确认公众号已登录，否则白跑一趟（发布要几分钟才报错）
-  fetch('/wxmp/refresh', {method: 'POST'})
+  fetch('/wxmp/refresh', {method: 'POST', headers: {'X-CSRF-Token': WXMP_CSRF}})
     .then(function (r) { return r.json(); })
     .then(function (s) {
       if (!s.logged_in) {
@@ -142,7 +145,7 @@ document.addEventListener('click', function (e) {
 
 function submitWxmp(caseId, wx) {
   wx.textContent = '提交中…';
-  fetch('/wxmp/cases/' + caseId, {method: 'POST'})
+  fetch('/wxmp/cases/' + caseId, {method: 'POST', headers: {'X-CSRF-Token': WXMP_CSRF}})
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (!d.ok) {

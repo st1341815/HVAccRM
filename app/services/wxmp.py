@@ -25,6 +25,7 @@ import io
 import json
 import os
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -210,13 +211,50 @@ def ensure_browser(wait: float = 25.0) -> None:
     raise RuntimeError("Chromium 启动超时（CDP 端口无响应）")
 
 
-def stop_browser() -> None:
-    pid = browser_pid()
-    if pid:
+def _signal_group(pid: int, sig: int) -> None:
+    """给 pid 所在进程组发信号；组已不存在则退回单 pid。"""
+    try:
+        os.killpg(os.getpgid(pid), sig)
+    except OSError:
         try:
-            os.kill(pid, 15)
+            os.kill(pid, sig)
         except OSError:
             pass
+
+
+def _wait_port_free(timeout: float) -> bool:
+    """等 CDP 端口不再应答（= 浏览器真的退了，比查进程更可靠）。
+
+    残留的 Chromium 子进程会变成 defunct 僵尸（父进程是 uvicorn，不回收），
+    `os.kill(pid, 0)` 对僵尸仍返回成功，所以不能靠 pid 存活判断。
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            cdp_mod.targets(PORT)
+        except Exception:
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def stop_browser() -> None:
+    """停掉 Chromium：对**整个进程组**发 SIGTERM，端口不释放再 SIGKILL。
+
+    Chromium 是多进程（browser + 多个 renderer + gpu + zygote），`ensure_browser`
+    里用 `start_new_session=True` 建了独立进程组。旧实现只给主 pid 发 SIGTERM：
+    - 子进程可能残留，继续占着 `--remote-debugging-port=9223`；
+    - 残留进程仍持有 profile 文件 → 新实例报
+      「The profile appears to be in use by another Chromium process」。
+
+    注意不要用 `pkill -f chromium`：会误杀同容器内其他用途的浏览器进程。
+    """
+    pid = browser_pid()
+    if pid:
+        _signal_group(pid, signal.SIGTERM)
+        if not _wait_port_free(5.0):
+            _signal_group(pid, signal.SIGKILL)
+            _wait_port_free(2.0)
     try:
         pid_path().unlink()
     except OSError:

@@ -159,8 +159,11 @@
 </style>
 
 <script>
+// CSRF token：refresh 是无 body 的 fetch POST，只能走自定义头（后端 _csrf_any 读它）
+const WXMP_CSRF = {{ csrf_token|tojson }};
+
 async function wxmpRefresh() {
-  const r = await fetch('/wxmp/refresh', {method: 'POST'});
+  const r = await fetch('/wxmp/refresh', {method: 'POST', headers: {'X-CSRF-Token': WXMP_CSRF}});
   const d = await r.json();
   if (d.logged_in) { location.reload(); return; }
   const img = document.getElementById('wxmp-qr');
