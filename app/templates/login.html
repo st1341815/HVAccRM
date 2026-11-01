@@ -38,45 +38,84 @@
   if (!btn) return;
   var form = btn.closest('form');
   var codeInput = form && form.querySelector('input[name="sms_code"]');
-  // 用户点过「获取验证码」的标记（仅用于给个更友好的原生提示）
-  var sentRequested = false;
 
-  btn.addEventListener('click', function () {
-    if (btn.disabled) return false;
-    if (!form || !form.checkValidity()) return; // 让浏览器先完成必填校验
-    sentRequested = true;
+  // 从返回的 HTML 里摘出 flash 提示（成功绿条 / 错误红条）
+  function extractMessage(html) {
+    var flash = html.match(/<div class="flash[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+    if (flash) return flash[1].replace(/<[^>]+>/g, '').trim();
+    return '';
+  }
+
+  // 展示提示：优先复用页面顶部已有的 flash 容器，没有就自建一个
+  function showMessage(htmlText, isError) {
+    var container = document.querySelector('main .flash');
+    if (!container) {
+      container = document.createElement('div');
+      var card = document.querySelector('.login-card');
+      if (card) card.insertBefore(container, card.firstChild);
+    }
+    container.className = 'flash ' + (isError ? 'err' : 'ok');
+    container.textContent = htmlText || (isError ? '发送失败，请稍后重试' : '验证码已发送');
+    container.style.display = '';
+  }
+
+  btn.addEventListener('click', function (e) {
+    // 关键修复：不再依赖「type=submit + formaction 原生提交」。
+    // 原生提交会在 click 处理器里把按钮设为 disabled 后被浏览器取消
+    // （HTML 规范：disabled 的 submit 按钮不参与提交）→ 表现为“点了没反应”。
+    // 这里一律阻止默认行为，改用手动 fetch，时序完全可控。
+    e.preventDefault();
+    if (btn.disabled) return;
+
+    // 必填校验（账号、密码）
+    var uname = form.querySelector('input[name="username"]');
+    var pwd = form.querySelector('input[name="password"]');
+    if (!uname.value.trim() || !pwd.value) {
+      showMessage('请先填写账号和密码', true);
+      uname.focus();
+      return;
+    }
+
+    // 组装表单数据
+    var fd = new FormData();
+    fd.append('username', uname.value);
+    fd.append('password', pwd.value);
+    var totpInput = form.querySelector('input[name="totp"]');
+    if (totpInput) fd.append('totp', totpInput.value);
+    fd.append('next', (form.querySelector('input[name="next"]') || {}).value || '/');
+    fd.append('csrf_token', (form.querySelector('input[name="csrf_token"]') || {}).value || '');
+
+    // 先进入倒计时（乐观 UI），再发请求
     var left = 60;
     btn.disabled = true;
-    btn.dataset.label = btn.textContent;
+    var origLabel = btn.textContent;
     btn.textContent = left + ' 秒后可重发';
     var timer = setInterval(function () {
       left -= 1;
       if (left <= 0) {
         clearInterval(timer);
         btn.disabled = false;
-        btn.textContent = btn.dataset.label || '获取验证码';
+        btn.textContent = origLabel;
       } else {
         btn.textContent = left + ' 秒后可重发';
       }
     }, 1000);
-    // 注意：不阻止默认提交——按钮 formaction 会把整个表单（含账号密码）提交到 /login/sms/send
-  });
 
-  // 未点「获取验证码」就带码提交时给个提示。
-  // 重要：绝不能误拦发码本身。只有能明确判定「这次提交不是发码按钮触发的」才干预；
-  // 老浏览器 SubmitEvent.submitter 为 undefined，此时一律放行，交给后端判断。
-  if (form && codeInput) {
-    form.addEventListener('submit', function (e) {
-      if (!e.submitter) return;            // 无法判定提交者 → 不干预
-      if (e.submitter === btn) return;      // 是发码按钮 → 放行
-      if (sentRequested) return;            // 本次已请求过验证码 → 放行
-      if (!codeInput.value.trim()) return;   // 没填码 → 交给后端提示
-      // 只提示，不阻断提交：阻断会让用户误以为"按钮坏了"，且后端已有明确文案
-      codeInput.setCustomValidity('请先点击「获取验证码」，收到短信后再填入验证码');
-      codeInput.reportValidity();
-      setTimeout(function () { codeInput.setCustomValidity(''); }, 100);
+    fetch('/login/sms/send', {
+      method: 'POST',
+      body: fd,
+      headers: { 'Accept': 'text/html' },
+      credentials: 'same-origin'
+    }).then(function (resp) {
+      return resp.text().then(function (t) { return { status: resp.status, text: t }; });
+    }).then(function (r) {
+      var msg = extractMessage(r.text);
+      var isErr = r.status >= 400 || (msg && /失败|错误|过期|频繁|上限|内网|锁定|无效|不存在|请/i.test(msg));
+      showMessage(msg, isErr);
+    }).catch(function () {
+      showMessage('网络异常，发送失败，请重试', true);
     });
-  }
+  });
 })();
 </script>
 {% endif %}
