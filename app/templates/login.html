@@ -22,7 +22,10 @@
           <button type="submit" formaction="/login/sms/send" class="ghost sms-send" id="smsSendBtn">获取验证码</button>
         </span>
       </label>
-      <p class="muted small">当前为外网访问，需短信验证后登录。点击「获取验证码」前请先填写上方账号和密码。</p>
+      <p class="muted small">
+        <strong>请按顺序操作：</strong>① 填写上方账号和密码 → ② 点击「获取验证码」→ ③ 收到短信后填入上面的输入框 → ④ 点击「登录」。
+        <br>验证码 5 分钟内有效；未点击「获取验证码」直接填码会校验失败。
+      </p>
     </div>
     {% endif %}
     <button type="submit">登录</button>
@@ -33,10 +36,15 @@
 (function () {
   var btn = document.getElementById('smsSendBtn');
   if (!btn) return;
+  var form = btn.closest('form');
+  var codeInput = form && form.querySelector('input[name="sms_code"]');
+  // 标记用户是否点过「获取验证码」：没点过就填码登录，多半是漏了这一步
+  var sentRequested = false;
+
   btn.addEventListener('click', function () {
     if (btn.disabled) return false;
-    var form = btn.closest('form');
     if (!form || !form.checkValidity()) return; // 让浏览器先完成必填校验
+    sentRequested = true;
     var left = 60;
     btn.disabled = true;
     btn.dataset.label = btn.textContent;
@@ -53,6 +61,19 @@
     }, 1000);
     // 注意：不阻止默认提交——按钮 formaction 会把整个表单（含账号密码）提交到 /login/sms/send
   });
+
+  // 前端提前拦截「没点获取验证码就提交」的情况，省一次往返、提示也更直接
+  if (form && codeInput) {
+    form.addEventListener('submit', function (e) {
+      // 点击「获取验证码」时浏览器以 submitter=btn 触发同一事件，需放行
+      if (e.submitter === btn) return;
+      if (sentRequested) return;
+      if (!codeInput.value.trim()) return; // 空着提交交给后端提示，保持既有行为
+      e.preventDefault();
+      alert('请先点击「获取验证码」，收到短信后再填入验证码并登录。');
+      codeInput.focus();
+    });
+  }
 })();
 </script>
 {% endif %}

@@ -188,8 +188,27 @@ def issue_code(db: Session, user: User, ip: str) -> tuple[bool, str]:
 
 
 def verify_code(db: Session, user: User, code: str) -> tuple[bool, str]:
-    """校验登录短信验证码（一次性；错 3 次作废）。调用方负责把失败计入登录锁定。"""
+    """校验登录短信验证码（一次性；错 3 次作废）。调用方负责把失败计入登录锁定。
+
+    错误提示分三种情形，措辞要能直接指导用户下一步操作：
+      1) 该账号从未发过码（最常见：用户跳过「获取验证码」直接输码）
+         → 明确提示「请先点击获取验证码」；
+      2) 发过码但已过期 / 已用过 / 错满 3 次
+         → 提示重新获取；
+      3) 有有效记录但码不对
+         → 提示码不正确（并给出剩余次数）。
+    以前三种情形共用「不存在或已过期」，用户看不出要先去点按钮。
+    """
     now_s = now_iso()
+
+    # 先看该账号有没有任何登录验证码记录，用于区分「没发过」和「发了但失效」
+    has_any = db.scalar(
+        select(func.count()).select_from(SmsCode).where(
+            SmsCode.user_id == user.id,
+            SmsCode.scene == "login",
+        )
+    ) or 0
+
     row = db.scalars(
         select(SmsCode)
         .where(
@@ -203,7 +222,10 @@ def verify_code(db: Session, user: User, code: str) -> tuple[bool, str]:
         .limit(1)
     ).first()
     if row is None:
-        return False, "验证码不存在或已过期，请重新获取"
+        if has_any == 0:
+            # 从未发过码：这是「跳过获取验证码」的典型误操作
+            return False, "尚未获取验证码，请先填写账号密码后点击「获取验证码」"
+        return False, "验证码已过期或已失效，请点击「获取验证码」重新获取"
     code = (code or "").strip()
     if not code.isdigit() or len(code) != 6:
         return False, "验证码应为 6 位数字"
