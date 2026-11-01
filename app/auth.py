@@ -296,17 +296,24 @@ def login_sms_send(
     username = username.strip()
     ip = get_client_ip(request)
     if not _sms_required(request, db):
+        log.warning("发码被拒（判定为内网，无需短信） user=%s ip=%s", username, ip)
         return render(
             request, "login.html", next=next, username=username,
             error="当前为内网访问，无需短信验证码",
         )
     if not verify_csrf(request.cookies.get(csrf_cookie_name()), csrf_token):
+        log.warning(
+            "发码被拒（CSRF 失效） user=%s ip=%s cookie有=%s token有=%s",
+            username, ip,
+            bool(request.cookies.get(csrf_cookie_name())), bool(csrf_token),
+        )
         return render(
             request, "login.html", status_code=400, next=next, need_sms=True,
             error="页面已过期，请刷新后重新登录", username=username,
         )
     wait = _wait_seconds(ip, username)
     if wait:
+        log.warning("发码被拒（登录失败次数过多，锁定中） user=%s ip=%s 剩余=%ss", username, ip, wait)
         return render(
             request, "login.html", status_code=429, next=next, need_sms=True,
             error=f"失败次数过多，请 {wait} 秒后重试", username=username,
@@ -316,13 +323,17 @@ def login_sms_send(
         _record_failure(ip, username)
         if user:
             log_action(db, user, "login_failed", "users", user.id, ip=ip, commit=True)
-        log.warning("发送验证码前密码校验失败 user=%s ip=%s", username, ip)
+        log.warning(
+            "发码被拒（账号或密码错误） user=%s ip=%s 用户存在=%s 启用=%s 密码已填=%s",
+            username, ip, bool(user), bool(user and user.is_active), bool(password),
+        )
         return render(
             request, "login.html", status_code=401, next=next, need_sms=True,
             error="账号或密码错误", username=username,
         )
     if user.totp_enabled:
         if not totp:
+            log.warning("发码被拒（该账号启用 TOTP，但未填动态码） user=%s ip=%s", username, ip)
             return render(
                 request, "login.html", status_code=401, next=next, need_sms=True,
                 error="请输入动态验证码", username=username, need_totp=True,
@@ -330,14 +341,18 @@ def login_sms_send(
         if not verify_totp(user.totp_secret or "", totp):
             _record_failure(ip, username)
             log_action(db, user, "totp_failed", "users", user.id, ip=ip, commit=True)
+            log.warning("发码被拒（TOTP 不正确） user=%s ip=%s", username, ip)
             return render(
                 request, "login.html", status_code=401, next=next, need_sms=True,
                 error="动态验证码不正确", username=username, need_totp=True,
             )
     ok, err = sms_svc.issue_code(db, user, ip)
     if not ok:
+        log.warning("发码被拒（issue_code 失败：限流/未绑手机/发送失败） user=%s ip=%s err=%s",
+                    username, ip, err)
         return render(request, "login.html", status_code=429, next=next, need_sms=True, error=err, username=username)
     log_action(db, user, "sms_send", "users", user.id, ip=ip, commit=True)
+    log.warning("已受理发码请求 user=%s mobile=%s ip=%s", username, sms_svc.mask_mobile(user.mobile or ""), ip)
     return render(
         request, "login.html", next=next, need_sms=True, username=username,
         flash={"level": "ok", "message": f"验证码已发送至 {sms_svc.mask_mobile(user.mobile or '')}，5 分钟内有效"},

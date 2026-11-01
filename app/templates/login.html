@@ -38,7 +38,7 @@
   if (!btn) return;
   var form = btn.closest('form');
   var codeInput = form && form.querySelector('input[name="sms_code"]');
-  // 标记用户是否点过「获取验证码」：没点过就填码登录，多半是漏了这一步
+  // 用户点过「获取验证码」的标记（仅用于给个更友好的原生提示）
   var sentRequested = false;
 
   btn.addEventListener('click', function () {
@@ -62,16 +62,19 @@
     // 注意：不阻止默认提交——按钮 formaction 会把整个表单（含账号密码）提交到 /login/sms/send
   });
 
-  // 前端提前拦截「没点获取验证码就提交」的情况，省一次往返、提示也更直接
+  // 未点「获取验证码」就带码提交时给个提示。
+  // 重要：绝不能误拦发码本身。只有能明确判定「这次提交不是发码按钮触发的」才干预；
+  // 老浏览器 SubmitEvent.submitter 为 undefined，此时一律放行，交给后端判断。
   if (form && codeInput) {
     form.addEventListener('submit', function (e) {
-      // 点击「获取验证码」时浏览器以 submitter=btn 触发同一事件，需放行
-      if (e.submitter === btn) return;
-      if (sentRequested) return;
-      if (!codeInput.value.trim()) return; // 空着提交交给后端提示，保持既有行为
-      e.preventDefault();
-      alert('请先点击「获取验证码」，收到短信后再填入验证码并登录。');
-      codeInput.focus();
+      if (!e.submitter) return;            // 无法判定提交者 → 不干预
+      if (e.submitter === btn) return;      // 是发码按钮 → 放行
+      if (sentRequested) return;            // 本次已请求过验证码 → 放行
+      if (!codeInput.value.trim()) return;   // 没填码 → 交给后端提示
+      // 只提示，不阻断提交：阻断会让用户误以为"按钮坏了"，且后端已有明确文案
+      codeInput.setCustomValidity('请先点击「获取验证码」，收到短信后再填入验证码');
+      codeInput.reportValidity();
+      setTimeout(function () { codeInput.setCustomValidity(''); }, 100);
     });
   }
 })();
