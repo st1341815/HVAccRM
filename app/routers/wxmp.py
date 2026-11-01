@@ -201,6 +201,39 @@ def wxmp_refresh(
     return JSONResponse(state)
 
 
+@router.post("/logout")
+def wxmp_logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require("case:edit")),
+    _csrf: None = Depends(_csrf_any),
+):
+    """手动退出公众号登录（清 Chromium profile），用于更换公众号重新扫码。
+
+    权限用 case:edit 而非 case:view：退出登录影响发布能力，与发草稿同级；
+    有正在进行的同步任务时拒绝退出（删 profile 会毁掉正在进行的发布）。
+    """
+    with _TASK_LOCK:
+        running = [
+            t for t in _TASKS.values()
+            if t.get("status") == "running" and not _is_stale_task(t)
+        ]
+    if running:
+        return redirect("/wxmp", "有正在进行的草稿同步，等它完成后再退出登录", "err")
+
+    result = wxmp_svc.logout()
+    if not result.get("ok"):
+        return redirect("/wxmp", "退出失败，详情见容器日志", "err")
+    log_action(
+        db, user, "wxmp_logout", "app_settings", None,
+        ip=client_ip(request), commit=True,
+    )
+    state = result.get("state") or {}
+    if state.get("error"):
+        return redirect("/wxmp", f"已清除登录态，但刷新二维码失败：{state['error']}", "err")
+    return redirect("/wxmp", "已退出公众号登录，请用微信重新扫码", "ok")
+
+
 @router.post("/cases/{case_id}")
 def wxmp_publish(
     request: Request,

@@ -23,7 +23,15 @@
   {% elif state.logged_in %}
     <p><span class="badge ok">已登录</span>
       <span class="muted small">登录态保存在 /data，容器重建不丢</span></p>
-    <button type="button" class="btn ghost" onclick="wxmpRefresh()">重新检测</button>
+    <div class="case-actions">
+      <button type="button" class="btn ghost" onclick="wxmpRefresh()">重新检测</button>
+      <form method="post" action="/wxmp/logout" class="inline"
+            onsubmit="return confirm('确定退出当前公众号？退出后需要重新扫码登录。');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn ghost danger">退出登录</button>
+      </form>
+    </div>
+    <p class="muted small">要更换公众号：点「退出登录」清除当前登录态，再用微信扫新公众号的码。</p>
   {% else %}
     <div class="wxmp-login">
       {% if state.qr %}

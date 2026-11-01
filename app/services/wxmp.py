@@ -25,6 +25,7 @@ import io
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
@@ -302,6 +303,29 @@ def login_state() -> dict:
         return {"ok": True, "logged_in": False, "qr": False}
     finally:
         c.close()
+
+
+def logout() -> dict:
+    """手动退出公众号登录，回到扫码状态（用于更换公众号）。
+
+    做法：停掉 Chromium → 删掉整个 profile（cookies / localStorage / service worker
+    一起清干净，比逐项清 cookie 可靠）→ 重启并重开登录页拿新二维码。
+    profile 只有几 MB，重建无成本；登录态本来就全在 profile 里，容器重建不丢的
+    正是这个目录，删掉即等于「退出所有公众号」。
+
+    注意：调用方必须保证当前没有正在运行的草稿同步任务（删 profile 会毁掉发布）。
+    """
+    stop_browser()
+    d = profile_dir()
+    if d.exists():
+        shutil.rmtree(d, ignore_errors=True)
+    _clear_stale_singleton()
+    ensure_browser()
+    try:
+        state = login_state()
+    except Exception as e:  # noqa: BLE001 - 浏览器抖动不应让退出流程报 500
+        return {"ok": True, "cleared": True, "state": {"ok": False, "error": str(e)}}
+    return {"ok": True, "cleared": True, "state": state}
 
 
 def _read_token(c: cdp_mod.CDP) -> str:
