@@ -3,12 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>分享统计 <span class="muted small">{{ filters.date_from }} ~ {{ filters.date_to }}</span></h1>
-  <nav class="tabs inline-tabs">
-    <a href="/cases">案例</a>
-    <a href="/cases/links">外链管理</a>
-    <a href="/cases/stats" class="active">统计</a>
-    <a href="/cases/custom">自定义</a>
-  </nav>
+  {% set active = 'stats' %}{% include "_fragments/case_tabs.html" %}
 </div>
 <p class="muted small">
   只统计匿名访问，不含任何客户信息；IP 只存单向摘要，不保留原始地址。<br>

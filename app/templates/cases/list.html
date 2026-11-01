@@ -3,12 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>案例 <span class="muted small">共 {{ cases|length }} 条</span></h1>
-  <nav class="tabs inline-tabs">
-    <a href="/cases" class="active">案例</a>
-    <a href="/cases/links">外链管理</a>
-    <a href="/cases/stats">统计</a>
-    <a href="/cases/custom">自定义</a>
-  </nav>
+  {% include "_fragments/case_tabs.html" with context %}
 </div>
 <p class="muted small">前期施工 / 后期施工完工后自动生成。展示图由你自行上传（用于活动宣传），不含客户隐私与商业信息。</p>
 

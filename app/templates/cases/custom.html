@@ -3,12 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>分享页自定义</h1>
-  <nav class="tabs inline-tabs">
-    <a href="/cases">案例</a>
-    <a href="/cases/links">外链管理</a>
-    <a href="/cases/stats">统计</a>
-    <a href="/cases/custom" class="active">自定义</a>
-  </nav>
+  {% set active = 'custom' %}{% include "_fragments/case_tabs.html" %}
 </div>
 <p class="muted small">
   这里改的内容<b>只作用于客户打开的案例分享页</b>（<code>/cases/share/…</code>），系统内部的案例列表、统计、登录页等一律不受影响。<br>

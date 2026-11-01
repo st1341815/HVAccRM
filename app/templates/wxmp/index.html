@@ -3,13 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>公众号草稿 <span class="muted small">案例 → 订阅号草稿箱</span></h1>
-  <nav class="tabs inline-tabs">
-    <a href="/cases">案例</a>
-    <a href="/cases/links">外链管理</a>
-    <a href="/cases/stats">统计</a>
-    <a href="/cases/custom">自定义</a>
-    <a href="/wxmp" class="active">公众号草稿</a>
-  </nav>
+  {% set active = 'wxmp' %}{% include "_fragments/case_tabs.html" %}
 </div>
 <p class="muted small">
   把案例写成公众号图文草稿（4 个字段 + 全部现场图）。<b>只存草稿，绝不自动发表</b>——发表由你在公众号后台人工确认。

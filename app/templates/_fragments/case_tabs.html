@@ -1,0 +1,10 @@
+{# 案例模块共用 tab 栏：案例页 / 外链管理 / 统计 / 自定义 / 公众号草稿。
+   active: 当前 tab（cases|links|stats|custom|wxmp）。
+   v1.9.19：公众号从侧栏迁到这里（用户要求主菜单不再显示公众号）。 #}
+<nav class="tabs inline-tabs">
+  <a href="/cases" class="{{ 'active' if active == 'cases' else '' }}">案例</a>
+  <a href="/cases/links" class="{{ 'active' if active == 'links' else '' }}">外链管理</a>
+  <a href="/cases/stats" class="{{ 'active' if active == 'stats' else '' }}">统计</a>
+  <a href="/cases/custom" class="{{ 'active' if active == 'custom' else '' }}">自定义</a>
+  {% if can('case:view') %}<a href="/wxmp" class="{{ 'active' if active == 'wxmp' else '' }}">公众号</a>{% endif %}
+</nav>
