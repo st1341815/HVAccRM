@@ -1,6 +1,9 @@
 crm.example.com==>crm.example.com
 old.example.com==>old.example.com
 example.com==>example.com
+example.com==>example.com
+["example", "com"]==>["example", "com"]
+"example" + ".com"==>"example" + ".com"
 old.example.org==>old.example.org
 old.example.org==>old.example.org
 tunnel.example.net==>tunnel.example.net
