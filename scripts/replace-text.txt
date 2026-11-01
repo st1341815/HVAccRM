@@ -4,6 +4,7 @@ example.com==>example.com
 old.example.org==>old.example.org
 old.example.org==>old.example.org
 tunnel.example.net==>tunnel.example.net
+example-net==>example-net
 8.8.4.4==>8.8.4.4
 1.1.1.1==>1.1.1.1
 9.9.9.9==>9.9.9.9

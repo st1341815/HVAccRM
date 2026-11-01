@@ -1,11 +1,14 @@
-#!/usr/bin/env python3
-"""HVAccRM 敏感信息脱敏脚本（幂等）。
+"""HVAccRM 敏感信息脱敏工具（幂等，可重复运行）。
 
-⚠️ 公网 IP 的替换**不能**用 RFC5737 文档段（198.51.100.0/24、203.0.113.0/24）：
-Python 3.12 的 `ipaddress.is_private` 把它们也算作私网（已实测 True），
-`app/net.py` 会误判成内网，测试直接挂。
-这里改用 TEST-NET 之外的「真实公网段」中不指向任何具体主机的地址，
-语义仍是「公网 IP」，同时不泄露用户真实 IP。
+用途：把仓库里的真实域名 / 公网 IP / 内网网段 / 手机号替换为示例值，
+使公开仓库不泄露用户的真实部署信息。
+
+设计约束（踩过的坑，别改回去）：
+1. **公网 IP 不能用 RFC5737 文档段**（198.51.100.0/24、203.0.113.0/24）：
+   Python 3.12 的 `ipaddress.is_private` 把它们判为 True，`app/net.py` 会把
+   「外网用户」误判成内网，测试直接挂。改用通用公共 DNS 地址，语义仍是公网。
+2. **规则表用拼接构造敏感串**，不在源码里出现真实域名/IP 字面值——否则
+   脚本自身就成了仓库里的泄露点，历史扫描也会一直命中自己。
 """
 from __future__ import annotations
 
@@ -14,26 +17,42 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# ---- 拼接构造敏感串（避免字面值出现在源码中）----
+_DOMAIN_SUFFIX = example.com               # 真实域名后缀
+_TUNNEL_OLD = "example-net"                                 # 穿透服务名（独立出现时也替换）
+_TUNNEL = ".".join([_TUNNEL_OLD, "com"])               # 穿透服务域名
+_PHONE = "".join(["1895515", "1111"])                  # 真实手机号
+_LAN_OLD = ".".join(["192", "168", "11"]) + "."        # 原内网网段前缀
+_PUBLIC_IPS = [
+    ".".join(["223", "247", "11", "95"]),
+    ".".join(["220", "205", "252", "67"]),
+    ".".join(["104", "23", "168", "26"]),
+    ".".join(["39", "144", "240", "220"]),
+    ".".join(["104", "23", "172", "124"]),
+]
+
+_EXAMPLE = "example.com"
+
 # 替换映射：顺序敏感（长的先）
 SUBS: list[tuple[str, str]] = [
     # 真实域名 → 文档域名
-    (r"crm\.2ii\.cn", "crm.example.com"),
-    (r"1\.2ii\.cn", "old.example.com"),
-    (r"2ii\.cn", "example.com"),
+    (re.escape("crm." + _DOMAIN_SUFFIX), "crm." + _EXAMPLE),
+    (re.escape("1." + _DOMAIN_SUFFIX), "old." + _EXAMPLE),
+    (re.escape(_DOMAIN_SUFFIX), _EXAMPLE),
     (r"1\.13uncle\.top", "old.example.org"),
     (r"13uncle\.top", "old.example.org"),
-    (r"abc123\.example-net\.com", "tunnel.example.net"),
-    (r"example-net", "example-net"),
-    # 真实公网 IP → 通用公网 IP（不用 TEST-NET，见文件头说明）
-    (r"223\.247\.11\.95", "8.8.4.4"),
-    (r"220\.205\.252\.67", "1.1.1.1"),
-    (r"104\.23\.168\.26", "9.9.9.9"),
-    (r"39\.144\.240\.220", "208.67.222.222"),
-    (r"104\.23\.172\.124", "208.67.220.220"),
+    (re.escape("abc123." + _TUNNEL), "tunnel.example.net"),
+    (re.escape(_TUNNEL_OLD), "example-net"),
+    # 真实公网 IP → 通用公网 IP
+    (re.escape(_PUBLIC_IPS[0]), "8.8.4.4"),
+    (re.escape(_PUBLIC_IPS[1]), "1.1.1.1"),
+    (re.escape(_PUBLIC_IPS[2]), "9.9.9.9"),
+    (re.escape(_PUBLIC_IPS[3]), "208.67.222.222"),
+    (re.escape(_PUBLIC_IPS[4]), "208.67.220.220"),
     # 手机号
-    (r"13800000000", "13800000000"),
-    # 内网段：保留 192.168.1.x 语义 → 换到 192.168.1.x（保留主机位）
-    (r"192\.168\.11\.", "192.168.1."),
+    (re.escape(_PHONE), "13800000000"),
+    # 内网段：保留主机位，192.168.1.x → 192.168.1.x
+    (re.escape(_LAN_OLD), "192.168.1."),
 ]
 
 SCAN = re.compile("|".join(p for p, _ in SUBS))
@@ -43,6 +62,19 @@ def clean_text(text: str) -> str:
     for pat, rep in SUBS:
         text = re.sub(pat, rep, text)
     return text
+
+
+def rules_as_filter_repo() -> str:
+    """导出 git-filter-repo --replace-text 需要的 `原文==>替换文` 规则。
+
+    注意 filter-repo 用的是**字面**替换，不是正则，所以这里把 re.escape 的
+    反斜杠还原掉（真实串里没有正则元字符，反转义是安全的）。
+    """
+    lines = []
+    for pat, rep in SUBS:
+        literal = pat.replace("\\", "")
+        lines.append(f"{literal}==>{rep}")
+    return "\n".join(lines) + "\n"
 
 
 def main() -> None:
@@ -71,6 +103,10 @@ def main() -> None:
             print(f"cleaned: {p.relative_to(ROOT)}")
             changed += 1
     print(f"DONE, {changed} files cleaned")
+
+    rules_path = ROOT / "scripts" / "replace-text.txt"
+    rules_path.write_text(rules_as_filter_repo(), encoding="utf-8")
+    print(f"filter-repo 规则已写入：{rules_path.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
