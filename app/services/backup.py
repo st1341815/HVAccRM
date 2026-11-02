@@ -75,7 +75,11 @@ def _db_snapshot(dest: Path) -> None:
 
 # ------------------------------------------------------------------ 备份
 def _scrub_secrets(db_file: Path) -> None:
-    """从备份副本的 app_settings 里删除短信密钥类键（fail-closed：删不动就抛）。"""
+    """从备份副本的 app_settings 里删除密钥类键（fail-closed：删不动就抛）。
+
+    目前包含：短信服务商密钥、安全入口字符串（`gate.path`）。删除后该键回落默认空值，
+    导入备份后需要重新在后台填一次。
+    """
     from .sms import SECRET_SETTING_KEYS
 
     con = sqlite3.connect(db_file, timeout=30)
@@ -91,7 +95,7 @@ def _scrub_secrets(db_file: Path) -> None:
         )
         con.commit()
         if cur.rowcount:
-            log.info("备份副本已剔除 %s 条短信密钥设置", cur.rowcount)
+            log.info("备份副本已剔除 %s 条敏感设置（短信密钥/安全入口）", cur.rowcount)
     finally:
         con.close()
 

@@ -48,6 +48,8 @@ SECRET_SETTING_KEYS = (
     "sms.tencent_skey",
     "sms.aliyun_sk",
     "sms.multisms_sk",
+    # 安全入口字符串等同「隐藏地址」，一旦泄露门牌就失效，同样不随备份外流
+    "gate.path",
 )
 
 _FMT = "%Y-%m-%d %H:%M:%S"

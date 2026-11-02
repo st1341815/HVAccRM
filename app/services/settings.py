@@ -59,6 +59,11 @@ _STATIC_DEFAULTS: dict[str, str] = {
     "sms.aliyun_ak": "",
     "sms.aliyun_sign": "",
     "sms.aliyun_tpl": "",
+    # ---- 安全入口（外网门牌）----
+    "gate.enabled": "0",            # 关 = 完全回到「域名直接可访问」的现状
+    "gate.path": "",                # 自定义字符串（/s/<这里>）；空 = 视为未配置
+    "gate.cookie_days": "30",       # 入口 Cookie 有效期（天）
+    "gate.bypass_private": "1",     # 1 = 内网（私网 IP + 私网 Host）免检
 }
 
 
@@ -169,3 +174,41 @@ def get_sms_config(db: Session) -> dict:
             "multisms_tpl": _str("sms.multisms_tpl"),
         },
     }
+
+
+def get_gate_config(db: Session) -> dict:
+    """安全入口（外网门牌）配置（类型化）。
+
+    `ready` = 已启用 **且** 入口字符串合法。启用但字符串为空/非法时按未启用处理
+    （fail-open 而不是把自己锁在门外），同时打一条 warning 让后台排查有据可查。
+    """
+    from ..gate import normalize_path
+
+    raw = all_settings(db)
+    enabled = raw.get("gate.enabled", "0") == "1"
+    path = normalize_path(raw.get("gate.path")) or ""
+    try:
+        days = int(raw.get("gate.cookie_days", 30))
+    except (TypeError, ValueError):
+        days = 30
+    days = max(1, min(365, days))
+    bypass_private = raw.get("gate.bypass_private", "1") == "1"
+    ready = bool(enabled and path)
+    if enabled and not path:
+        import logging
+
+        logging.getLogger("crm.gate").warning("安全入口已启用但入口字符串未设置/不合法，本次按未启用处理")
+    return {
+        "enabled": enabled,
+        "path": path,
+        "cookie_days": days,
+        "bypass_private": bypass_private,
+        "ready": ready,
+    }
+
+
+def save_gate_config(db: Session, *, enabled: bool, path: str, cookie_days: int, bypass_private: bool) -> None:
+    set_(db, "gate.enabled", "1" if enabled else "0")
+    set_(db, "gate.path", path)
+    set_(db, "gate.cookie_days", str(max(1, min(365, int(cookie_days)))))
+    set_(db, "gate.bypass_private", "1" if bypass_private else "0")

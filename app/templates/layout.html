@@ -74,7 +74,9 @@
   {% if flash %}<div class="flash {{ flash.level }}">{{ flash.message }}</div>{% endif %}
   {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
-  {% block footer %}<footer class="foot">v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }}</footer>{% endblock %}
+  {% block footer %}<footer class="foot">
+    {% if security %}<span class="sec-badge {{ security.key }}" title="{{ security.title }}"><i></i>安全等级：{{ security.level }}</span><span class="foot-sep">·</span>{% endif %}v{{ version }} · {{ settings.app_name_en }} — {{ settings.app_name }}
+  </footer>{% endblock %}
 </main>
 {% if user %}
 </div>

@@ -143,6 +143,13 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 
 .wrap { flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto; padding: 1.2rem 1.5rem; }
 .foot { text-align: center; color: var(--muted); font-size: .78rem; padding: 1.5rem 0; }
+/* 页脚安全等级徽章：小圆点 + 文案，颜色只用语义色的墨色，不抢视线 */
+.foot-sep { margin: 0 .35rem; color: var(--card-border); }
+.sec-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .05rem .5rem; border-radius: 999px; font-size: .74rem; border: 1px solid transparent; }
+.sec-badge i { width: .42rem; height: .42rem; border-radius: 50%; background: currentColor; display: inline-block; }
+.sec-badge.high { color: var(--success-ink); background: var(--success-bg); border-color: #cfdcc8; }
+.sec-badge.mid { color: var(--warning-ink); background: var(--warning-bg); border-color: #e3d6b8; }
+.sec-badge.low { color: var(--danger-ink); background: var(--danger-bg); border-color: var(--danger-border); }
 /* 对外分享页的版权/ICP 声明（两行居中，与内部版本页脚区分） */
 .foot-legal { padding: 1.1rem 0 1.6rem; font-size: .74rem; line-height: 1.9; }
 .foot-legal div { margin: 0; white-space: normal; }

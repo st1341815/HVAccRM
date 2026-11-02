@@ -110,14 +110,20 @@ def read_flash(request: Request) -> dict[str, str] | None:
 
 
 def render(request: Request, name: str, status_code: int = 200, **ctx: Any):
+    from . import gate
+
     user = getattr(request.state, "user", None)
     csrf = csrf_token_for(request)
+    security = getattr(request.state, "security", None)
+    if not security:  # 非中间件路径（部分测试直调视图）时兜底算一份
+        security = gate.evaluate(request, {"ready": False}, secure=bool(getattr(request, "url", None) and request.url.scheme == "https")).security
     ctx.update(
         {
             "user": user,
             "settings": get_settings(),
             "version": __version__,
             "today": today_str(),
+            "security": security,
             "csrf_token": csrf,
             "can": lambda perm: permissions.has_perm(user, perm),
             "can_amount": permissions.can_see_amount(user),

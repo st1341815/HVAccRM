@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import log_action
 from ..csrf import csrf_protect
+from .. import gate as gate_mod
 from ..config import get_settings
 from ..db import SessionLocal, commit_retry, engine, get_db
 from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso, today_str
@@ -44,6 +45,20 @@ SCOPES = {
     "self": "仅本人负责",
     "shared": "本人 + 显式共享",
 }
+
+
+def site_base(request: Request) -> str:
+    """当前访问的站点根地址（给「安全入口地址」预览用）。
+
+    优先 `PUBLIC_BASE_URL`（反代场景显式配置时最准），否则用 `X-Forwarded-Proto` + Host
+    现推——这样在内网打开后台时预览的是内网地址，在外网打开时预览的就是公网地址。
+    """
+    s = get_settings()
+    if (s.public_base_url or "").strip():
+        return s.public_base_url.strip().rstrip("/")
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+    host = request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}".rstrip("/")
 
 
 @router.get("")
@@ -82,6 +97,8 @@ def overview(
         sms_cfg=sms_cfg,
         sms_provider_labels=sms_svc.PROVIDER_LABELS,
         sms_masked={k: sms_svc.mask_secret(v) for k, v in sms_cfg["creds"].items()},
+        gate_cfg=settings_svc.get_gate_config(db),
+        site_base=site_base(request),
     )
 
 
@@ -629,6 +646,73 @@ def save_sms_settings(
     )
     commit_retry(db)
     return redirect("/admin#sms", "短信验证设置已保存（服务商切换即时生效）")
+
+
+@router.post("/gate/settings")
+def save_gate_settings(
+    request: Request,
+    enabled: str | None = Form(None),
+    path: str = Form(""),
+    cookie_days: str = Form("30"),
+    bypass_private: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    """保存安全入口（外网门牌）设置。
+
+    保存后**主动给当前浏览器下发一枚新 Cookie**：管理员刚设置的字符串，自己应当立刻
+    可用，否则他一从内网切到外网就会被自己的门牌挡在 404 外面（体验上像「把自己锁外面」）。
+    但仅在「本机在门牌生效范围内」时才下发——内网免检模式下无需、也不该多给一枚 Cookie。
+    """
+    clean = gate_mod.normalize_path(path)
+    if path.strip() and clean is None:
+        return redirect(
+            "/admin#gate",
+            "入口字符串不合法：需 4–64 位，仅限字母、数字与 . _ ~ -",
+            "err",
+        )
+    try:
+        days = int(cookie_days or 30)
+    except (TypeError, ValueError):
+        days = 30
+    settings_svc.save_gate_config(
+        db,
+        enabled=bool(enabled),
+        path=clean or "",
+        cookie_days=days,
+        bypass_private=bool(bypass_private),
+    )
+    log_action(
+        db, user, "update", "gate_settings", None,
+        new={"enabled": bool(enabled and clean), "cookie_days": days, "bypass_private": bool(bypass_private)},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    gate_mod.invalidate()
+    cfg = settings_svc.get_gate_config(db)
+
+    if not enabled:
+        message = "安全入口已关闭：域名可直接访问"
+    elif not clean:
+        message = "已保存，但入口字符串未填写，当前按未启用处理"
+    else:
+        message = f"安全入口已启用：外网请访问 /s/{clean}"
+    response = redirect("/admin#gate", message)
+
+    # 门牌生效范围内（外网，或关掉了内网免检）→ 立刻给当前浏览器放行，避免本人被挡
+    if cfg["ready"]:
+        external = not gate_mod.is_local(request)
+        if external or not cfg["bypass_private"]:
+            gate_mod.set_cookie(response, cfg, secure=_is_secure(request))
+    return response
+
+
+def _is_secure(request: Request) -> bool:
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if proto:
+        return proto in ("https", "wss")
+    return request.url.scheme == "https"
 
 
 @router.post("/sms/test")

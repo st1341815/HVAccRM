@@ -111,6 +111,39 @@
   <p class="muted small">密钥保存后只回显尾 4 位，留空提交保持不变；备份包不含短信密钥。调试模式下验证码写入运行日志（docker logs 可见），不实际发送。切换服务商即时生效，无需重启。</p>
 </section>
 
+<section class="card" id="gate">
+  <h2>安全入口（外网门牌）</h2>
+  <form method="post" action="/admin/gate/settings" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="checkline"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
+    <div class="inline-group">
+      <span class="inline-label">入口字符串</span>
+      <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
+      <button type="button" class="ghost" id="gateGen">随机生成</button>
+    </div>
+    <div class="inline-group">
+      <span class="inline-label">免检天数</span>
+      <input name="cookie_days" value="{{ gate_cfg.cookie_days }}" inputmode="numeric" style="max-width:6rem"> <span class="muted small">天（通过入口后同浏览器不再要求）</span>
+    </div>
+    <label class="checkline"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
+    <p class="muted small">
+      开启后，外网必须访问 <code id="gatePreview">{{ site_base }}/s/{{ gate_cfg.path or '你的字符串' }}</code> 才能进入；
+      未通过入口的外网请求一律返回 404（不提示、不出现登录页，扫描器看不到系统存在）。
+      4–64 位，仅限字母、数字与 <code>. _ ~ -</code>。
+    </p>
+    <p class="muted small">
+      当前状态：{% if gate_cfg.ready %}<span class="badge ok">生效中</span>{% elif gate_cfg.enabled %}<span class="badge warn">已启用但字符串未设置（按未启用处理）</span>{% else %}<span class="badge">未启用</span>{% endif %}
+      · 本次访问：{% if security %}<span class="sec-badge {{ security.key }}"><i></i>{{ security.level }}</span>（{{ security.title }}）{% endif %}
+    </p>
+    <button type="submit">保存设置</button>
+  </form>
+  <p class="muted small">
+    注意：① 入口字符串等同于「隐藏地址」，泄露即失效，且不会写进备份包，换设备后需重新填写；
+    ② 修改字符串后，已通过入口的浏览器需重新打开一次新地址；
+    ③ 这是**降低暴露面**的措施，不能替代强密码、TOTP 与短信验证，建议同时开启。
+  </p>
+</section>
+
 <section class="card">
   <h2>最近备份</h2>
   <table class="tight">
@@ -135,6 +168,30 @@
   }
   sel.addEventListener('change', sync);
   sync();
+})();
+</script>
+<script>
+(function () {
+  var input = document.getElementById('gatePath');
+  var gen = document.getElementById('gateGen');
+  var preview = document.getElementById('gatePreview');
+  if (!gen || !input) return;
+  var base = preview ? String(preview.textContent).replace(/\/s\/.*$/, '') : '';
+  gen.addEventListener('click', function () {
+    var abc = 'abcdefghijkmnpqrstuvwxyz23456789';
+    var out = '';
+    var buf = new Uint8Array(12);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(buf);
+    else for (var j = 0; j < buf.length; j++) buf[j] = Math.floor(Math.random() * 256);
+    for (var i = 0; i < buf.length; i++) out += abc[buf[i] % abc.length];
+    input.value = out;
+    input.dispatchEvent(new Event('input'));
+  });
+  function syncPreview() {
+    if (preview) preview.textContent = base + '/s/' + (input.value.trim() || '你的字符串');
+  }
+  input.addEventListener('input', syncPreview);
+  syncPreview();
 })();
 </script>
 {% endblock %}

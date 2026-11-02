@@ -176,6 +176,19 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     secure = _is_https(request)
     set_request_secure(secure)  # 供 Cookie 的 Secure 标志统一取用
+    # 安全入口（外网门牌）：在「认证」之前先过一道准入门槛。
+    # 未通过时直接返回 404（与不存在的路由同形），连登录页都不暴露给外网扫描器。
+    from . import gate as gate_mod
+
+    decision = gate_mod.evaluate(request, gate_mod.config(), secure=secure)
+    request.state.security = decision.security
+    if decision.response is not None:
+        response = decision.response
+        if not path.startswith("/static"):
+            response.headers.setdefault("X-Content-Type-Options", "nosniff")
+            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+            response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
     request.state.user = None
     if not _is_exempt(path):
         with session_scope() as db:
