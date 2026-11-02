@@ -32,6 +32,16 @@
   </div>
 </div>
 
+<div class="card note-card">
+  <strong>智能跳过重复备份</strong>
+  <p class="muted small" style="margin:.35rem 0 0">
+    每次自动备份前会先比对「业务数据 + 媒体」的内容指纹。
+    {% if last_backup_fp_at %}最近一次实际生成备份：<b>{{ last_backup_fp_at }}</b>{% else %}尚未记录指纹（下次自动备份时建立）{% endif %}。
+    自那之后数据没有任何变化时，定时任务会跳过打包并记一条日志——此时<b>最近的一份备份仍然完整可用</b>，只是不再重复写一份一模一样的 zip。
+    登录记录、分享访问、短信验证码这类日志不计入变更判定。手动点「立即备份」总是强制生成新备份。
+  </p>
+</div>
+
 <section class="card">
   <h2>备份文件</h2>
   <table class="tight">

@@ -396,6 +396,7 @@ def backups_page(
         cfg=settings_svc.get_backup_config(db),
         media=photo_svc.total_usage(),
         pending=backup_svc.has_pending_restore(),
+        last_backup_fp_at=backup_svc.last_fingerprint(db)[1],
         default_dir=str(get_settings().backup_dir),
         dows=[("0", "周一"), ("1", "周二"), ("2", "周三"), ("3", "周四"), ("4", "周五"), ("5", "周六"), ("6", "周日")],
     )
@@ -409,7 +410,8 @@ def run_backup(
     _csrf: None = Depends(csrf_protect),
 ):
     try:
-        result = backup_svc.run_backup_job(db)
+        # 手动点击是明确的「我现在就要一份」意图，强制全量，不走「无变化跳过」
+        result = backup_svc.run_backup_job(db, force=True)
     except Exception:  # noqa: BLE001 - 统一脱敏，细节只进日志
         log.exception("手动备份失败")
         return redirect("/admin/backups", "备份失败，详情见容器日志（data/logs/crm.log）", "err")

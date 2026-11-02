@@ -202,3 +202,134 @@ def test_apply_pending_restore_keeps_backup_on_bad_zip(fake_fs, tmp_path):
     assert result["db"] is False
     assert result["error"]
     assert not backup_svc.has_pending_restore()
+
+
+# --------------------------------------------------- 变更指纹 / 跳过重复备份
+def _add_tables(fake_fs: "_FakeSettings", db=None) -> None:
+    """在 fake 库上补出日志类与业务类表，用于指纹判定测试。
+
+    engine 是 session 级共享内存库，前面用例可能改过 backup.dir，
+    这里显式把保存目录钉到 fake 目录，避免用例间互相污染。
+    """
+    if db is not None:
+        settings_svc.set_(db, "backup.dir", str(fake_fs.backup_dir))
+        db.commit()
+    conn = sqlite3.connect(fake_fs.db_path)
+    conn.execute("CREATE TABLE audit_log (id INTEGER PRIMARY KEY, action TEXT)")
+    conn.execute("CREATE TABLE share_visits (id INTEGER PRIMARY KEY, who TEXT)")
+    conn.execute("CREATE TABLE sms_codes (id INTEGER PRIMARY KEY, code TEXT)")
+    conn.execute("CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT)")
+    conn.commit()
+    conn.close()
+
+
+def test_db_fingerprint_stable_for_same_data(fake_fs, tmp_path):
+    """同一份数据重复计算，指纹必须完全一致（否则跳过永远不生效）。"""
+    f1 = backup_svc._db_fingerprint(tmp_path)
+    f2 = backup_svc._db_fingerprint(tmp_path)
+    assert f1 == f2
+
+
+def test_db_fingerprint_ignores_log_tables(fake_fs, tmp_path):
+    """登录/分享/短信验证码这类日志表的变化，不算「数据变了」。"""
+    _add_tables(fake_fs)
+    before = backup_svc._db_fingerprint(tmp_path)
+    conn = sqlite3.connect(fake_fs.db_path)
+    conn.execute("INSERT INTO audit_log (action) VALUES ('login')")
+    conn.execute("INSERT INTO share_visits (who) VALUES ('v1')")
+    conn.execute("INSERT INTO sms_codes (code) VALUES ('123456')")
+    conn.commit()
+    conn.close()
+    assert backup_svc._db_fingerprint(tmp_path) == before
+
+
+def test_db_fingerprint_changes_on_business_data(fake_fs, tmp_path):
+    """业务表（customers）变化必须让指纹改变，保证有变更当天一定备份。"""
+    _add_tables(fake_fs)
+    before = backup_svc._db_fingerprint(tmp_path)
+    conn = sqlite3.connect(fake_fs.db_path)
+    conn.execute("INSERT INTO customers (name) VALUES ('陶姐')")
+    conn.commit()
+    conn.close()
+    assert backup_svc._db_fingerprint(tmp_path) != before
+
+
+def test_media_fingerprint_tracks_add_and_remove(fake_fs):
+    """媒体指纹：新增/删除文件要变，恢复原状要回到原值。"""
+    base = backup_svc._media_fingerprint(fake_fs.media_dir)
+    f = fake_fs.media_dir / "a.jpg"
+    f.write_bytes(b"x" * 32)
+    with_file = backup_svc._media_fingerprint(fake_fs.media_dir)
+    assert with_file != base
+    f.unlink()
+    assert backup_svc._media_fingerprint(fake_fs.media_dir) == base
+
+
+def test_run_backup_job_skips_when_unchanged(fake_fs, db):
+    """第一次备份生成 zip；数据没变时第二次跳过；改了业务数据后再次生成。"""
+    _add_tables(fake_fs, db)
+    first = backup_svc.run_backup_job(db)
+    assert first["skipped"] is False and first["file"]
+
+    second = backup_svc.run_backup_job(db)
+    assert second["skipped"] is True
+    assert second["file"] is None
+    # 跳过时不应产生新 zip
+    assert len(list(fake_fs.backup_dir.glob("crm-backup-*.zip"))) == 1
+
+    conn = sqlite3.connect(fake_fs.db_path)
+    conn.execute("INSERT INTO customers (name) VALUES ('董小姐')")
+    conn.commit()
+    conn.close()
+
+    third = backup_svc.run_backup_job(db)
+    assert third["skipped"] is False
+    assert len(list(fake_fs.backup_dir.glob("crm-backup-*.zip"))) == 2
+
+
+def test_run_backup_job_log_only_changes_still_skip(fake_fs, db):
+    """只产生登录日志时，自动备份仍应跳过（这是方案一的核心诉求）。"""
+    _add_tables(fake_fs, db)
+    backup_svc.run_backup_job(db)
+    conn = sqlite3.connect(fake_fs.db_path)
+    conn.execute("INSERT INTO audit_log (action) VALUES ('login')")
+    conn.commit()
+    conn.close()
+    assert backup_svc.run_backup_job(db)["skipped"] is True
+
+
+def test_run_backup_job_force_overrides_skip(fake_fs, db):
+    """手动「立即备份」必须强制生成，不受去重影响。"""
+    _add_tables(fake_fs, db)
+    backup_svc.run_backup_job(db)
+    forced = backup_svc.run_backup_job(db, force=True)
+    assert forced["skipped"] is False and forced["file"]
+    assert len(list(fake_fs.backup_dir.glob("crm-backup-*.zip"))) == 2
+
+
+def test_last_fingerprint_recorded(fake_fs, db):
+    """备份成功后应记录指纹与时间，供页面展示。"""
+    _add_tables(fake_fs, db)
+    assert backup_svc.last_fingerprint(db) == (None, None)
+    backup_svc.run_backup_job(db)
+    fp, at = backup_svc.last_fingerprint(db)
+    assert fp and at
+
+
+def test_db_fingerprint_excludes_own_metadata(fake_fs, db, tmp_path):
+    """回归：指纹自身存在 app_settings，写指纹不能改变指纹（自我指涉会导致跳过永不生效）。"""
+    _add_tables(fake_fs, db)
+    before = backup_svc._db_fingerprint(tmp_path)
+    settings_svc.set_(db, backup_svc.FINGERPRINT_SETTING_KEY, "deadbeef" * 8)
+    settings_svc.set_(db, backup_svc.FINGERPRINT_TIME_KEY, "2026-11-02T10:00:00")
+    db.commit()
+    assert backup_svc._db_fingerprint(tmp_path) == before
+
+
+def test_run_backup_job_skip_is_repeatable(fake_fs, db):
+    """连续三次 run_backup_job：只有第一次真正打包，后两次都跳过。"""
+    _add_tables(fake_fs, db)
+    assert backup_svc.run_backup_job(db)["skipped"] is False
+    assert backup_svc.run_backup_job(db)["skipped"] is True
+    assert backup_svc.run_backup_job(db)["skipped"] is True
+    assert len(list(fake_fs.backup_dir.glob("crm-backup-*.zip"))) == 1

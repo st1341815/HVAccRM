@@ -194,6 +194,9 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 .kpi.alert .kpi-num { color: var(--danger-ink); }
 .kpis.compact .kpi { padding: .35rem .7rem .4rem; min-width: 5.5rem; }
 .kpis.compact .kpi-num { font-size: 1.1rem; }
+/* 说明型卡片（如备份页「智能跳过重复备份」）：弱底色 + 左侧细线，与操作区区分 */
+.card.note-card { background: var(--paper-3); border-color: var(--line); border-left: 2px solid var(--brand-200); padding: .7rem .9rem; }
+.card.note-card strong { font-size: .88rem; }
 /* 施工看板：筛选结果标签与数字合并一行 */
 .kpi-inline { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; }
 .kpi-inline .kpi-num { display: inline; }

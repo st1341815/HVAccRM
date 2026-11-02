@@ -14,10 +14,12 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import shutil
 import sqlite3
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +43,19 @@ CONFIG_DIR_NAME = "config"
 # ------------------------------------------------------------------ 工具
 def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def _unique_archive_path(backup_dir: Path, stamp: str) -> Path:
+    """同秒内重复备份（连续点两次「立即备份」）不能互相覆盖，加 -2/-3 后缀。"""
+    dest = backup_dir / f"{ARCHIVE_PREFIX}{stamp}.zip"
+    if not dest.exists():
+        return dest
+    n = 2
+    while True:
+        cand = backup_dir / f"{ARCHIVE_PREFIX}{stamp}-{n}.zip"
+        if not cand.exists():
+            return cand
+        n += 1
 
 
 def _pending_path() -> Path:
@@ -106,7 +121,7 @@ def make_full_backup(db=None) -> Path:
     backup_dir = _resolve_backup_dir(db)
     stamp = _stamp()
     tmp_db = backup_dir / f".tmp-{stamp}.db"
-    dest = backup_dir / f"{ARCHIVE_PREFIX}{stamp}.zip"
+    dest = _unique_archive_path(backup_dir, stamp)
 
     _db_snapshot(tmp_db)
     # 备份副本剔除短信密钥（13叔定案：服务商/密钥后台可改，但备份 zip 不携带）
@@ -189,6 +204,156 @@ def run_backup_job(db=None) -> dict:
     path = make_full_backup(db)
     removed = prune_backups(db)
     return {"file": path.name, "size": path.stat().st_size, "pruned": removed}
+
+
+# ------------------------------------------------------------------ 变更判定
+# 这些表「不参与变更判定」：它们跟随登录 / 分享访问 / 发码自然增长，
+# 业务数据没动也会天天变。若计入指纹，跳过逻辑永远不会触发。
+# 注意：它们**仍会照常打进备份包**，只是不作为「是否值得出新包」的依据。
+FINGERPRINT_EXCLUDED_TABLES = frozenset({"audit_log", "share_visits", "sms_codes"})
+FINGERPRINT_SETTING_KEY = "backup.last_fingerprint"
+FINGERPRINT_TIME_KEY = "backup.last_fingerprint_at"
+# 指纹自身存在 app_settings 里——若不排除，写指纹会改变指纹，形成自我指涉，跳过永远不成立。
+FINGERPRINT_EXCLUDED_SETTINGS = (FINGERPRINT_SETTING_KEY, FINGERPRINT_TIME_KEY)
+
+
+def _db_fingerprint(tmp_dir: Path) -> str:
+    """数据库内容指纹：排除 FINGERPRINT_EXCLUDED_TABLES 后，对规范化副本算 sha256。
+
+    为什么不直接 hash 主库文件：WAL 模式下即使只改一行，文件布局也可能变；
+    反之 checkpoint / VACUUM 即使数据未变也会重写文件字节。用 `VACUUM INTO`
+    先重建一份规范化副本，同一份逻辑数据永远得到同样的字节（已实测三次一致）。
+    """
+    tmp = tmp_dir / ".fingerprint.db"
+    tmp.unlink(missing_ok=True)
+    src = sqlite3.connect(get_settings().db_path, timeout=30)
+    try:
+        dst = sqlite3.connect(str(tmp), timeout=30)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    try:
+        con = sqlite3.connect(str(tmp), timeout=30)
+        try:
+            existing = {
+                r[0] for r in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            for t in FINGERPRINT_EXCLUDED_TABLES & existing:
+                con.execute(f'DELETE FROM "{t}"')
+            # 指纹自身的存储记录也排除，否则「写指纹」本身就会改变指纹（自我指涉）
+            if "app_settings" in existing:
+                con.execute(
+                    'DELETE FROM app_settings WHERE "key" IN (%s)'
+                    % ",".join("?" * len(FINGERPRINT_EXCLUDED_SETTINGS)),
+                    FINGERPRINT_EXCLUDED_SETTINGS,
+                )
+            con.commit()
+            con.execute("VACUUM")  # 让删除后的空页也规范化掉
+        finally:
+            con.close()
+        h = hashlib.sha256()
+        with open(tmp, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _media_fingerprint(media_dir: Path) -> str:
+    """媒体内容指纹：(相对路径, 大小, mtime_ns) 排序后哈希。
+
+    照片上传后不再被改写，这个判据足够；不读文件内容，千级文件也是毫秒级。
+    """
+    h = hashlib.sha256()
+    if not media_dir.exists():
+        return h.hexdigest()
+    entries: list[tuple[str, int, int]] = []
+    for p in media_dir.rglob("*"):
+        if p.is_file():
+            st = p.stat()
+            entries.append((p.relative_to(media_dir).as_posix(), st.st_size, st.st_mtime_ns))
+    entries.sort()
+    for rel, size, mtime in entries:
+        h.update(f"{rel}\0{size}\0{mtime}\n".encode("utf-8"))
+    return h.hexdigest()
+
+
+def compute_fingerprint(tmp_dir: Path | None = None) -> str:
+    """业务数据 + 媒体的联合指纹。tmp_dir 供测试注入。"""
+    s = get_settings()
+    media_dir = Path(s.media_dir)
+    if tmp_dir is None:
+        with tempfile.TemporaryDirectory(prefix="hva-fp-") as d:
+            db_fp = _db_fingerprint(Path(d))
+    else:
+        db_fp = _db_fingerprint(Path(tmp_dir))
+    media_fp = _media_fingerprint(media_dir)
+    return hashlib.sha256(f"{db_fp}:{media_fp}".encode()).hexdigest()
+
+
+def last_fingerprint(db=None) -> tuple[str | None, str | None]:
+    """返回 (上次备份时的指纹, 时间)。未记录过则为 (None, None)。"""
+    if db is None:
+        return None, None
+    try:
+        return (
+            settings_svc.get(db, FINGERPRINT_SETTING_KEY) or None,
+            settings_svc.get(db, FINGERPRINT_TIME_KEY) or None,
+        )
+    except Exception:  # pragma: no cover - 库未就绪
+        return None, None
+
+
+def run_backup_job(db=None, force: bool = False) -> dict:
+    """自动备份入口：业务数据与媒体都没变 → 跳过打包（force=True 则强制全量）。"""
+    result: dict[str, Any] = {"skipped": False}
+    if not force:
+        try:
+            current = compute_fingerprint()
+        except Exception:
+            log.exception("计算备份指纹失败——本次按「有变化」处理，照常备份")
+            current = None
+        if current is not None:
+            prev, prev_at = last_fingerprint(db)
+            if prev and prev == current:
+                log.info("数据自上次备份以来无变化，跳过本次打包（上次 %s）", prev_at)
+                return {
+                    "skipped": True,
+                    "since": prev_at,
+                    "pruned": 0,
+                    "file": None,
+                    "size": 0,
+                }
+    else:
+        current = None
+
+    path = make_full_backup(db)
+    removed = prune_backups(db)
+    # 备份成功后才更新指纹；记录本次备份时刻对应的数据版本
+    if current is None:
+        try:
+            current = compute_fingerprint()
+        except Exception:
+            log.exception("备份后计算指纹失败——下次将按「有变化」处理")
+    if current and db is not None:
+        try:
+            settings_svc.set_(db, FINGERPRINT_SETTING_KEY, current)
+            settings_svc.set_(
+                db, FINGERPRINT_TIME_KEY, datetime.now().isoformat(timespec="seconds")
+            )
+            db.commit()
+        except Exception:
+            log.exception("记录备份指纹失败（不影响备份本身）")
+    result.update(
+        {"file": path.name, "size": path.stat().st_size, "pruned": removed, "skipped": False}
+    )
+    return result
 
 
 # ------------------------------------------------------------------ 导入
