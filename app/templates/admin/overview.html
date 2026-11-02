@@ -131,7 +131,8 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <div class="field-grid">
-      <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
+      <label class="checkline check-pair"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
+      <label class="checkline check-pair"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
       <label class="lab span-2">入口字符串
         <span class="inline-group">
           <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
@@ -144,7 +145,6 @@
           <span class="muted small">天</span>
         </span>
       </label>
-      <label class="checkline span-2"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
     </div>
 
     <div class="gate-preview">

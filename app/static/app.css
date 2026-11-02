@@ -435,6 +435,10 @@ details.filter-collapse .filterbar { padding-top: .1rem; }
 /* 例外：带 .checkline 的复选行在 .stack 里必须保持横向（复选框 + 说明文字同一行）。
    .stack label 的 column 会把它们拆成两行——此前复选框和文字是上下错开的。 */
 .stack label.checkline { display: flex; flex-direction: row; align-items: center; gap: .3rem; flex-wrap: wrap; }
+/* 并排的两个复选行（安全入口的「启用」+「内网访问免检」）：各自占一列、同处一行。
+   说明文字较长会折成两行，此时复选框要与首行文字对齐（flex-start），而不是飘到中间。 */
+.field-grid > label.checkline.check-pair { align-items: flex-start; }
+.field-grid > label.checkline.check-pair > input[type=checkbox] { margin-top: .12rem; }
 
 /* ---------------------------------------------------------------- 相册 */
 /* 照片查看页：适配屏幕放大显示 */
@@ -510,6 +514,9 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   /* 设置类模块在手机上退化为单列，控件整行铺满（避免两列把标签挤断行） */
   .field-grid { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
   .field-grid > .span-2, .field-grid > .span-all { grid-column: auto; }
+  /* 窄屏下并排的复选行各占整行：两列会把说明文字挤成很碎的折行 */
+  .field-grid > label.checkline.check-pair { grid-column: 1 / -1; align-items: center; }
+  .field-grid > label.checkline.check-pair > input[type=checkbox] { margin-top: 0; }
   .field-grid input.short { width: 5.5rem; }
   .module-actions button { flex: 1 1 auto; }
   .gate-state { margin-left: 0; }
