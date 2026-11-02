@@ -53,7 +53,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <div class="field-grid">
-      <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}> 启用（仅外网访问要求短信验证码，内网登录不受影响）</label>
+      <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}><span class="check-text">启用（仅外网访问要求短信验证码，内网登录不受影响）</span></label>
       <label class="lab">服务商
         <select name="provider" id="smsProvider">
           {% for key, label in sms_provider_labels.items() %}

@@ -432,6 +432,9 @@ details.filter-collapse .filterbar { padding-top: .1rem; }
 
 .login-card { max-width: 380px; margin: 8vh auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem; box-shadow: var(--shadow-md); }
 .stack label { display: flex; flex-direction: column; gap: .25rem; }
+/* 例外：带 .checkline 的复选行在 .stack 里必须保持横向（复选框 + 说明文字同一行）。
+   .stack label 的 column 会把它们拆成两行——此前复选框和文字是上下错开的。 */
+.stack label.checkline { display: flex; flex-direction: row; align-items: center; gap: .3rem; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------- 相册 */
 /* 照片查看页：适配屏幕放大显示 */
