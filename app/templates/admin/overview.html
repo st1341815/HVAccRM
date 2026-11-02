@@ -54,7 +54,7 @@
 
     <div class="field-grid">
       <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}> 启用（仅外网访问要求短信验证码，内网登录不受影响）</label>
-      <label class="lab inline">服务商
+      <label class="lab">服务商
         <select name="provider" id="smsProvider">
           {% for key, label in sms_provider_labels.items() %}
           <option value="{{ key }}" {{ 'selected' if sms_cfg.provider == key else '' }}>{{ label }}</option>
@@ -132,13 +132,13 @@
 
     <div class="field-grid">
       <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
-      <label class="lab inline span-2"><span class="lab-text">入口字符串</span>
+      <label class="lab span-2">入口字符串
         <span class="inline-group">
           <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
           <button type="button" class="ghost" id="gateGen">随机生成</button>
         </span>
       </label>
-      <label class="lab inline"><span class="lab-text">免检天数</span>
+      <label class="lab">免检天数
         <span class="inline-group">
           <input name="cookie_days" value="{{ gate_cfg.cookie_days }}" inputmode="numeric" class="short">
           <span class="muted small">天</span>
