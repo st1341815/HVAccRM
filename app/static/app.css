@@ -311,6 +311,12 @@ button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem .9rem; align-items: start; }
 .field-grid > .span-2, .field-grid > .span-all { grid-column: 1 / -1; }
 .field-grid label.lab { display: flex; flex-direction: column; gap: .25rem; min-width: 0; font-size: .85rem; color: var(--ink); }
+/* inline 变体：标签与控件同行、整体靠左（仅桌面；移动端仍走下面的单列纵向堆叠）。
+   标签定宽 + 控件吃掉剩余宽度，这样同一栅格列里的多行 inline 标签也能左右边界对齐。 */
+.field-grid label.lab.inline { flex-direction: row; align-items: center; justify-content: flex-start; gap: .5rem; }
+.field-grid label.lab.inline > :not(.lab-text):not(span.muted) { flex: 1 1 auto; min-width: 0; }
+.field-grid label.lab.inline > .inline-group { flex: 1 1 auto; min-width: 0; }
+.field-grid label.lab.inline > .lab-text { flex: 0 0 auto; white-space: nowrap; }
 .field-grid label.lab > .inline-group { display: flex; align-items: center; gap: .4rem; }
 .field-grid label.lab > .inline-group > input, .field-grid label.lab > .inline-group > select { flex: 1 1 auto; min-width: 0; }
 .field-grid label.lab > .inline-group > button { flex: 0 0 auto; }
@@ -507,6 +513,9 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   /* 设置类模块在手机上退化为单列，控件整行铺满（避免两列把标签挤断行） */
   .field-grid { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
   .field-grid > .span-2, .field-grid > .span-all { grid-column: auto; }
+  /* 手机端 inline 变体回退为纵向堆叠：窄屏同行会把标签挤成两行 */
+  .field-grid label.lab.inline { flex-direction: column; align-items: stretch; gap: .25rem; }
+  .field-grid label.lab.inline > .lab-text { white-space: normal; }
   .field-grid input.short { width: 5.5rem; }
   .module-actions button { flex: 1 1 auto; }
   .gate-state { margin-left: 0; }
