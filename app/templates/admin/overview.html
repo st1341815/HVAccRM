@@ -51,97 +51,126 @@
   <h2>短信验证（外网登录）</h2>
   <form method="post" action="/admin/sms/settings" class="stack">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label class="checkline"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}> 启用（仅外网访问要求短信验证码，内网登录不受影响）</label>
-    <div class="inline-group">
-      <span class="inline-label">服务商</span>
-      <select name="provider" id="smsProvider">
-        {% for key, label in sms_provider_labels.items() %}
-        <option value="{{ key }}" {{ 'selected' if sms_cfg.provider == key else '' }}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <label>外网域名（逗号分隔，支持 *.xx 通配；IP 判定为主信号，此为兜底）
-      <input name="external_domains" value="{{ sms_cfg.external_domains | join(', ') }}" placeholder="crm.example.com">
-    </label>
-    <p class="muted small">判定规则：真实客户端 IP 为公网 → 外网（需验证码）；私网/回环/VPN 隧道 → 内网。人在内网用域名访问（NAT 回流）按内网处理。</p>
 
-    <div class="sms-provider-fields" data-provider="multisms" {{ '' if sms_cfg.provider == 'multisms' else 'hidden' }}>
-      <label>网关地址<input name="multisms_base" value="{{ sms_cfg.creds.multisms_base }}" placeholder="https://sms.example.com（不带末尾斜杠）"></label>
-      <label>AccessKey<input name="multisms_ak" value="{{ sms_cfg.creds.multisms_ak }}" placeholder="ak_..."></label>
-      <label>SecretKey<input name="multisms_sk" placeholder="{{ sms_masked.multisms_sk or '未设置（留空保持不变）' }}"></label>
-      <label>模板编码<input name="multisms_tpl" value="{{ sms_cfg.creds.multisms_tpl }}" placeholder="verify_code"></label>
-      <p class="muted small">调用本机或内网的 sms-multi 网关。网关侧需把本机出口 IP 加入该 Key 的 IP 白名单。验证码以模板变量 <code>{code}</code> 传入。</p>
+    <div class="field-grid">
+      <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if sms_cfg.enabled else '' }}> 启用（仅外网访问要求短信验证码，内网登录不受影响）</label>
+      <label class="lab">服务商
+        <select name="provider" id="smsProvider">
+          {% for key, label in sms_provider_labels.items() %}
+          <option value="{{ key }}" {{ 'selected' if sms_cfg.provider == key else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="lab">外网域名（逗号分隔，支持 *.xx 通配）
+        <input name="external_domains" value="{{ sms_cfg.external_domains | join(', ') }}" placeholder="crm.example.com">
+      </label>
     </div>
-    <div class="sms-provider-fields" data-provider="zhenzi" {{ '' if sms_cfg.provider == 'zhenzi' else 'hidden' }}>
-      <label>榛子云 appId<input name="zhenzi_appid" value="{{ sms_cfg.creds.zhenzi_appid }}"></label>
-      <label>榛子云 appSecret<input name="zhenzi_secret" placeholder="{{ sms_masked.zhenzi_secret or '未设置（留空保持不变）' }}"></label>
-      <label>榛子云 模板ID（可选，留空用默认文案）<input name="zhenzi_tpl" value="{{ sms_cfg.creds.zhenzi_tpl }}"></label>
+
+    <div class="sms-provider-fields field-grid" data-provider="multisms" {{ '' if sms_cfg.provider == 'multisms' else 'hidden' }}>
+      <label class="lab span-2">网关地址<input name="multisms_base" value="{{ sms_cfg.creds.multisms_base }}" placeholder="https://sms.example.com（不带末尾斜杠）"></label>
+      <label class="lab">AccessKey<input name="multisms_ak" value="{{ sms_cfg.creds.multisms_ak }}" placeholder="ak_..."></label>
+      <label class="lab">SecretKey<input name="multisms_sk" placeholder="{{ sms_masked.multisms_sk or '未设置（留空保持不变）' }}"></label>
+      <label class="lab span-2">模板编码<input name="multisms_tpl" value="{{ sms_cfg.creds.multisms_tpl }}" placeholder="verify_code"></label>
     </div>
-    <div class="sms-provider-fields" data-provider="tencent" {{ '' if sms_cfg.provider == 'tencent' else 'hidden' }}>
-      <label>SecretId<input name="tencent_sid" value="{{ sms_cfg.creds.tencent_sid }}"></label>
-      <label>SecretKey<input name="tencent_skey" placeholder="{{ sms_masked.tencent_skey or '未设置（留空保持不变）' }}"></label>
-      <label>SdkAppId<input name="tencent_appid" value="{{ sms_cfg.creds.tencent_appid }}"></label>
-      <label>短信签名<input name="tencent_sign" value="{{ sms_cfg.creds.tencent_sign }}"></label>
-      <label>模板ID<input name="tencent_tpl" value="{{ sms_cfg.creds.tencent_tpl }}"></label>
+    <div class="sms-provider-fields field-grid" data-provider="zhenzi" {{ '' if sms_cfg.provider == 'zhenzi' else 'hidden' }}>
+      <label class="lab">榛子云 appId<input name="zhenzi_appid" value="{{ sms_cfg.creds.zhenzi_appid }}"></label>
+      <label class="lab">榛子云 appSecret<input name="zhenzi_secret" placeholder="{{ sms_masked.zhenzi_secret or '未设置（留空保持不变）' }}"></label>
+      <label class="lab span-2">榛子云 模板ID（可选，留空用默认文案）<input name="zhenzi_tpl" value="{{ sms_cfg.creds.zhenzi_tpl }}"></label>
     </div>
-    <div class="sms-provider-fields" data-provider="aliyun" {{ '' if sms_cfg.provider == 'aliyun' else 'hidden' }}>
-      <label>AccessKeyId<input name="aliyun_ak" value="{{ sms_cfg.creds.aliyun_ak }}"></label>
-      <label>AccessKeySecret<input name="aliyun_sk" placeholder="{{ sms_masked.aliyun_sk or '未设置（留空保持不变）' }}"></label>
-      <label>短信签名<input name="aliyun_sign" value="{{ sms_cfg.creds.aliyun_sign }}"></label>
-      <label>模板Code<input name="aliyun_tpl" value="{{ sms_cfg.creds.aliyun_tpl }}"></label>
+    <div class="sms-provider-fields field-grid" data-provider="tencent" {{ '' if sms_cfg.provider == 'tencent' else 'hidden' }}>
+      <label class="lab">SecretId<input name="tencent_sid" value="{{ sms_cfg.creds.tencent_sid }}"></label>
+      <label class="lab">SecretKey<input name="tencent_skey" placeholder="{{ sms_masked.tencent_skey or '未设置（留空保持不变）' }}"></label>
+      <label class="lab">SdkAppId<input name="tencent_appid" value="{{ sms_cfg.creds.tencent_appid }}"></label>
+      <label class="lab">短信签名<input name="tencent_sign" value="{{ sms_cfg.creds.tencent_sign }}"></label>
+      <label class="lab span-2">模板ID<input name="tencent_tpl" value="{{ sms_cfg.creds.tencent_tpl }}"></label>
+    </div>
+    <div class="sms-provider-fields field-grid" data-provider="aliyun" {{ '' if sms_cfg.provider == 'aliyun' else 'hidden' }}>
+      <label class="lab">AccessKeyId<input name="aliyun_ak" value="{{ sms_cfg.creds.aliyun_ak }}"></label>
+      <label class="lab">AccessKeySecret<input name="aliyun_sk" placeholder="{{ sms_masked.aliyun_sk or '未设置（留空保持不变）' }}"></label>
+      <label class="lab">短信签名<input name="aliyun_sign" value="{{ sms_cfg.creds.aliyun_sign }}"></label>
+      <label class="lab">模板Code<input name="aliyun_tpl" value="{{ sms_cfg.creds.aliyun_tpl }}"></label>
     </div>
 
     <details class="ms">
       <summary>限流与有效期</summary>
-      <div class="ms-panel stack">
-        <label>验证码有效期（秒，60–3600）<input name="code_ttl_seconds" value="{{ sms_cfg.code_ttl_seconds }}" inputmode="numeric"></label>
-        <label>发送冷却（秒，30–3600）<input name="send_cooldown" value="{{ sms_cfg.send_cooldown }}" inputmode="numeric"></label>
-        <label>单账号日上限<input name="daily_limit_per_user" value="{{ sms_cfg.daily_limit_per_user }}" inputmode="numeric"></label>
-        <label>单 IP 日上限<input name="daily_limit_per_ip" value="{{ sms_cfg.daily_limit_per_ip }}" inputmode="numeric"></label>
-        <label>全局日上限（保险丝）<input name="daily_cap_total" value="{{ sms_cfg.daily_cap_total }}" inputmode="numeric"></label>
+      <div class="ms-panel field-grid span-all">
+        <label class="lab">验证码有效期（秒，60–3600）<input name="code_ttl_seconds" value="{{ sms_cfg.code_ttl_seconds }}" inputmode="numeric"></label>
+        <label class="lab">发送冷却（秒，30–3600）<input name="send_cooldown" value="{{ sms_cfg.send_cooldown }}" inputmode="numeric"></label>
+        <label class="lab">单账号日上限<input name="daily_limit_per_user" value="{{ sms_cfg.daily_limit_per_user }}" inputmode="numeric"></label>
+        <label class="lab">单 IP 日上限<input name="daily_limit_per_ip" value="{{ sms_cfg.daily_limit_per_ip }}" inputmode="numeric"></label>
+        <label class="lab">全局日上限（保险丝）<input name="daily_cap_total" value="{{ sms_cfg.daily_cap_total }}" inputmode="numeric"></label>
       </div>
     </details>
-    <button type="submit">保存设置</button>
+
+    <div class="module-actions">
+      <button type="submit">保存设置</button>
+      <span class="muted small">切换服务商即时生效，无需重启</span>
+    </div>
   </form>
-  <form method="post" action="/admin/sms/test" class="filterbar" onsubmit="return confirm('发送一条测试短信（按当前服务商配置）？');">
+
+  <form method="post" action="/admin/sms/test" class="filterbar sms-test" onsubmit="return confirm('发送一条测试短信（按当前服务商配置）？');">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input name="test_mobile" placeholder="测试手机号（如 13900000000）" required>
     <button type="submit" class="ghost">发送测试短信</button>
   </form>
-  <p class="muted small">密钥保存后只回显尾 4 位，留空提交保持不变；备份包不含短信密钥。调试模式下验证码写入运行日志（docker logs 可见），不实际发送。切换服务商即时生效，无需重启。</p>
+
+  <div class="module-notes">
+    <h3>说明</h3>
+    <ul>
+      <li><b>判定规则</b>：真实客户端 IP 为公网 → 外网（需验证码）；私网 / 回环 / VPN 隧道 → 内网。人在内网用域名访问（NAT 回流）按内网处理。外网域名为兜底信号，IP 判定是主信号。</li>
+      <li><b>密钥</b>：保存后只回显尾 4 位，留空提交表示保持不变；备份包不含短信密钥。</li>
+      <li><b>调试</b>：调试模式下验证码写入运行日志（<code>docker logs</code> 可见），不实际发送。</li>
+      <li><b>短信网关（sms-multi）</b>：调用本机或内网的 sms-multi 网关，网关侧需把本机出口 IP 加入该 Key 的 IP 白名单；验证码以模板变量 <code>{code}</code> 传入。</li>
+    </ul>
+  </div>
 </section>
 
 <section class="card" id="gate">
   <h2>安全入口（外网门牌）</h2>
   <form method="post" action="/admin/gate/settings" class="stack">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label class="checkline"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
-    <div class="inline-group">
-      <span class="inline-label">入口字符串</span>
-      <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
-      <button type="button" class="ghost" id="gateGen">随机生成</button>
+
+    <div class="field-grid">
+      <label class="checkline span-2"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
+      <label class="lab span-2">入口字符串
+        <span class="inline-group">
+          <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
+          <button type="button" class="ghost" id="gateGen">随机生成</button>
+        </span>
+      </label>
+      <label class="lab">免检天数
+        <span class="inline-group">
+          <input name="cookie_days" value="{{ gate_cfg.cookie_days }}" inputmode="numeric" class="short">
+          <span class="muted small">天</span>
+        </span>
+      </label>
+      <label class="checkline span-2"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
     </div>
-    <div class="inline-group">
-      <span class="inline-label">免检天数</span>
-      <input name="cookie_days" value="{{ gate_cfg.cookie_days }}" inputmode="numeric" style="max-width:6rem"> <span class="muted small">天（通过入口后同浏览器不再要求）</span>
+
+    <div class="gate-preview">
+      外网入口地址
+      <code id="gatePreview">{{ site_base }}/s/{{ gate_cfg.path or '你的字符串' }}</code>
+      <span class="gate-state">
+        当前状态：{% if gate_cfg.ready %}<span class="badge ok">生效中</span>{% elif gate_cfg.enabled %}<span class="badge warn">已启用但字符串未设置（按未启用处理）</span>{% else %}<span class="badge">未启用</span>{% endif %}
+        · 本次访问：{% if security %}<span class="sec-badge {{ security.key }}"><i></i>{{ security.level }}</span>（{{ security.title }}）{% endif %}
+      </span>
     </div>
-    <label class="checkline"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
-    <p class="muted small">
-      开启后，外网必须访问 <code id="gatePreview">{{ site_base }}/s/{{ gate_cfg.path or '你的字符串' }}</code> 才能进入；
-      未通过入口的外网请求一律返回 404（不提示、不出现登录页，扫描器看不到系统存在）。
-      4–64 位，仅限字母、数字与 <code>. _ ~ -</code>。
-    </p>
-    <p class="muted small">
-      当前状态：{% if gate_cfg.ready %}<span class="badge ok">生效中</span>{% elif gate_cfg.enabled %}<span class="badge warn">已启用但字符串未设置（按未启用处理）</span>{% else %}<span class="badge">未启用</span>{% endif %}
-      · 本次访问：{% if security %}<span class="sec-badge {{ security.key }}"><i></i>{{ security.level }}</span>（{{ security.title }}）{% endif %}
-    </p>
-    <button type="submit">保存设置</button>
+
+    <div class="module-actions">
+      <button type="submit">保存设置</button>
+    </div>
   </form>
-  <p class="muted small">
-    注意：① 入口字符串等同于「隐藏地址」，泄露即失效，且不会写进备份包，换设备后需重新填写；
-    ② 修改字符串后，已通过入口的浏览器需重新打开一次新地址；
-    ③ 这是**降低暴露面**的措施，不能替代强密码、TOTP 与短信验证，建议同时开启。
-  </p>
+
+  <div class="module-notes">
+    <h3>说明</h3>
+    <ul>
+      <li><b>生效方式</b>：开启后外网必须访问上面的入口地址才能进入；未通过入口的外网请求一律返回 404（不提示、不出现登录页，扫描器看不到系统存在）。</li>
+      <li><b>格式</b>：4–64 位，仅限字母、数字与 <code>. _ ~ -</code>。</li>
+      <li><b>泄露风险</b>：入口字符串等同于「隐藏地址」，泄露即失效，且不会写进备份包，换设备后需重新填写。</li>
+      <li><b>改字符串后</b>：已通过入口的浏览器需重新打开一次新地址。</li>
+      <li><b>定位</b>：这是降低暴露面的措施，不能替代强密码、TOTP 与短信验证，建议同时开启。</li>
+    </ul>
+  </div>
 </section>
 
 <section class="card">
