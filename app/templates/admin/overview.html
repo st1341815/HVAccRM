@@ -131,8 +131,8 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <div class="field-grid">
-      <label class="checkline check-pair"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用（外网访问必须先打开安全入口地址，内网不受影响）</label>
-      <label class="checkline check-pair"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检（私网 IP 且通过局域网地址访问时直接放行）</label>
+      <label class="checkline check-pair"><input type="checkbox" name="enabled" value="1" {{ 'checked' if gate_cfg.enabled else '' }}> 启用安全入口</label>
+      <label class="checkline check-pair"><input type="checkbox" name="bypass_private" value="1" {{ 'checked' if gate_cfg.bypass_private else '' }}> 内网访问免检</label>
       <label class="lab span-2">入口字符串
         <span class="inline-group">
           <input name="path" id="gatePath" value="{{ gate_cfg.path }}" placeholder="如 hvaccrm-13" autocomplete="off">
@@ -165,6 +165,7 @@
     <h3>说明</h3>
     <ul>
       <li><b>生效方式</b>：开启后外网必须访问上面的入口地址才能进入；未通过入口的外网请求一律返回 404（不提示、不出现登录页，扫描器看不到系统存在）。</li>
+      <li><b>内网访问免检</b>：勾选后，私网 IP 且通过局域网地址访问时直接放行，不要求走入口；不勾选则内网也要先打开入口地址。</li>
       <li><b>格式</b>：4–64 位，仅限字母、数字与 <code>. _ ~ -</code>。</li>
       <li><b>泄露风险</b>：入口字符串等同于「隐藏地址」，泄露即失效，且不会写进备份包，换设备后需重新填写。</li>
       <li><b>改字符串后</b>：已通过入口的浏览器需重新打开一次新地址。</li>
