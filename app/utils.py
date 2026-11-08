@@ -1,6 +1,7 @@
 """路由层通用小工具。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,23 @@ def get_or_404(db: Session, model: Any, pk: Any, label: str = "记录"):
     if obj is None:
         raise HTTPException(status_code=404, detail=f"{label}不存在（id={pk}）")
     return obj
+
+
+_NUM_SEG = re.compile(r"(\d+)")
+
+
+def room_sort_key(text: str | None) -> list[tuple[int, int, str]]:
+    """房号「自然排序」key：数字段按数值比、其余按字面比。
+
+    纯字符串排序会把「10#201」排在「6#401」前面（'1' < '6'），房号一多就没法看。
+    切成 (类型, 数值, 文本) 三元组，既能混排也不会在比较时抛 TypeError。
+    合同台账、客户列表两处共用（同一栋楼的房号在两边顺序必须一致）。
+    """
+    parts = _NUM_SEG.split(text or "")
+    out: list[tuple[int, int, str]] = []
+    for i, part in enumerate(parts):
+        out.append((0, int(part), "") if i % 2 else (1, 0, part))
+    return out
 
 
 def parse_date(value: str | None) -> str | None:

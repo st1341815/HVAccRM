@@ -1,6 +1,27 @@
+{% macro sort_th(key, label, links, cur, cur_order) -%}
+{%- if links -%}
+<th class="sortable"><a href="{{ links[key] }}">{{ label }}{% if cur == key %}<span class="sort-arrow">{{ '▲' if cur_order == 'asc' else '▼' }}</span>{% endif %}</a></th>
+{%- else -%}
+<th>{{ label }}</th>
+{%- endif -%}
+{%- endmacro %}
 {% if customers %}
+{% set _links = sort_links|default({}) %}
+{% set _sort = sort|default('') %}
+{% set _order = order|default('desc') %}
 <table class="tight">
-  <thead><tr><th>客户</th><th>房号</th><th>手机</th><th>意向产品</th><th>状态</th>{% if show_money %}<th>合同额</th><th>已收</th><th>未收</th>{% endif %}</tr></thead>
+  <thead><tr>
+    {{ sort_th('name', '客户', _links, _sort, _order) }}
+    {{ sort_th('room', '房号', _links, _sort, _order) }}
+    <th>手机</th>
+    <th>意向产品</th>
+    {{ sort_th('status', '状态', _links, _sort, _order) }}
+    {% if show_money %}
+    {{ sort_th('total', '合同额', _links, _sort, _order) }}
+    {{ sort_th('received', '已收', _links, _sort, _order) }}
+    {{ sort_th('outstanding', '未收', _links, _sort, _order) }}
+    {% endif %}
+  </tr></thead>
   <tbody>
   {% for c in customers %}
     {% set s = summaries.get(c.id) %}

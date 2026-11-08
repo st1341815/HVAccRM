@@ -1,6 +1,8 @@
 """客户管理：CRUD、联系人、共享、按数据范围过滤、FTS 搜索、自动建工序任务。"""
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
@@ -10,6 +12,7 @@ from ..audit import log_action
 from ..auth import current_user_or_redirect
 from ..db import commit_retry, get_db
 from ..models import (
+    CUSTOMER_STATUS_LABELS,
     Contact,
     Customer,
     CustomerShare,
@@ -38,11 +41,24 @@ from ..services import photos as photo_svc
 from ..services import search as search_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_int
+from ..utils import client_ip, get_or_404, parse_int, room_sort_key
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
 CUSTOMER_TYPES = ["家装业主", "工程客户", "经销商", "老客户转介"]
+
+# 客户列表可排序列（顺序即表头顺序）。金额三列按权限在视图里再过滤。
+_BASE_SORTS: list[tuple[str, str]] = [
+    ("name", "客户"),
+    ("room", "房号"),
+    ("status", "状态"),
+]
+_AMOUNT_SORTS: list[tuple[str, str]] = [
+    ("total", "合同额"),
+    ("received", "已收"),
+    ("outstanding", "未收"),
+]
+_STATUS_ORDER = {k: i for i, k in enumerate(CUSTOMER_STATUS_LABELS)}
 SOURCES = ["自然到店", "老客户转介", "楼盘扫楼", "设计师推荐", "装修公司", "线上咨询", "其他"]
 
 
@@ -62,6 +78,8 @@ def list_customers(
     source: str = "",
     owner: str = "",
     project_id: str = "",
+    sort: str = "",
+    order: str = "desc",
     db: Session = Depends(get_db),
     user: User = Depends(require("customer:view")),
 ):
@@ -80,6 +98,42 @@ def list_customers(
     projects = list(db.scalars(select(Project).order_by(Project.name)).all())
     show_money = has_perm(user, "payment:view") and can_see_amount(user)
     summaries = {c.id: finance_svc.customer_summary(db, c) for c in customers} if show_money else {}
+
+    # ---- 排序（内存里做：房号是 property、金额来自 finance 汇总，SQL 没有对应列）----
+    sort_options = list(_BASE_SORTS) + (_AMOUNT_SORTS if show_money else [])
+
+    def _amt(c, field: str) -> float:
+        s = summaries.get(c.id)
+        return float(getattr(s, field, 0) or 0) if s else 0.0
+
+    sort_keys = {
+        "name": lambda c: (c.name or ""),
+        "room": lambda c: room_sort_key(c.room_label_short or ""),
+        "status": lambda c: (_STATUS_ORDER.get(c.status or "", 99), c.status or ""),
+        "total": lambda c: _amt(c, "total"),
+        "received": lambda c: _amt(c, "received"),
+        "outstanding": lambda c: _amt(c, "outstanding"),
+    }
+    # 默认不排序：保持 search_customers 的相关度/默认顺序（客户列表不像合同台账有天然时间序）
+    if sort not in dict(sort_options) or sort not in sort_keys:
+        sort = ""
+    order = "desc" if order == "desc" else "asc"
+    if sort:
+        customers.sort(key=sort_keys[sort], reverse=(order == "desc"))
+
+    # 排序链接：带上现有筛选条件，首点 desc、再点 asc
+    base_params = {
+        k: v
+        for k, v in {
+            "q": q, "status": status, "source": source, "owner": owner, "project_id": project_id,
+        }.items()
+        if v
+    }
+    sort_links = {}
+    for key, _label in sort_options:
+        new_order = "asc" if (key == sort and order == "desc") else "desc"
+        sort_links[key] = "/customers?" + urlencode({**base_params, "sort": key, "order": new_order})
+
     return render(
         request,
         "customers/list.html",
@@ -94,6 +148,10 @@ def list_customers(
         summaries=summaries,
         show_money=show_money,
         sources=SOURCES,
+        sort=sort,
+        order=order,
+        sort_options=sort_options,
+        sort_links=sort_links,
     )
 
 

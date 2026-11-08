@@ -1,7 +1,6 @@
 """合同管理：明细、收款计划、增项、三数核对视图。"""
 from __future__ import annotations
 
-import re
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -40,7 +39,7 @@ from ..services import photos as photo_svc
 from ..services import settlement as settlement_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_float, parse_int
+from ..utils import client_ip, get_or_404, parse_float, parse_int, room_sort_key
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
@@ -58,20 +57,7 @@ _AMOUNT_SORTS: list[tuple[str, str]] = [
 ]
 _SETTLE_SORTS: list[tuple[str, str]] = [("settled", "结算")]
 
-_NUM_SEG = re.compile(r"(\d+)")
 
-
-def _room_sort_key(text: str) -> list[tuple[int, int, str]]:
-    """房号的「自然排序」key：数字段按数值比、其余按字面比。
-
-    纯字符串排序会把「10#201」排在「6#401」前面（'1' < '6'），房号一多就没法看。
-    切成 (类型, 数值, 文本) 三元组，既能混排也不会在比较时抛 TypeError。
-    """
-    parts = _NUM_SEG.split(text or "")
-    out: list[tuple[int, int, str]] = []
-    for i, part in enumerate(parts):
-        out.append((0, int(part), "") if i % 2 else (1, 0, part))
-    return out
 CONTRACT_PHOTO_KIND = "纸质合同"
 
 
@@ -138,8 +124,8 @@ def list_contracts(
     def _room(r):
         c = r[0]
         if not c.customer:
-            return _room_sort_key("")
-        return _room_sort_key(c.customer.room_label_short or c.customer.name or "")
+            return room_sort_key("")
+        return room_sort_key(c.customer.room_label_short or c.customer.name or "")
 
     sort_keys = {
         "room": _room,
