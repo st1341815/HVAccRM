@@ -49,7 +49,7 @@ cat ./hvaccrm/data/first_boot.txt        # 里面是用户名和一次性密码
 ```yaml
 services:
   hvaccrm:
-    image: 13uncle/hvaccrm:1.12.1       # 生产建议钉版本，勿用 latest
+    image: 13uncle/hvaccrm:1.12.9       # 生产建议钉版本，勿用 latest
     container_name: hvaccrm
     restart: unless-stopped
     ports: ["8090:8000"]
@@ -74,7 +74,7 @@ docker compose up -d
 
 | 标签 | 含义 |
 | --- | --- |
-| `1.12.1` | **固定版本**，生产建议用这个（升级时改 tag 即可） |
+| `1.12.9` | **固定版本**，生产建议用这个（升级时改 tag 即可） |
 | `latest` | 最新稳定版，跟随最新 `X.Y.Z` |
 
 只发布完整 `X.Y.Z` 版本号 + `latest`，不提供 `1.12` / `1` 这类浮动短标签——避免"看起来没变、实际变了"。
@@ -143,7 +143,7 @@ docker compose up -d
 ## 升级
 
 ```bash
-docker pull 13uncle/hvaccrm:1.12.1     # 或改成新版本号
+docker pull 13uncle/hvaccrm:1.12.9     # 或改成新版本号
 docker compose up -d                   # 重建容器
 ```
 
