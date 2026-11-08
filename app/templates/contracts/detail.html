@@ -119,10 +119,10 @@
         <td>{{ r.supplier.name if r.supplier else '-' }}</td>
         <td>{{ r.installer.display_name if r.installer else '-' }}</td>
         <td class="break">{{ r.remark or '-' }}</td>
-        <td>
+        <td data-photo-group>
           {% set phs = cost_photos.get(r.id, []) %}
-          {% for ph in phs[:3] %}
-            <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
+          {% for ph in phs %}
+            <a class="photo-link{{ ' extra' if loop.index > 3 else '' }}" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
           {% endfor %}
           {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
           {% if not phs %}<span class="muted small">—</span>{% endif %}
@@ -250,10 +250,10 @@
         <td>{{ p.method or '-' }}</td>
         <td>{{ p.voucher_no or '-' }}</td>
         <td>{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
-        <td>
+        <td data-photo-group>
           {% set phs = payment_photos.get(p.id, []) %}
-          {% for ph in phs[:3] %}
-            <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
+          {% for ph in phs %}
+            <a class="photo-link{{ ' extra' if loop.index > 3 else '' }}" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
           {% endfor %}
           {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
           {% if not phs %}<span class="muted small">—</span>{% endif %}

@@ -264,6 +264,10 @@ label { display: block; font-size: .85rem; color: var(--ink); }
 .inline-group { display: inline-flex; align-items: center; gap: .4rem; flex: 0 0 auto; }
 .task-photos { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); display: inline-block; vertical-align: middle; }
+/* 表格行内凭证：只显示前 3 张，其余留在 DOM 里（display:none 仍可被灯箱 querySelector 收到），
+   这样点开缩略图后在灯箱里能翻完这一笔的全部凭证，又不会把单元格撑宽。
+   分组靠 <td data-photo-group>，见 layout.html 的 collect()。 */
+.photo-link.extra { display: none; }
 .task-upload { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
 .picked-name { flex: 1 1 100%; word-break: break-all; }
 .task-upload button[type=submit]:disabled { opacity: .6; cursor: not-allowed; }
