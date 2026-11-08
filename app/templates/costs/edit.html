@@ -31,6 +31,10 @@
       </optgroup>{% endif %}
     </select>
     <input name="remark" value="{{ cost.remark or '' }}" placeholder="备注（材料规格 / 工序 / 结算方式）">
+    <select name="created_by" title="录入人：谁把这笔费用录进系统的">
+      {% if not cost.created_by %}<option value="" selected>录入人（未指定）</option>{% endif %}
+      {% for u in recorders %}<option value="{{ u.id }}" {{ 'selected' if cost.created_by == u.id else '' }}>{{ u.display_name }}（{{ role_labels.get(u.role, u.role) }}）{% if not u.is_active %}·已停用{% endif %}</option>{% endfor %}
+    </select>
     <label class="inline-label" title="可多张：发票 / 收据 / 对账单">新增附图
       <input type="file" name="files" accept="image/*" multiple>
     </label>

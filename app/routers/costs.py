@@ -421,6 +421,12 @@ def edit_cost_form(
         if cur:
             other_users.append(cur)
     photos = photo_svc.photos_by_cost(db, [cost.id]).get(cost.id, [])
+    # 录入人候选：启用账号；若原本录入人已停用，也要留在列表里以便回显（否则下拉会静默跳到别人）
+    recorders = cost_svc.active_users(db)
+    if cost.created_by and not any(u.id == cost.created_by for u in recorders):
+        cur = db.get(User, cost.created_by)
+        if cur:
+            recorders = recorders + [cur]
     return render(
         request,
         "costs/edit.html",
@@ -431,6 +437,7 @@ def edit_cost_form(
         other_users=other_users,
         photos=photos,
         categories=COST_CATEGORIES,
+        recorders=recorders,
     )
 
 
@@ -444,6 +451,7 @@ async def update_cost(
     installer_id: str = Form(""),
     remark: str = Form(""),
     spent_at: str = Form(""),
+    created_by: str = Form(""),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
     user: User = Depends(require("cost:edit")),
@@ -468,6 +476,13 @@ async def update_cost(
     if category == COST_NEEDS_INSTALLER:
         if not iid or not db.get(User, iid):
             return redirect(f"/costs/{cost.id}/edit", f"「{COST_NEEDS_INSTALLER}」必须选择安装师傅", "err")
+    # 录入人：留空表示不改；给了值就必须是存在的账号（防止被构造 id 写入）
+    recorder_id = cost.created_by
+    if created_by.strip():
+        parsed = parse_int(created_by)
+        if not parsed or not db.get(User, parsed):
+            return redirect(f"/costs/{cost.id}/edit", "录入人不存在", "err")
+        recorder_id = parsed
 
     old_vals = {
         "category": cost.category,
@@ -476,6 +491,7 @@ async def update_cost(
         "installer_id": cost.installer_id,
         "remark": cost.remark,
         "spent_at": cost.spent_at,
+        "created_by": cost.created_by,
     }
     cost.category = category
     cost.amount = round(amt, 2)
@@ -483,6 +499,7 @@ async def update_cost(
     cost.installer_id = iid if category == COST_NEEDS_INSTALLER else None
     cost.remark = remark.strip() or None
     cost.spent_at = (spent_at.strip() or today_str())[:10]
+    cost.created_by = recorder_id
 
     # 新增附图（已有附图的删除走 /photos/{id}/delete）
     saved, dedup, errors = 0, 0, []

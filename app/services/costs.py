@@ -66,6 +66,16 @@ def contract_installers(db: Session) -> tuple[list[User], list[User]]:
     return installers, others
 
 
+def active_users(db: Session) -> list[User]:
+    """全部启用账号（按显示名排序）——「录入人」下拉用。
+
+    不复用 `contract_installers`：那个是按「施工费用优先选安装工」分组的，
+    录入人跟角色无关，谁录的都可能，分组反而妨碍查找。
+    """
+    users = list(db.scalars(select(User).where(User.is_active == 1)).all())
+    return sorted(users, key=lambda u: (u.display_name or u.username or ""))
+
+
 def active_suppliers(db: Session) -> list[Supplier]:
     return list(db.scalars(select(Supplier).where(Supplier.is_active == 1).order_by(Supplier.name)).all())
 
