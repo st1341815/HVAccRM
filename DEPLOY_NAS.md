@@ -8,14 +8,14 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **v1.12.3**（2026-11-08，表格附图列一行 + 折叠）；回滚 tag `hvaccrm:pre-1.12.3`（= v1.12.2 镜像），`hvaccrm:pre-1.12.2`（= v1.12.1）、`hvaccrm:pre-1.12.1`（= v1.12.0）继续保留 |
+| 当前版本 | **v1.12.4**（2026-11-08，核算页「结算日」可排序）；回滚 tag `hvaccrm:pre-1.12.4`（= v1.12.3 镜像），`pre-1.12.3`（v1.12.2）、`pre-1.12.2`（v1.12.1）、`pre-1.12.1`（v1.12.0）继续保留 |
 | 访问地址 | 外网 `https://<your-domain>:8443` · 局域网 `http://<nas-ip>:8090` |
 | 容器名 / 镜像 | `hvaccrm` / `hvaccrm:local`（约 908 MB：多阶段构建 + 容器内 chromium，非 root） |
 | 挂载 | `<data-directory>/Docker/Hvaccrm/data → /data`、`<data-directory>/Docker/Hvaccrm/config → /config:ro` |
 | 环境变量 | `TZ=Asia/Shanghai`、`APP_SECRET_KEY`、`ADMIN_USER/ADMIN_PASS`、`DB_PATH=/data/crm.db`、`DATA_DIR=/data`、`CONFIG_DIR=/config`、`LOG_LEVEL=INFO` |
 | 资源限制 | `mem_limit 512m`，日志 `json-file 5m × 3` |
 | 健康检查 | 容器内 `GET /health`（60s 间隔）→ `healthy` |
-| 验证结果 | v1.12.3：容器内 `GET /health` = `{"status":"ok","db":true,"version":"1.12.3"}`、镜像 id `a0fa25a4`（重建前 `b0ebaa22` = v1.12.2）、**pytest 306 passed**。`scripts/smoke_test.sh` 仍是 **171 个请求检查 / 302 处断言**（含 v1.12 新增的结算 7e 段）；本表原有的“92/92 通过”是 v1.7.x 时代的记录，**smoke 测试需在内网机器补跑一次** |
+| 验证结果 | v1.12.4：容器内 `GET /health` = `{"status":"ok","db":true,"version":"1.12.4"}`、镜像 id `14717f45`（重建前 `a0fa25a4` = v1.12.3）、**pytest 311 passed**。`scripts/smoke_test.sh` 仍是 **171 个请求检查 / 302 处断言**（含 v1.12 新增的结算 7e 段）；本表原有的“92/92 通过”是 v1.7.x 时代的记录，**smoke 测试需在内网机器补跑一次** |
 | 部署形态 | **fnOS Docker Compose 项目**，项目名 `hvaccrm`，工作目录 `<data-directory>/Docker/Hvaccrm`，compose 文件 `docker-compose.yml` |
 
 部署变量保存在 NAS：`<data-directory>/Docker/Hvaccrm/config/deploy.env`，并已派生一份 `<data-directory>/Docker/Hvaccrm/.env`（compose 默认读取，权限均为 `600`，含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
