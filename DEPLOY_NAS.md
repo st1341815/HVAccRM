@@ -8,13 +8,14 @@
 
 | 项 | 值 |
 | --- | --- |
+| 当前版本 | **v1.12.0**（2026-11-08，合同结算 + 核算模块）；回滚 tag `hvaccrm:pre-1.12.0` |
 | 访问地址 | 外网 `https://<your-domain>:8443` · 局域网 `http://<nas-ip>:8090` |
-| 容器名 / 镜像 | `crm` / `crm:local`（177 MB，多阶段构建，非 root） |
+| 容器名 / 镜像 | `hvaccrm` / `hvaccrm:local`（约 908 MB：多阶段构建 + 容器内 chromium，非 root） |
 | 挂载 | `<data-directory>/Docker/Hvaccrm/data → /data`、`<data-directory>/Docker/Hvaccrm/config → /config:ro` |
 | 环境变量 | `TZ=Asia/Shanghai`、`APP_SECRET_KEY`、`ADMIN_USER/ADMIN_PASS`、`DB_PATH=/data/crm.db`、`DATA_DIR=/data`、`CONFIG_DIR=/config`、`LOG_LEVEL=INFO` |
 | 资源限制 | `mem_limit 512m`，日志 `json-file 5m × 3` |
 | 健康检查 | 容器内 `GET /health`（60s 间隔）→ `healthy` |
-| 验证结果 | `scripts/smoke_test.sh` 92/92 通过 |
+| 验证结果 | v1.12.0：容器内 `GET /health` = `{"status":"ok","db":true,"version":"1.12.0"}`、源码 md5 与仓库一致、alembic 已到 `0019`、**pytest 300 passed**。`scripts/smoke_test.sh` 已增至 **171 个请求检查 / 302 处断言**（含 v1.12 新增的结算 7e 段）；本表原有的“92/92 通过”是 v1.7.x 时代的记录，之后未再留下完整跑通记录，**v1.12.0 需在内网机器补跑一次** |
 | 部署形态 | **fnOS Docker Compose 项目**，项目名 `hvaccrm`，工作目录 `<data-directory>/Docker/Hvaccrm`，compose 文件 `docker-compose.yml` |
 
 部署变量保存在 NAS：`<data-directory>/Docker/Hvaccrm/config/deploy.env`，并已派生一份 `<data-directory>/Docker/Hvaccrm/.env`（compose 默认读取，权限均为 `600`，含 `APP_SECRET_KEY` 与 `ADMIN_PASS`，请自行改密后更新）。
@@ -24,11 +25,11 @@
 飞牛的 Docker 应用按「Compose 项目」组织，裸容器（`docker container create` 直接创建）只出现在
 **容器**页签、不会出现在**项目**页签。因此部署已改为 compose 项目形态：
 
-- 飞牛桌面 → **Docker → 项目**：可见项目 `crm`（running 1/1），可从这里启动/停止/查看容器；
-- 飞牛桌面 → **Docker → 容器**：可见容器 `hvaccrm`，`所属项目` 列显示 `crm`；
+- 飞牛桌面 → **Docker → 项目**：可见项目 `hvaccrm`（running 1/1），可从这里启动/停止/查看容器；
+- 飞牛桌面 → **Docker → 容器**：可见容器 `hvaccrm`，`所属项目` 列显示 `hvaccrm`；
 - 项目工作目录必须是**宿主机真实路径**。若用 `docker:cli` 之类的容器代跑 compose，挂载必须
   写成 `<data-directory>:<data-directory>`（路径一致），否则 `com.docker.compose.project.working_dir`
-  会记成容器内路径（如 `/work/crm`），飞牛界面点进项目时找不到 compose 文件。
+  会记成容器内路径（如 `/work/Hvaccrm`），飞牛界面点进项目时找不到 compose 文件。
 
 在 NAS 上手动管理（等价于界面操作）：
 
@@ -83,7 +84,7 @@ trim-cli --profile home --allow-insecure-http docker container create \
 # 4) 启动应用容器
 set -a; . <data-directory>/Docker/Hvaccrm/config/deploy.env; set +a
 trim-cli --profile home --allow-insecure-http docker container create \
-  --image crm:local --name hvaccrm \
+  --image hvaccrm:local --name hvaccrm \
   --mount <data-directory>/Docker/Hvaccrm/data:/data:rw --mount <data-directory>/Docker/Hvaccrm/config:/config:ro \
   --port 8090:8000 --memory 512 --restart --start --yes \
   --env TZ=Asia/Shanghai --env "APP_SECRET_KEY=$APP_SECRET_KEY" \

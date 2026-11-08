@@ -28,7 +28,7 @@
 ┌────────────────────────────────────────────┐
 │  宿主机（Docker Host）                        │
 │                                             │
-│  容器 crm  (镜像 crm:local, 非 root 1000:1000) │
+│  容器 hvaccrm（非 root）                   │
 │  ├─ uvicorn :8000  ←  唯一 HTTP 服务         │
 │  ├─ /data   → 数据库 + 媒体 + 备份 + 日志     │
 │  └─ /config → 部署配置（只读）                 │
@@ -64,10 +64,10 @@ HVAccRM 提供开箱即用的 Docker Compose 编排，单机/局域网自托管�
 
 ```yaml
 services:
-  crm:
+  hvaccrm:
     build: .                       # 用仓库里的 Dockerfile 构建
-    image: crm:local               # 镜像名（可自定义）
-    container_name: crm            # 容器名
+    image: hvaccrm:local           # 镜像名（与仓库 compose 一致，可自定义）
+    container_name: hvaccrm        # 容器名
     restart: unless-stopped        # 开机/崩溃自动拉起
     user: "1000:1000"              # 非 root 运行（NAS 普通用户 UID/GID）
 
@@ -185,10 +185,10 @@ docker compose -f docker-compose.nas.yml up -d --build
 
 ```yaml
 services:
-  crm:
+  hvaccrm:
     build: .
-    image: crm:local
-    container_name: crm
+    image: hvaccrm:local
+    container_name: hvaccrm
     restart: unless-stopped
     user: "1000:1000"
     # 不再对外暴露端口，只在内网 docker 网络里让 nginx 访问

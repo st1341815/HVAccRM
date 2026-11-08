@@ -193,6 +193,9 @@ crm/
 | 客户锁定（前期施工完工自动锁定，新建合同过滤） | `services/tasks.py::finish_task` + `routers/contracts.py` |
 | 案例外链（有效期 / 访问次数 / 手动失效） | `services/cases.py::share_state` + `routers/cases.py` |
 | 报表口径（销售额/成本/已收各按自己的日期归集） | `routers/reports.py` |
+| 结算前置校验（有未完成工序 / 作废合同不可结算） | `services/settlement.py::can_settle` |
+| 结算冻结（已结算合同的收款 / 费用 / 施工 / 合同金额全部拒写，备注除外） | `services/settlement.py::block_reason`（所有写入口的唯一出口） |
+| 利润与核算共用一套毛利算法（两个页面口径不漂移） | `services/overview.py::build_ctx` |
 | 照片路径/命名/缩略图/去重 | `services/photos.py` |
 | 房号级联 + 同楼盘模糊搜索 | `routers/projects.py` + 客户表单 JS |
 | 权限点 + 数据范围双重校验 | `permissions.py`（`require()` + `visible_customer_ids`） |
@@ -210,17 +213,17 @@ BASE_URL=http://127.0.0.1:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test
 覆盖：认证、页面可达性、楼盘/房号级联与模糊搜索、客户 CRUD 与 FTS、
 合同金额/增项、超额拦截、退款、工序前置依赖与跳过原因、完工锁客、
 照片多图上传/缩略图/Hash 去重、5 个角色的权限拦截、金额隔离、数据范围、
-会话失效、备份、审计日志。
+会话失效、备份、审计日志、**合同结算与结算后写冻结、核算页口径**。
 
 ## 6. 角色与权限
 
 | 角色 | 权限点 | 数据范围 |
 | --- | --- | --- |
 | admin | 全部 | all |
-| sales | 客户 CRUD、看合同/收款、成本录入、工序、上传照片、案例、报表 | self |
+| sales | 客户 CRUD、看合同/收款、成本录入、工序、上传照片、案例、报表、看核算 | self |
 | designer | 看客户、看工序、上传照片、案例（**不可见金额**） | shared |
 | installer | 看工序、上传照片、案例（**白名单**：仅被指派任务的客户） | self |
-| finance | 看客户/合同、收款管理、退款、成本、案例、报表 | all |
+| finance | 看客户/合同、收款管理、退款、成本、案例、报表、**核算与结算关账**（`settlement:edit`） | all |
 
 ## 7. 运维
 
@@ -231,7 +234,17 @@ BASE_URL=http://127.0.0.1:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test
 
 ## 8. 版本说明
 
-当前版本 **v1.7.0**（2026-10-28，安全加固版：登录开放重定向 / CSRF / 异常脱敏 / 密钥与初始口令随机化 / Cookie Secure / 依赖升级 / CI 门禁）；预构建镜像 **Docker Hub** `13uncle/hvaccrm:1.7.0`（含 `:latest`），与源码 Release 同版本。
+当前版本 **v1.12.0**（2026-11-08）。v1.8 以来的主线：
+
+| 版本 | 主题 |
+|---|---|
+| v1.8.x | 外网短信验证码登录（内外网双信号判定，fail-safe 按外网 + TOTP 兜底）、案例对外只读 API |
+| v1.9.x | 案例 → 微信公众号草稿（容器内 chromium + CDP，不依赖宿主机）；图片完整性预检、CSRF、二维码取原图；自建短信网关 provider；外链分享与访问统计 |
+| v1.10.x | 安全入口（外网门牌 `/s/<字符串>` + 签名 Cookie，内网免检；未进门对外表现为 404）、页脚安全等级徽章、短信服务商后台可切换 |
+| v1.11.0 | 备份内容指纹去重（业务数据无变化则跳过打包；`audit_log`/`share_visits`/`sms_codes` 不计入指纹但仍打进包） |
+| v1.12.0 | 合同结算开关（`settled`，与 `status` 正交）+ 独立核算模块（`/accounting/profit` 全量口径、`/accounting/settlement` 仅已结算）；结算后收款 / 费用 / 施工 / 合同金额冻结 |
+
+预构建镜像在 **Docker Hub** `13uncle/hvaccrm`，tag 与 Release 同名（`:latest` 跟随最近一次推送），源码见 GitHub Release。
 
 **发版命名约定**：git tag `vX.Y.Z`；GitHub Release 标题固定 `HVAccRM vX.Y.Z`（主题只写在正文）；Docker 镜像 `<用户>/hvaccrm:X.Y.Z` + `:latest`；本地回滚 tag `hvaccrm:pre-X.Y.Z`。完整规则见 [`docs/版本更新记录.md`](docs/版本更新记录.md) §二。
 
@@ -239,7 +252,7 @@ BASE_URL=http://127.0.0.1:8090 ADMIN_PW='<admin 密码>' bash scripts/smoke_test
 
 HVAccRM 已于 2026-10-13 发布 **v1.0.0**，这是自 v0.9.0 起的首个正式版里程碑。相对 v0.14.x 主要变化：
 
-- 新增自动化测试套件（`tests/`，pytest，19 个用例），覆盖财务口径 / 权限 / 报表聚合 / 工序锁客
+- 新增自动化测试套件（`tests/`，pytest；当时 19 个用例，现为 300 个），覆盖财务口径 / 权限 / 报表聚合 / 工序锁客
 - 修复 installer 白名单权限 `&=`（交集）应为 `|=`（并集）——installer 此前看不到自己被指派任务的客户
 - `pyproject.toml` 与 `app/__init__.py` 版本号已同步（1.0.0），并新增 `scripts/bump_version.py` 防再漂移
 - `admin_force_password_change` 默认 True（部署漏配 `.env` 也强制首登改密）
