@@ -1,6 +1,9 @@
 """合同管理：明细、收款计划、增项、三数核对视图。"""
 from __future__ import annotations
 
+import re
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -40,6 +43,35 @@ from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
+
+# 合同台账可排序列（顺序即表头顺序）。金额 / 结算两类按权限在路由里再过滤。
+_BASE_SORTS: list[tuple[str, str]] = [
+    ("room", "房号"),
+    ("product_type", "产品"),
+    ("sign_date", "签订日"),
+]
+_AMOUNT_SORTS: list[tuple[str, str]] = [
+    ("total", "总额"),
+    ("received", "已收"),
+    ("outstanding", "未收"),
+    ("recovery_rate", "回款率"),
+]
+_SETTLE_SORTS: list[tuple[str, str]] = [("settled", "结算")]
+
+_NUM_SEG = re.compile(r"(\d+)")
+
+
+def _room_sort_key(text: str) -> list[tuple[int, int, str]]:
+    """房号的「自然排序」key：数字段按数值比、其余按字面比。
+
+    纯字符串排序会把「10#201」排在「6#401」前面（'1' < '6'），房号一多就没法看。
+    切成 (类型, 数值, 文本) 三元组，既能混排也不会在比较时抛 TypeError。
+    """
+    parts = _NUM_SEG.split(text or "")
+    out: list[tuple[int, int, str]] = []
+    for i, part in enumerate(parts):
+        out.append((0, int(part), "") if i % 2 else (1, 0, part))
+    return out
 CONTRACT_PHOTO_KIND = "纸质合同"
 
 
@@ -69,6 +101,8 @@ def list_contracts(
     customer_q: str = "",
     status: str = "",
     settled: str = "",
+    sort: str = "sign_date",
+    order: str = "desc",
     db: Session = Depends(get_db),
     user: User = Depends(require("contract:view")),
 ):
@@ -91,6 +125,48 @@ def list_contracts(
     if allowed is not None:
         contracts = [c for c in contracts if c.customer_id in allowed]
     rows = [(c, finance_svc.contract_summary(db, c)) for c in contracts]
+
+    # ---- 排序（全部在内存里做：已收 / 未收 / 回款率来自 finance 汇总，SQL 里没有现成列）----
+    can_amount = can_see_amount(user)
+    can_settle = has_perm(user, "settlement:edit")
+    sort_options = list(_BASE_SORTS)
+    if can_amount:
+        sort_options += _AMOUNT_SORTS
+    if can_settle:
+        sort_options += _SETTLE_SORTS
+
+    def _room(r):
+        c = r[0]
+        if not c.customer:
+            return _room_sort_key("")
+        return _room_sort_key(c.customer.room_label_short or c.customer.name or "")
+
+    sort_keys = {
+        "room": _room,
+        "product_type": lambda r: (r[0].product_type or ""),
+        "sign_date": lambda r: (r[0].sign_date or ""),
+        "total": lambda r: r[1].total,
+        "received": lambda r: r[1].received,
+        "outstanding": lambda r: r[1].outstanding,
+        "recovery_rate": lambda r: r[1].recovery_rate,
+        "settled": lambda r: (1 if r[0].is_settled else 0),
+    }
+    if sort not in dict(sort_options) or sort not in sort_keys:
+        sort = "sign_date"
+    order = "desc" if order == "desc" else "asc"
+    rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
+
+    # 排序链接：带上现有筛选条件（点列头不丢筛选），首点 desc、再点 asc
+    base_params = {
+        k: v
+        for k, v in {"customer_q": customer_q, "status": status, "settled": settled}.items()
+        if v
+    }
+    sort_links = {}
+    for key, _label in sort_options:
+        new_order = "asc" if (key == sort and order == "desc") else "desc"
+        sort_links[key] = "/contracts?" + urlencode({**base_params, "sort": key, "order": new_order})
+
     totals = {
         "total": round(sum(s.total for _, s in rows), 2),
         "received": round(sum(s.received for _, s in rows), 2),
@@ -108,8 +184,16 @@ def list_contracts(
         status=status,
         settled=settled,
         keep_qs=keep_qs,
-        can_amount=can_see_amount(user),
-        can_settle=has_perm(user, "settlement:edit"),
+        sort=sort,
+        order=order,
+        sort_options=sort_options,
+        sort_links=sort_links,
+        can_amount=can_amount,
+        can_settle=can_settle,
+        # render() 会用 request.state.user 重算 can_amount 并覆盖同名 ctx；
+        # 表头（sort_options）与行（金额/结算单元格）必须同源，否则会错列，故另起名。
+        show_amount=can_amount,
+        show_settle=can_settle,
         can_delete_contract=has_perm(user, "admin:setting"),
     )
 
