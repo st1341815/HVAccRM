@@ -42,12 +42,14 @@
         <td class="nowrap">{{ p.method or '-' }}</td>
         <td class="nowrap">{{ p.voucher_no or '-' }}</td>
         <td class="nowrap">{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
-        <td data-photo-group>
+        <td class="photo-cell" data-photo-group>
           {% set phs = payment_photos.get(p.id, []) %}
-          {% for ph in phs %}
-            <a class="photo-link{{ ' extra' if loop.index > 3 else '' }}" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
+          {% for ph in phs[:3] %}
+            <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
           {% endfor %}
-          {% if phs|length > 3 %}<span class="muted small">+{{ phs|length - 3 }}</span>{% endif %}
+          {# 第 4 张起用无 img 的隐藏锚点留在 DOM 里：列表只占一行，灯箱仍能翻完这一笔全部凭证 #}
+          {% for ph in phs[3:] %}<a class="photo-link" href="/photos/{{ ph.id }}" hidden aria-hidden="true"></a>{% endfor %}
+          {% if phs|length > 3 %}<span class="muted small" title="点图可翻看全部 {{ phs|length }} 张">+{{ phs|length - 3 }}</span>{% endif %}
           {% if not phs %}<span class="muted small">—</span>{% endif %}
         </td>
         <td>{{ p.remark or '-' }}</td>

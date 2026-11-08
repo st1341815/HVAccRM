@@ -138,10 +138,10 @@ document.addEventListener('click', function (e) {
     const ct = a.closest('.case-thumbs');
     if (ct) return Array.from(ct.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
     // 表格行内的凭证缩略图：按「这一笔记录」分组（收款截图、成本凭证等各自成组）。
-    // v1.12.2 修复：此前这里直接兜底成「整页所有照片」，点开某笔记录再翻页会串到
-    // 别的记录 —— 语义上错误，且用户会以为自己在看同一笔的凭证。
+    // v1.12.3：列表只渲染前 3 张，第 4 张起是**无 img 的隐藏锚点**（和 .task-photos 同一套做法），
+    // 所以这里不能像 .gallery 那样过滤掉「没 img 的锚点」，否则灯箱翻不到第 4 张以后。
     const grp = a.closest('[data-photo-group]');
-    if (grp) return Array.from(grp.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
+    if (grp) return Array.from(grp.querySelectorAll(ANCHOR_SEL));
     // 兜底：整页所有照片（仅用于没有分组标记的孤立缩略图）
     return Array.from(document.querySelectorAll(ANCHOR_SEL)).filter(x => x.querySelector('img'));
   }
