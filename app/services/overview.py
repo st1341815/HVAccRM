@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from urllib.parse import urlencode
 
 from sqlalchemy import select
@@ -69,6 +70,7 @@ def build_ctx(
     sort: str = "sign_date",
     order: str = "desc",
     base_path: str = "/accounting/profit",
+    extra_sorts: Sequence[tuple[str, str]] = (),
 ) -> dict:
     """构造利润/核算页面的完整上下文（KPI + 成本构成 + 明细行 + 排序链接）。"""
     contracts = apply_filters(db, contracts, date_from=date_from, date_to=date_to, customer_q=customer_q)
@@ -81,10 +83,10 @@ def build_ctx(
             continue
         rows.append((c, fin, p))
 
-    if sort not in [k for k, _ in SORT_OPTIONS]:
-        sort = "sign_date"
-    order = "desc" if order == "desc" else "asc"
-    sort_key = {
+    # 页面可追加自己的可排序列（如核算页的「结算日」只有已结算合同才有意义），
+    # 共用 SORT_OPTIONS 保持两页口径一致，不因某一页的特殊列互相牵连。
+    sort_options = list(SORT_OPTIONS) + [s for s in extra_sorts if s[0] not in dict(SORT_OPTIONS)]
+    sort_keys = {
         "product_type": lambda r: (r[0].product_type or ""),
         "sign_date": lambda r: (r[0].sign_date or ""),
         "income": lambda r: r[2].income,
@@ -93,8 +95,12 @@ def build_ctx(
         "gross_margin": lambda r: r[2].gross_margin,
         "received": lambda r: r[2].received,
         "outstanding": lambda r: r[1].outstanding,
-    }[sort]
-    rows.sort(key=sort_key, reverse=(order == "desc"))
+        "settled_at": lambda r: (r[0].settled_at or ""),
+    }
+    if sort not in sort_keys or sort not in [k for k, _ in sort_options]:
+        sort = "sign_date"
+    order = "desc" if order == "desc" else "asc"
+    rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
 
     base_params = {
         k: v
@@ -107,7 +113,7 @@ def build_ctx(
         if v
     }
     sort_links = {}
-    for key, _ in SORT_OPTIONS:
+    for key, _ in sort_options:
         new_order = "asc" if (key == sort and order == "desc") else "desc"
         sort_links[key] = f"{base_path}?" + urlencode({**base_params, "sort": key, "order": new_order})
 
@@ -135,7 +141,7 @@ def build_ctx(
         },
         "sort": sort,
         "order": order,
-        "sort_options": SORT_OPTIONS,
+        "sort_options": sort_options,
         "sort_links": sort_links,
         "can_edit": has_perm(user, "cost:edit"),
         "can_amount": can_see_amount(user),

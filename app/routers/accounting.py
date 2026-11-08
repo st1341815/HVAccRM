@@ -34,6 +34,7 @@ def _common(
     only_cost: str,
     sort: str,
     order: str,
+    extra_sorts=(),
 ):
     contracts = overview_svc.visible_contracts(db, user)
     if settled_only:
@@ -49,6 +50,7 @@ def _common(
         sort=sort,
         order=order,
         base_path=base_path,
+        extra_sorts=extra_sorts,
     )
     return render(
         request,
@@ -111,6 +113,8 @@ def settlement_view(
         settled_only=True,
         template="accounting/settlement.html",
         base_path="/accounting/settlement",
+        # 「结算日」只在已结算合同上有意义，做成页面私有的可排序列（利润核算页没有这列）
+        extra_sorts=[("settled_at", "结算日")],
         date_from=date_from,
         date_to=date_to,
         customer_q=customer_q,

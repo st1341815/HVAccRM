@@ -51,7 +51,6 @@
         {% for key, label in sort_options %}
         <th class="sortable"><a href="{{ sort_links[key] }}">{{ label }}{% if sort == key %}<span class="sort-arrow">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}</a></th>
         {% endfor %}
-        <th>结算日</th>
         <th></th>
       </tr>
       <tr class="sum-row">
