@@ -276,9 +276,18 @@ class Contract(Base):
     product_type = Column(String)  # 产品类型（单选，PRODUCT_OPTIONS 白名单）
     discount = Column(Float, default=0)  # 已不在表单采集，保留列以兼容历史数据
     status = Column(String, default="active")
+    # 结算标记：与 status 正交（status 表示业务流转，settled 表示财务关账）
+    settled = Column(Integer, default=0)
+    settled_at = Column(String)
+    settled_by = Column(Integer)  # 执行结算的用户 id，仅记录
     notes = Column(Text)
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(String, default=now_iso)
+
+    @property
+    def is_settled(self) -> bool:
+        """模板与逻辑统一用这个属性判断，避免 None 被判成假以外的情况。"""
+        return bool(self.settled)
 
     customer = relationship("Customer", back_populates="contracts")
     items = relationship("ContractItem", back_populates="contract", cascade="all, delete-orphan")

@@ -1,14 +1,24 @@
 {% extends "layout.html" %}
 {% block title %}合同 {{ contract.no or contract.id }}{% endblock %}
 {% block content %}
+{% set locked = contract.is_settled %}
 <div class="page-head">
   <h1>合同 {{ contract.no or ('#' ~ contract.id) }}
     <span class="badge">{{ summary.status }}</span>
+    <span class="badge {{ 's-done' if locked else '' }}">{{ '已结算' if locked else '未结算' }}</span>
   </h1>
   <div class="actions">
     <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
     <a class="btn ghost" href="/contracts">合同列表</a>
-    {% if can_delete_contract %}
+    {% if can_settle %}
+    <form method="post" action="/contracts/{{ contract.id }}/{{ 'unsettle' if locked else 'settle' }}" class="inline"
+          {% if locked %}onsubmit="return confirm('确认取消该合同的结算？取消后可继续录入收款、费用与施工。');"{% else %}onsubmit="return confirm('确认把该合同标记为结算？标记后其收款、费用、施工新增将被冻结。');"{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="back" value="/contracts/{{ contract.id }}">
+      <button class="btn{{ ' ghost' if locked else '' }}">{{ '取消结算' if locked else '标记结算' }}</button>
+    </form>
+    {% endif %}
+    {% if can_delete_contract and not locked %}
     <form method="post" action="/contracts/{{ contract.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ contract.no or ('#' ~ contract.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');">
       <button class="btn danger">删除合同</button>
     </form>
@@ -16,10 +26,17 @@
   </div>
 </div>
 
+{% if locked %}
+<div class="flash">
+  该合同已于 {{ contract.settled_at or '-' }} 标记结算：收款、费用、施工、增项与合同金额已冻结。如需继续录入，请先点「取消结算」。
+</div>
+{% endif %}
+
 <div class="meta">
   <span>签订日：{{ contract.sign_date }}</span>
   <span>产品类型：<strong>{{ contract.product_type or '未填写' }}</strong></span>
   <span>状态：{{ contract.status }}</span>
+  {% if locked %}<span>结算：<strong>{{ contract.settled_at or '已结算' }}</strong></span>{% endif %}
   <span>创建：{{ contract.created_at }}</span>
 </div>
 
@@ -37,7 +54,7 @@
 </div>
 {% endif %}
 
-{% if can_pay %}
+{% if can_pay and not locked %}
 <section class="card">
   <h2>登记收款 / 退款</h2>
   <form method="post" action="/payments/record" class="filterbar" enctype="multipart/form-data">
@@ -68,7 +85,7 @@
       <tr>
         <td>{{ co.reason }}</td><td>{{ co.amount|money }}</td><td>{{ co.approved_at or '-' }}</td>
         <td>
-          {% if can_edit %}
+          {% if can_edit and not locked %}
           <form method="post" action="/contracts/change-orders/{{ co.id }}/delete" class="inline">
             <button class="ghost danger">删除</button>
           </form>
@@ -78,7 +95,7 @@
     {% endfor %}
     </tbody>
   </table>
-  {% if can_edit %}
+  {% if can_edit and not locked %}
   <form method="post" action="/contracts/{{ contract.id }}/change-orders" class="filterbar">
     <input name="reason" placeholder="增项原因" required>
     <input name="amount" placeholder="金额" inputmode="decimal" required>
@@ -112,7 +129,7 @@
         </td>
         <td>{{ cost_users[r.created_by].display_name if r.created_by and cost_users.get(r.created_by) else '-' }}</td>
         <td>
-          {% if can_cost %}
+          {% if can_cost and not locked %}
           <form method="post" action="/costs/{{ r.id }}/delete" class="inline" onsubmit="return confirm('删除这条成本记录？');">
             <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
             <button class="ghost danger">删除</button>
@@ -125,7 +142,7 @@
   </table>
   {% if not costs %}<p class="muted">还没有成本记录。材料成本需选供应商，施工费用需选安装师傅。</p>{% endif %}
 
-  {% if can_cost %}
+  {% if can_cost and not locked %}
   <form method="post" action="/costs/new" class="filterbar" enctype="multipart/form-data">
     <input type="hidden" name="contract_id" value="{{ contract.id }}">
     <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
@@ -167,7 +184,7 @@
         <td>{{ it.product_name }}</td><td>{{ it.spec or '-' }}</td><td>{{ it.qty }}</td>
         <td>{{ it.unit or '-' }}</td><td>{{ it.unit_price|money }}</td><td>{{ it.amount|money }}</td>
         <td>
-          {% if can_edit %}
+          {% if can_edit and not locked %}
           <form method="post" action="/contracts/items/{{ it.id }}/delete" class="inline">
             <button class="ghost danger">删除</button>
           </form>
@@ -177,7 +194,7 @@
     {% endfor %}
     </tbody>
   </table>
-  {% if can_edit %}
+  {% if can_edit and not locked %}
   <form method="post" action="/contracts/{{ contract.id }}/items" class="filterbar">
     <input name="product_name" placeholder="产品名称 *" required>
     <input name="spec" placeholder="规格">
@@ -249,7 +266,7 @@
   {% if not payments %}<p class="muted">还没有收款记录。</p>{% endif %}
 </section>
 
-{% if can_edit %}
+{% if can_edit and not locked %}
 <section class="card">
   <h2>修改合同</h2>
   <form method="post" action="/contracts/{{ contract.id }}/edit" class="stack">

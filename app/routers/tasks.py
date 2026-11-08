@@ -23,6 +23,7 @@ from ..models import (
 )
 from ..permissions import has_perm, require, task_scope_conditions, visible_customer_ids
 from ..services import photos as photo_svc
+from ..services import settlement as settlement_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_int, return_path
@@ -57,6 +58,17 @@ def _can_touch(db: Session, user: User, task: Task) -> bool:
         return True
     allowed = visible_customer_ids(db, user)
     return allowed is None or task.customer_id in allowed
+
+
+def _settled_block(db: Session, task: Task, back: str, request: Request):
+    """已结算合同下的施工工序不再允许操作；客户级勘测任务（contract_id 为空）不受影响。"""
+    if not task.contract_id:
+        return None
+    contract = db.get(Contract, task.contract_id)
+    reason = settlement_svc.block_reason(contract, "task")
+    if reason:
+        return redirect(return_path(back, request.headers.get("referer"), "/tasks"), reason, "err")
+    return None
 
 
 def _photo_ctx(db: Session, tasks: list[Task], user: User, request: Request) -> dict:
@@ -218,6 +230,8 @@ def start(
     task = get_or_404(db, Task, task_id, "工序任务")
     if not _can_touch(db, user, task):
         return render(request, "403.html", status_code=403)
+    if (frozen := _settled_block(db, task, back, request)):
+        return frozen
     ok, msg = task_svc.start_task(db, task)
     log_action(db, user, "task_start" if ok else "task_start_denied", "tasks", task.id, new={"status": task.status, "msg": msg}, ip=client_ip(request))
     commit_retry(db)
@@ -237,6 +251,8 @@ def done(
     task = get_or_404(db, Task, task_id, "工序任务")
     if not _can_touch(db, user, task):
         return render(request, "403.html", status_code=403)
+    if (frozen := _settled_block(db, task, back, request)):
+        return frozen
     d = _norm_date(done_date)
     if notes.strip():
         # 追加而非覆盖：保留原有备注，带上实际施工日期便于追溯
@@ -265,6 +281,8 @@ def skip(
     task = get_or_404(db, Task, task_id, "工序任务")
     if not _can_touch(db, user, task):
         return render(request, "403.html", status_code=403)
+    if (frozen := _settled_block(db, task, back, request)):
+        return frozen
     ok, msg = task_svc.skip_task(db, task, skip_reason)
     log_action(db, user, "task_skip" if ok else "task_skip_denied", "tasks", task.id, new={"status": task.status, "reason": skip_reason}, ip=client_ip(request))
     commit_retry(db)
@@ -280,6 +298,8 @@ def assign(
     user: User = Depends(require("task:assign")),
 ):
     task = get_or_404(db, Task, task_id, "工序任务")
+    if (frozen := _settled_block(db, task, "", request)):
+        return frozen
     before = {"assignee_id": task.assignee_id}
     task.assignee_id = parse_int(assignee_id)
     task.updated_at = now_iso()

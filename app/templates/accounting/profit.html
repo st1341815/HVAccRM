@@ -2,11 +2,10 @@
 {% block title %}利润核算{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>成本与利润 <span class="muted small">以合同为单个项目核算</span></h1>
+  <h1>核算与利润 <span class="muted small">以合同为单个项目核算</span></h1>
   <nav class="tabs inline-tabs">
-    <a href="/costs">成本明细</a>
-    <a href="/costs/overview" class="active">利润核算</a>
-    <a href="/costs/suppliers">供应商</a>
+    <a href="/accounting/profit" class="active">利润核算</a>
+    <a href="/accounting/settlement">核算（已结算）</a>
   </nav>
 </div>
 
@@ -33,13 +32,13 @@
 </section>
 
 <section class="card">
-  <form method="get" action="/costs/overview" class="filterbar">
+  <form method="get" action="/accounting/profit" class="filterbar">
     <label class="inline-label">签订日从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
     <input name="customer_q" value="{{ filters.customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <label class="checkline"><input type="checkbox" name="only_cost" value="1" {{ 'checked' if filters.only_cost else '' }}> 只看已录成本</label>
     <button type="submit">筛选</button>
-    <a class="btn ghost" href="/costs/overview">重置</a>
+    <a class="btn ghost" href="/accounting/profit">重置</a>
   </form>
 </section>
 

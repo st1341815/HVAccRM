@@ -13,6 +13,7 @@ from ..permissions import has_perm, require, visible_customer_ids
 from ..services import finance as finance_svc
 from ..services import photos as photo_svc
 from ..services import search as search_svc
+from ..services import settlement as settlement_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
@@ -102,6 +103,8 @@ def new_payment_form(
     allowed = visible_customer_ids(db, user)
     if allowed is not None:
         contracts = [c for c in contracts if c.customer_id in allowed]
+    # 已结算合同不再出现在登记收款的选择框里（服务端另有兜底拦截）
+    contracts = [c for c in contracts if not settlement_svc.is_settled(c)]
     # 合同选择改为可搜索下拉：序列化供前端本地过滤（合同号/房号/客户名）
     contract_options = [
         {
@@ -167,6 +170,9 @@ async def record_payment(
     contract = db.get(Contract, parse_int(contract_id))
     if not contract:
         return redirect("/payments", "合同不存在", "err")
+    # 结算冻结：必须在写库与截图落盘之前返回
+    if (frozen := settlement_svc.block_reason(contract, "payment")):
+        return redirect(back or f"/contracts/{contract.id}", frozen, "err")
     amt = parse_float(amount)
     is_refund = amt < 0
     if is_refund and not has_perm(user, "payment:refund"):
@@ -241,6 +247,8 @@ def delete_payment(
 ):
     payment = get_or_404(db, Payment, payment_id, "收款记录")
     contract = db.get(Contract, payment.contract_id)
+    if contract and (frozen := settlement_svc.block_reason(contract, "payment")):
+        return redirect(f"/contracts/{contract.id}", frozen, "err")
     photo_svc.delete_photos_for(db, payment_id=payment.id)  # 先清付款截图，避免外键阻挡
     log_action(db, user, "delete", "payments", payment.id, old=payment, ip=client_ip(request))
     db.delete(payment)
@@ -291,6 +299,8 @@ async def update_payment(
     contract = db.get(Contract, payment.contract_id)
     if not contract:
         return redirect("/payments", "合同不存在", "err")
+    if (frozen := settlement_svc.block_reason(contract, "payment")):
+        return redirect(f"/contracts/{contract.id}", frozen, "err")
     amt = parse_float(amount)
     is_refund = amt < 0
     if is_refund and not has_perm(user, "payment:refund"):

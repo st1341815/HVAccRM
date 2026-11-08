@@ -34,6 +34,7 @@ from ..services import cases as cases_svc
 from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
+from ..services import settlement as settlement_svc
 from ..services import tasks as task_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
@@ -42,11 +43,32 @@ router = APIRouter(prefix="/contracts", tags=["contracts"])
 CONTRACT_PHOTO_KIND = "纸质合同"
 
 
+def _back_target(back: str, fallback: str) -> str:
+    """只接受站内相对路径，避免 back 被拿来做开放重定向。"""
+    b = (back or "").strip()
+    if b.startswith("/") and not b.startswith("//"):
+        return b
+    return fallback
+
+
+def _settle_redirect(back: str, msg: str, level: str = "ok"):
+    return redirect(_back_target(back, "/contracts"), msg, level)
+
+
+def _frozen(contract: Contract, action: str, target: str):
+    """已结算合同拦截写操作；返回 RedirectResponse 或 None。"""
+    reason = settlement_svc.block_reason(contract, action)
+    if reason:
+        return redirect(target, reason, "err")
+    return None
+
+
 @router.get("")
 def list_contracts(
     request: Request,
     customer_q: str = "",
     status: str = "",
+    settled: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(require("contract:view")),
 ):
@@ -56,6 +78,11 @@ def list_contracts(
         stmt = stmt.where(Contract.customer_id.in_(cids or [-1]))
     if status:
         stmt = stmt.where(Contract.status == status)
+    if settled == "1":
+        stmt = stmt.where(Contract.settled == 1)
+    elif settled == "0":
+        # 存量数据在迁移前可能为 NULL，按未结算处理
+        stmt = stmt.where(or_(Contract.settled == 0, Contract.settled.is_(None)))
     contracts = list(db.scalars(stmt).all())
     allowed = None
     from ..permissions import visible_customer_ids
@@ -70,6 +97,8 @@ def list_contracts(
         "outstanding": round(sum(s.outstanding for _, s in rows), 2),
         "overdue": round(sum(s.overdue for _, s in rows), 2),
     }
+    # 当前筛选条件的查询串，供行内结算按钮回跳时保留筛选
+    keep_qs = request.url.query
     return render(
         request,
         "contracts/list.html",
@@ -77,9 +106,51 @@ def list_contracts(
         totals=totals,
         customer_q=customer_q,
         status=status,
+        settled=settled,
+        keep_qs=keep_qs,
         can_amount=can_see_amount(user),
+        can_settle=has_perm(user, "settlement:edit"),
         can_delete_contract=has_perm(user, "admin:setting"),
     )
+
+
+@router.post("/{contract_id}/settle")
+def settle_contract(
+    request: Request,
+    contract_id: int,
+    back: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("settlement:edit")),
+):
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    ok, why = settlement_svc.can_settle(db, contract)
+    if not ok:
+        return _settle_redirect(back, why.rstrip("。"), "err")
+    before, changed = settlement_svc.set_settled(db, contract, True, user)
+    if not changed:
+        commit_retry(db)
+        return _settle_redirect(back, "该合同已是结算状态", "err")
+    log_action(db, user, "settle", "contracts", contract.id, old=before, new=contract, ip=client_ip(request))
+    commit_retry(db)
+    return _settle_redirect(back, f"合同 {contract.no or ('#' + str(contract.id))} 已标记结算，收款/费用/施工新增已冻结")
+
+
+@router.post("/{contract_id}/unsettle")
+def unsettle_contract(
+    request: Request,
+    contract_id: int,
+    back: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("settlement:edit")),
+):
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    before, changed = settlement_svc.set_settled(db, contract, False, user)
+    if not changed:
+        commit_retry(db)
+        return _settle_redirect(back, "该合同不是结算状态", "err")
+    log_action(db, user, "unsettle", "contracts", contract.id, old=before, new=contract, ip=client_ip(request))
+    commit_retry(db)
+    return _settle_redirect(back, f"合同 {contract.no or ('#' + str(contract.id))} 已取消结算，可继续录入")
 
 
 @router.get("/new")
@@ -302,6 +373,7 @@ def contract_detail(
         can_cost=can_cost,
         can_amount=can_see_amount(user),
         can_edit=has_perm(user, "contract:edit"),
+        can_settle=has_perm(user, "settlement:edit"),
         can_pay=has_perm(user, "payment:edit"),
         can_refund=has_perm(user, "payment:refund"),
         can_delete_photo=has_perm(user, "photo:delete"),
@@ -331,6 +403,26 @@ def update_contract(
         ).first()
         if dup:
             return redirect(f"/contracts/{contract_id}", f"合同号 {no} 已被其他合同占用", "err")
+    # 已结算：金额相关字段冻结，仅允许改备注（备注不进核算口径）
+    if settlement_svc.is_settled(contract):
+        ptype_new = (product_type or "").strip() or None
+        frozen_changes = []
+        if abs(parse_float(total_amount) - (contract.total_amount or 0)) > 0.005:
+            frozen_changes.append("合同额")
+        if sign_date and sign_date != (contract.sign_date or ""):
+            frozen_changes.append("签订日")
+        if ptype_new != (contract.product_type or None):
+            frozen_changes.append("产品类型")
+        if (status or "active") != (contract.status or "active"):
+            frozen_changes.append("状态")
+        if no != contract.no:
+            frozen_changes.append("合同号")
+        if frozen_changes:
+            return redirect(
+                f"/contracts/{contract_id}",
+                f"该合同已结算，{'、'.join(frozen_changes)}不可修改；如需调整请先取消结算",
+                "err",
+            )
     before = {
         "no": contract.no,
         "sign_date": contract.sign_date,
@@ -369,6 +461,8 @@ def add_item(
     user: User = Depends(require("contract:edit")),
 ):
     contract = get_or_404(db, Contract, contract_id, "合同")
+    if (frozen := _frozen(contract, "edit", f"/contracts/{contract_id}")):
+        return frozen
     q = parse_float(qty)
     up = parse_float(unit_price)
     amt = parse_float(amount) if amount.strip() else round(q * up, 2)
@@ -398,6 +492,8 @@ def delete_item(
 ):
     item = get_or_404(db, ContractItem, item_id, "合同明细")
     cid = item.contract_id
+    if item.contract and (frozen := _frozen(item.contract, "edit", f"/contracts/{cid}")):
+        return frozen
     log_action(db, user, "delete", "contract_items", item.id, old=item, ip=client_ip(request))
     db.delete(item)
     commit_retry(db)
@@ -416,6 +512,8 @@ def add_plan(
     user: User = Depends(require("contract:edit")),
 ):
     contract = get_or_404(db, Contract, contract_id, "合同")
+    if (frozen := _frozen(contract, "edit", f"/contracts/{contract_id}")):
+        return frozen
     order = parse_int(sort_order) or (max([p.sort_order or 0 for p in contract.plans], default=0) + 1)
     plan = PaymentPlan(
         contract_id=contract_id,
@@ -442,6 +540,8 @@ def delete_plan(
 ):
     plan = get_or_404(db, PaymentPlan, plan_id, "收款计划")
     cid = plan.contract_id
+    if plan.contract and (frozen := _frozen(plan.contract, "edit", f"/contracts/{cid}")):
+        return frozen
     log_action(db, user, "delete", "payment_plans", plan.id, old=plan, ip=client_ip(request))
     db.delete(plan)
     commit_retry(db)
@@ -460,6 +560,8 @@ def add_change_order(
     user: User = Depends(require("contract:edit")),
 ):
     contract = get_or_404(db, Contract, contract_id, "合同")
+    if (frozen := _frozen(contract, "edit", f"/contracts/{contract_id}")):
+        return frozen
     amt = parse_float(amount)
     co = ChangeOrder(
         contract_id=contract_id,
@@ -498,6 +600,8 @@ def delete_change_order(
 ):
     co = get_or_404(db, ChangeOrder, co_id, "增项")
     cid = co.contract_id
+    if co.contract and (frozen := _frozen(co.contract, "edit", f"/contracts/{cid}")):
+        return frozen
     log_action(db, user, "delete", "change_orders", co.id, old=co, ip=client_ip(request))
     db.delete(co)
     commit_retry(db)
@@ -513,6 +617,12 @@ def delete_contract(
 ):
     """删除合同（破坏性，仅管理员）：连同其收款、成本、施工工序、对外案例与照片一并清除。"""
     contract = get_or_404(db, Contract, contract_id, "合同")
+    if settlement_svc.is_settled(contract):
+        return redirect(
+            f"/contracts/{contract.id}",
+            "该合同已结算，不能删除；如需删除请先取消结算",
+            "err",
+        )
     no = contract.no or f"#{contract.id}"
 
     payment_ids = [p.id for p in contract.payments]

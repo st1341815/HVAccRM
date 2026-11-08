@@ -436,8 +436,10 @@ has "登记成本" && ok "合同页有成本登记模块" || bad "合同页缺�
 has "11,000.00" && ok "成本合计 11000 已汇总" || bad "成本合计不对"
 has "27,000.00" && ok "毛利 27000 已计算（收入 38000 − 成本 11000）" || bad "毛利不对"
 has 'label="安装工"' && ok "安装师傅下拉含「安装工」分组" || bad "安装师傅下拉缺安装工分组"
-c=$(code -b $J "$B/costs"); chk "利润核算页" 200 "$c"
+c=$(code -b $J "$B/accounting/profit"); chk "利润核算页（已迁到核算模块）" 200 "$c"
 has "11,000.00" && ok "利润页成本合计一致" || bad "利润页成本合计不一致"
+c=$(code -b $J "$B/costs/overview"); chk "旧利润核算地址" 302 "$c"
+loc | grep -q "/accounting/profit" && ok "旧地址 302 到 /accounting/profit" || bad "旧地址未重定向"
 c=$(code -b $J "$B/costs"); chk "成本明细页" 200 "$c"
 has "锅炉主机及管材" && ok "明细展示备注" || bad "明细缺备注"
 has "/photos/" && ok "明细页显示附图缩略图" || bad "明细页未显示附图"
@@ -487,9 +489,47 @@ c=$(code -b $J "$B/contracts"); has 'name="customer_id"' && bad "合同台账仍
 c=$(code -b $J "$B/payments?contract_q=ONE"); chk "收款按合同号筛选（后端参数保留）" 200 "$c"
 has 'name="contract_q"' && bad "收款页仍显示合同号筛选框（v0.14.77 已移除）" || ok "收款页已移除合同号筛选框（后端参数保留）"
 c=$(code -b $J "$B/payments"); has 'name="contract_id"' && bad "收款仍用合同 ID 筛选" || ok "收款已改合同号关键字筛选"
-c=$(code -b $J "$B/costs?customer_q=13711112222"); chk "利润核算按手机号筛选" 200 "$c"
+c=$(code -b $J "$B/accounting/profit?customer_q=13711112222"); chk "利润核算按手机号筛选" 200 "$c"
 has "1203" && ok "手机号筛选命中利润核算" || bad "手机号筛选未命中利润核算"
-c=$(code -b $J "$B/costs"); has 'name="customer_id"' && bad "利润核算仍用客户 ID 筛选" || ok "利润核算已改关键字筛选"
+c=$(code -b $J "$B/accounting/profit"); has 'name="customer_id"' && bad "利润核算仍用客户 ID 筛选" || ok "利润核算已改关键字筛选"
+
+echo "== 7e. 合同结算开关与冻结 =="
+# 前置：结算要求合同无未完成工序，先把还能完工的节点都推进掉
+for _i in $(seq 1 40); do
+  TDX=$(curl -s -b $J "$B/tasks?scope=open" | grep -o '/tasks/[0-9]*/done' | head -1 | grep -o '[0-9]*')
+  [ -z "$TDX" ] && break
+  code -b $J -c $J -X POST -H "referer: $B/tasks" "$B/tasks/$TDX/done" > /dev/null
+done
+c=$(code -b $J "$B/contracts"); chk "合同台账" 200 "$c"
+has "标记结算" && ok "台账有结算开关按钮" || bad "台账缺结算开关按钮"
+CT2=$(csrf $J /contracts)
+c=$(code -b $J -X POST -d "csrf_token=$CT2&back=/contracts" "$B/contracts/$CTID/settle")
+chk "标记合同结算" 303 "$c"
+c=$(code -b $J "$B/contracts?settled=1"); chk "台账按已结算筛选" 200 "$c"
+has "已结算" && ok "已结算状态在台账可见" || bad "已结算状态未展示"
+c=$(code -b $J -X POST -F "contract_id=$CTID" -F "category=材料成本" -F "amount=66" -F "supplier_id=$SPID" -F "remark=结算后费用应被拒$RUN" $B/costs/new)
+chk "已结算合同登记费用（重定向）" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID")
+has "结算后费用应被拒" && bad "已结算合同仍能登记费用" || ok "已结算合同费用新增被冻结"
+c=$(code -b $J -X POST -F "contract_id=$CTID" -F "amount=66" -F "remark=结算后收款应被拒$RUN" $B/payments/record)
+chk "已结算合同登记收款（重定向）" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID")
+has "结算后收款应被拒" && bad "已结算合同仍能登记收款" || ok "已结算合同收款新增被冻结"
+c=$(code -b $J "$B/costs/new"); chk "登记费用页" 200 "$c"
+has "\"id\": $CTID," && bad "已结算合同仍在费用选择框" || ok "已结算合同已从费用选择框隐藏"
+c=$(code -b $J "$B/payments/new"); chk "登记收款页" 200 "$c"
+has "\"id\": $CTID," && bad "已结算合同仍在收款选择框" || ok "已结算合同已从收款选择框隐藏"
+c=$(code -b $J "$B/accounting/settlement"); chk "核算页（仅已结算合同）" 200 "$c"
+has "只统计已标记结算的合同" && ok "核算页明确只统计已结算合同" || bad "核算页口径说明缺失"
+has "按合同核算" && ok "核算页展示明细表" || bad "核算页缺明细表"
+c=$(code -b $J "$B/accounting/profit"); chk "利润核算页（全量）" 200 "$c"
+has "以合同为单个项目核算" && ok "利润核算页仍是全量口径" || bad "利润核算页口径异常"
+c=$(code -b $J -X POST -d "csrf_token=$CT2&back=/contracts/$CTID" "$B/contracts/$CTID/unsettle")
+chk "取消结算" 303 "$c"
+c=$(code -b $J -X POST -F "contract_id=$CTID" -F "category=材料成本" -F "amount=77" -F "supplier_id=$SPID" -F "remark=取消结算后费用可录$RUN" $B/costs/new)
+chk "取消结算后登记费用" 303 "$c"
+c=$(code -b $J "$B/contracts/$CTID")
+has "取消结算后费用可录" && ok "取消结算后费用恢复录入" || bad "取消结算后仍无法录入费用"
 
 echo "== 8. 会话失效 / 备份 / 审计 =="
 login_user $SU sales12345 $D sales12345x && ok "sales 重新登录" || bad "sales 重新登录失败"

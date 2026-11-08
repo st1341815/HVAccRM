@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,7 @@ from ..services import costs as cost_svc
 from ..services import photos as photo_svc
 from ..services import finance as finance_svc
 from ..services import search as search_svc
+from ..services import settlement as settlement_svc
 from ..templating import redirect, render
 from ..utils import client_ip, get_or_404, parse_float, parse_int
 
@@ -46,98 +48,13 @@ def _money_ok(user: User) -> bool:
 
 
 @router.get("/overview")
-def overview(
-    request: Request,
-    date_from: str = "",
-    date_to: str = "",
-    customer_q: str = "",
-    only_cost: str = "",
-    sort: str = "sign_date",
-    order: str = "desc",
-    db: Session = Depends(get_db),
-    user: User = Depends(require("cost:view")),
-):
-    from urllib.parse import urlencode
+def overview(request: Request):
+    """利润核算已迁到「核算」模块，这里保留 302 兼容旧书签/手机端快捷方式。
 
-    sort_options = [
-        ("product_type", "产品类型"),
-        ("sign_date", "签订日"),
-        ("income", "收入"),
-        ("cost", "成本"),
-        ("gross_profit", "毛利"),
-        ("gross_margin", "毛利率"),
-        ("received", "已收"),
-        ("outstanding", "未收"),
-    ]
-    contracts = _visible_contracts(db, user)
-    if date_from:
-        contracts = [c for c in contracts if (c.sign_date or "") >= date_from]
-    if date_to:
-        contracts = [c for c in contracts if (c.sign_date or "") <= date_to]
-    if customer_q and customer_q.strip():
-        cids = set(search_svc.customer_ids_by_keyword(db, customer_q))
-        contracts = [c for c in contracts if c.customer_id in cids]
-
-    rows = []
-    for c in contracts:
-        fin = finance_svc.contract_summary(db, c)
-        p = cost_svc.profit_summary(db, c)
-        if only_cost and p.cost <= 0:
-            continue
-        rows.append((c, fin, p))
-
-    # 排序：默认按签单日降序，点表头切换字段与升降序
-    if sort not in [k for k, _ in sort_options]:
-        sort = "sign_date"
-    order = "desc" if order == "desc" else "asc"
-    sort_key = {
-        "product_type": lambda r: (r[0].product_type or ""),
-        "sign_date": lambda r: (r[0].sign_date or ""),
-        "income": lambda r: r[2].income,
-        "cost": lambda r: r[2].cost,
-        "gross_profit": lambda r: r[2].gross_profit,
-        "gross_margin": lambda r: r[2].gross_margin,
-        "received": lambda r: r[2].received,
-        "outstanding": lambda r: r[1].outstanding,
-    }[sort]
-    rows.sort(key=sort_key, reverse=(order == "desc"))
-
-    # 排序链接：保留现有筛选参数，仅切换字段/升降序
-    base_params = {
-        k: v
-        for k, v in request.query_params.items()
-        if k in ("date_from", "date_to", "customer_q", "only_cost") and v
-    }
-    sort_links = {}
-    for key, _ in sort_options:
-        new_order = "asc" if (key == sort and order == "desc") else "desc"
-        sort_links[key] = "/costs/overview?" + urlencode({**base_params, "sort": key, "order": new_order})
-
-    totals = {
-        "income": round(sum(p.income for _, _, p in rows), 2),
-        "received": round(sum(p.received for _, _, p in rows), 2),
-        "outstanding": round(sum(f.outstanding for _, f, _ in rows), 2),
-        "cost": round(sum(p.cost for _, _, p in rows), 2),
-        "gross_profit": round(sum(p.gross_profit for _, _, p in rows), 2),
-    }
-    totals["gross_margin"] = (
-        round(totals["gross_profit"] / totals["income"] * 100, 1) if totals["income"] > cost_svc.TOL else 0.0
-    )
-    return render(
-        request,
-        "costs/overview.html",
-        rows=rows,
-        totals=totals,
-        categories=COST_CATEGORIES,
-        category_totals=cost_svc.category_totals(db, [c.id for c, _, _ in rows]),
-        filters={"date_from": date_from, "date_to": date_to, "customer_q": customer_q, "only_cost": only_cost},
-        sort=sort,
-        order=order,
-        sort_options=sort_options,
-        sort_links=sort_links,
-        can_edit=has_perm(user, "cost:edit"),
-        today=today_str(),
-    )
+    用 302 而非 301：301 会被浏览器永久缓存，日后想改回原页面就难了。
+    """
+    qs = request.url.query
+    return RedirectResponse("/accounting/profit" + (f"?{qs}" if qs else ""), status_code=302)
 
 
 @router.get("")
@@ -347,6 +264,8 @@ def new_cost_form(
     user: User = Depends(require("cost:edit")),
 ):
     contracts = _visible_contracts(db, user)
+    # 已结算合同不再出现在登记费用的选择框里（服务端另有兜底拦截）
+    contracts = [c for c in contracts if not settlement_svc.is_settled(c)]
     # 合同选择改为可搜索下拉：序列化供前端本地过滤（合同号/房号/客户名）
     contract_options = [
         {
@@ -390,6 +309,9 @@ async def create_cost(
     target = back or (f"/contracts/{contract_id}" if contract else "/costs")
     if not contract:
         return redirect("/costs", "合同不存在", "err")
+    # 结算冻结：必须在写库与附图落盘之前返回，避免产生孤儿图片
+    if (frozen := settlement_svc.block_reason(contract, "cost")):
+        return redirect(target, frozen, "err")
     category = category.strip()
     if category not in COST_CATEGORIES:
         return redirect(target, "费用项目请从下拉中选择", "err")
@@ -460,6 +382,8 @@ def delete_cost(
 ):
     cost = get_or_404(db, ContractCost, cost_id, "成本记录")
     contract_id = cost.contract_id
+    if cost.contract and (frozen := settlement_svc.block_reason(cost.contract, "cost")):
+        return redirect(back or f"/contracts/{contract_id}", frozen, "err")
     detach = photo_svc.delete_photos_for(db, cost_id=cost.id)  # 先清附图，避免外键阻挡
     log_action(db, user, "delete", "contract_costs", cost.id, old=cost, ip=client_ip(request))
     db.delete(cost)
@@ -521,6 +445,8 @@ async def update_cost(
     contract = db.get(Contract, cost.contract_id)
     if not contract:
         return redirect("/costs", "合同不存在", "err")
+    if (frozen := settlement_svc.block_reason(contract, "cost")):
+        return redirect(f"/contracts/{contract.id}", frozen, "err")
     category = category.strip()
     if category not in COST_CATEGORIES:
         return redirect(f"/costs/{cost.id}/edit", "费用项目请从下拉中选择", "err")

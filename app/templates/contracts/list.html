@@ -21,6 +21,11 @@
       <option value="">全部状态</option>
       {% for s in ['active','done','void'] %}<option value="{{ s }}" {{ 'selected' if status == s else '' }}>{{ s }}</option>{% endfor %}
     </select>
+    <select name="settled">
+      <option value="">全部结算状态</option>
+      <option value="0" {{ 'selected' if settled == '0' else '' }}>未结算</option>
+      <option value="1" {{ 'selected' if settled == '1' else '' }}>已结算</option>
+    </select>
     <button type="submit">筛选</button>
     <a class="btn ghost" href="/contracts">重置</a>
   </form>
@@ -28,7 +33,7 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>房号</th><th>产品</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>回款率</th>{% endif %}<th>状态</th><th></th></tr></thead>
+    <thead><tr><th>房号</th><th>产品</th><th>签订日</th>{% if can_amount %}<th>总额</th><th>已收</th><th>未收</th><th>回款率</th>{% endif %}{% if can_settle %}<th>结算</th>{% endif %}<th>状态</th><th></th></tr></thead>
     <tbody>
     {% for c, s in rows %}
       <tr>
@@ -40,8 +45,19 @@
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
         <td>{{ s.recovery_rate }}%</td>
         {% endif %}
+        {% if can_settle %}
+        <td data-label="结算" class="settle-cell">
+          <span class="badge {{ 's-done' if c.is_settled else '' }}">{{ '已结算' if c.is_settled else '未结算' }}</span>
+          <form method="post" action="/contracts/{{ c.id }}/{{ 'unsettle' if c.is_settled else 'settle' }}" class="inline"
+                {% if c.is_settled %}onsubmit="return confirm('确认取消该合同的结算？取消后可继续录入收款、费用与施工。');"{% else %}onsubmit="return confirm('确认把该合同标记为结算？标记后其收款、费用、施工新增将被冻结。');"{% endif %}>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="back" value="{{ ('/contracts?' ~ keep_qs) if keep_qs else '/contracts' }}">
+            <button class="btn tiny{{ ' ghost' if c.is_settled else '' }}">{{ '取消结算' if c.is_settled else '标记结算' }}</button>
+          </form>
+        </td>
+        {% endif %}
         <td>{{ c.status }}</td>
-        <td><a href="/contracts/{{ c.id }}">详情 →</a>{% if can_delete_contract %}<form method="post" action="/contracts/{{ c.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ c.no or ('#' ~ c.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');"><button class="btn danger">删除</button></form>{% endif %}</td>
+        <td><a href="/contracts/{{ c.id }}">详情 →</a>{% if can_delete_contract and not c.is_settled %}<form method="post" action="/contracts/{{ c.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ c.no or ('#' ~ c.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');"><button class="btn danger">删除</button></form>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

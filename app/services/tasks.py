@@ -85,6 +85,9 @@ def generate_contract_tasks(db: Session, contract: Contract) -> list[Task]:
     """
     if _open_contract_task(db, contract.id):
         return []
+    # 已结算合同不再生成新工序（防御未来新增入口；正常路径下已结算合同也不会走到这里）
+    if bool(getattr(contract, "settled", 0)):
+        return []
     return _generate_next_contract_task(db, contract)
 
 
@@ -119,6 +122,8 @@ def activate_next_contract_stage(db: Session, contract_id: int) -> Task | None:
     """施工节点完工/跳过时，生成同一合同的下一个施工节点（默认开工）。"""
     contract = db.get(Contract, contract_id)
     if not contract:
+        return None
+    if bool(getattr(contract, "settled", 0)):
         return None
     rows = _generate_next_contract_task(db, contract)
     return rows[0] if rows else None

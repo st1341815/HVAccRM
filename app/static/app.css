@@ -295,6 +295,9 @@ button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .btn { display: inline-block; padding: .42rem .9rem; border-radius: var(--radius-sm); background: var(--brand-strong); color: #fff; white-space: nowrap; }
 .btn:hover { background: var(--brand-ink); text-decoration: none; }
 .btn.ghost { background: var(--brand-50); color: var(--brand-dark); }
+/* 合同台账「结算」列：badge 与开关按钮同一行，窄屏不折行 */
+.settle-cell { white-space: nowrap; }
+.settle-cell form.inline { margin-left: .35rem; }
 /* 页头主操作按钮：与选中 tab 同款样式（淡蓝背景 + 胶囊圆角 + 等高，和「成本明细」active 导航一致） */
 .btn-tab {
   background: var(--brand);

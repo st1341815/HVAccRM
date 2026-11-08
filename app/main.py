@@ -20,6 +20,7 @@ from .config import get_settings, set_timezone
 from .db import healthcheck, session_scope
 from .routers import (
     admin,
+    accounting,
     cases,
     contracts,
     costs,
@@ -223,6 +224,7 @@ app.include_router(customers.router)
 app.include_router(contracts.router)
 app.include_router(payments.router)
 app.include_router(costs.router)
+app.include_router(accounting.router)
 app.include_router(tasks.router)
 app.include_router(cases.router)
 app.include_router(photos.router)
