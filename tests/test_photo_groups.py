@@ -103,6 +103,52 @@ def test_cost_entries_renders_one_group_per_record(db, admin, today):
     assert re.search(r'class="muted small">\+1<', html), "超过 3 张时应显示 +N 提示"
 
 
+def _seed_payments(db, admin, today, spec):
+    """spec: [截图张数, ...]，每条对应一笔收款；返回 [(payment_id, [photo_id...]), ...]。"""
+    from app.models import Contract, Customer, Payment, Photo
+
+    out = []
+    for i, nph in enumerate(spec):
+        cust = Customer(name=f"收款分组客户{i}", owner_id=admin.id, status="active")
+        db.add(cust); db.flush()
+        c = Contract(customer_id=cust.id, no=f"PPP-{i}", sign_date=today,
+                     total_amount=20000, status="active")
+        db.add(c); db.flush()
+        pay = Payment(contract_id=c.id, amount=1000.0 * (i + 1), paid_at=today,
+                      method="微信", voucher_no=f"V{i}", received_by=admin.id)
+        db.add(pay); db.flush()
+        pids = []
+        for k in range(nph):
+            ph = Photo(customer_id=cust.id, contract_id=c.id, payment_id=pay.id,
+                       kind="payment", path=f"pp/{i}_{k}.jpg",
+                       orig_name=f"截图{i}-{k}.jpg", created_at="2026-01-01T00:00:00")
+            db.add(ph); db.flush()
+            pids.append(ph.id)
+        out.append((pay.id, pids))
+    return out
+
+
+def test_payments_list_renders_one_group_per_record(db, admin, today):
+    """收款流水页（用户报的第二处）：每笔收款一个分组，组内只有自己的付款截图。"""
+    from app.routers.payments import list_payments
+
+    seeded = _seed_payments(db, admin, today, [2, 5])
+    resp = list_payments(request=_fake_request("/payments"), db=db, user=admin)
+    html = bytes(resp.body).decode()
+
+    cells = re.findall(r"<td data-photo-group>(.*?)</td>", html, re.S)
+    assert len(cells) == 2, f"应有 2 个付款截图单元格，实际 {len(cells)}"
+    got_sets = [[int(x) for x in re.findall(r"/photos/(\d+)/thumb", c)] for c in cells]
+    expected = [pids for _, pids in seeded]
+    assert sorted(map(sorted, got_sets)) == sorted(map(sorted, expected)), (
+        "收款流水的付款截图串组了：灯箱翻页会翻到别的收款记录"
+    )
+
+    five = next(c for c in cells if len(re.findall(r"/photos/\d+/thumb", c)) == 5)
+    assert five.count("photo-link extra") == 2, "5 张时第 4、5 张应带 extra（隐藏但留在 DOM）"
+    assert re.search(r'class="muted small">\+2<', html), "超过 3 张时应显示 +2 提示"
+
+
 def test_lightbox_collect_handles_photo_group_before_global_fallback():
     """collect() 必须认 [data-photo-group]，且排在「整页遍历」兜底之前。"""
     js = (TPL / "layout.html").read_text()
