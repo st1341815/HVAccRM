@@ -139,6 +139,7 @@ def list_contracts(
     }
     if sort not in dict(sort_options) or sort not in sort_keys:
         sort = "sign_date"
+        order = "desc"  # 字段都非法了，方向一起回默认
     order = "desc" if order == "desc" else "asc"
     rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
 

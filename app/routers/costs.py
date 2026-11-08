@@ -28,7 +28,7 @@ from ..services import finance as finance_svc
 from ..services import search as search_svc
 from ..services import settlement as settlement_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_float, parse_int
+from ..utils import client_ip, get_or_404, parse_float, parse_int, room_sort_key
 
 router = APIRouter(prefix="/costs", tags=["costs"])
 COST_PHOTO_KIND = "成本凭证"
@@ -76,6 +76,7 @@ def entries(
 
     sort_options = [
         ("spent_at", "日期"),
+        ("room", "房号"),
         ("category", "费用项目"),
         ("amount", "金额"),
         ("supplier", "供应商"),
@@ -121,11 +122,17 @@ def entries(
     # 排序：默认按日期降序，点表头切换字段与升降序
     if sort not in [k for k, _ in sort_options]:
         sort = "spent_at"
+        order = "desc"  # 字段都非法了，方向一起回默认
     order = "desc" if order == "desc" else "asc"
 
     def _key(r):
         if sort == "spent_at":
             return r.spent_at or ""
+        if sort == "room":
+            c = contract_map.get(r.contract_id)
+            if not c or not c.customer:
+                return room_sort_key("")
+            return room_sort_key(c.customer.room_label_short or c.customer.name or "")
         if sort == "category":
             return r.category or ""
         if sort == "amount":

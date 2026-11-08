@@ -34,6 +34,11 @@ def room_sort_key(text: str | None) -> list[tuple[int, int, str]]:
     return out
 
 
+# 通用别名：凡是「编号 + 数字」的文本（凭证号 P10 / P6、单号、房号）都该按数值段比，
+# 否则 'P10' 会排在 'P6' 前面。房号场景继续用 room_sort_key 这个名字读起来更直白。
+alnum_sort_key = room_sort_key
+
+
 def parse_date(value: str | None) -> str | None:
     v = (value or "").strip()
     if not v:

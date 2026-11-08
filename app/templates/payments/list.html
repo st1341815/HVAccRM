@@ -17,6 +17,8 @@
 
 <section class="card">
   <form method="get" action="/payments" class="filterbar">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
     <input name="customer_q" value="{{ filters.customer_q }}" placeholder="房号 / 客户姓名 / 手机号">
     <label class="inline-label">从 <input name="date_from" type="date" value="{{ filters.date_from }}"></label>
     <label class="inline-label">到 <input name="date_to" type="date" value="{{ filters.date_to }}"></label>
@@ -31,7 +33,20 @@
 
 <section class="card">
   <table>
-    <thead><tr><th>收款日期</th><th>金额</th><th>房号</th><th>方式</th><th>凭证号</th><th>收款人</th><th>付款截图</th><th>备注</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        {% set arr = '▲' if order == 'asc' else '▼' %}
+        <th class="sortable"><a href="{{ sort_links['paid_at'] }}">收款日期{% if sort == 'paid_at' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['amount'] }}">金额{% if sort == 'amount' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['room'] }}">房号{% if sort == 'room' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['method'] }}">方式{% if sort == 'method' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['voucher_no'] }}">凭证号{% if sort == 'voucher_no' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th class="sortable"><a href="{{ sort_links['received_by'] }}">收款人{% if sort == 'received_by' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th>付款截图</th>
+        <th class="sortable"><a href="{{ sort_links['remark'] }}">备注{% if sort == 'remark' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
     {% for p in payments %}
       {% set c = contract_map.get(p.contract_id) %}

@@ -1,6 +1,8 @@
 """收款管理：实收流水、超额拦截、退款登记、逾期视图。"""
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,7 +17,7 @@ from ..services import photos as photo_svc
 from ..services import search as search_svc
 from ..services import settlement as settlement_svc
 from ..templating import redirect, render
-from ..utils import client_ip, get_or_404, parse_float, parse_int
+from ..utils import alnum_sort_key, client_ip, get_or_404, parse_float, parse_int
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -31,6 +33,8 @@ def list_payments(
     date_from: str = "",
     date_to: str = "",
     method: str = "",
+    sort: str = "paid_at",
+    order: str = "desc",
     db: Session = Depends(get_db),
     user: User = Depends(require("payment:view")),
 ):
@@ -63,6 +67,58 @@ def list_payments(
         ]
 
     users = {u.id: u for u in db.scalars(select(User)).all()}
+
+    # ---- 排序（内存里做：房号跨表取 customer 的 property、收款人是另一张表里的中文名）----
+    sort_options = [
+        ("paid_at", "收款日期"),
+        ("amount", "金额"),
+        ("room", "房号"),
+        ("method", "方式"),
+        ("voucher_no", "凭证号"),
+        ("received_by", "收款人"),
+        ("remark", "备注"),
+    ]
+    if sort not in dict(sort_options):
+        sort = "paid_at"
+        order = "desc"  # 字段都非法了，方向一起回默认，别让 ?sort=xx&order=asc 排成升序
+    order = "desc" if order == "desc" else "asc"
+
+    def _room_of(p):
+        c = contract_map.get(p.contract_id)
+        if not c or not c.customer:
+            return alnum_sort_key("")
+        return alnum_sort_key(c.customer.room_label_short or c.customer.name or "")
+
+    def _user_name(uid):
+        u = users.get(uid) if uid else None
+        return u.display_name if u else ""
+
+    sort_keys = {
+        "paid_at": lambda p: (p.paid_at or ""),
+        "amount": lambda p: p.amount or 0,
+        "room": _room_of,
+        "method": lambda p: (p.method or ""),
+        # 凭证号是「字母 + 序号」，纯字符串会把 P10 排到 P6 前面，走自然排序
+        "voucher_no": lambda p: alnum_sort_key(p.voucher_no or ""),
+        "received_by": lambda p: _user_name(p.received_by),
+        "remark": lambda p: (p.remark or ""),
+    }
+    payments.sort(key=sort_keys[sort], reverse=(order == "desc"))
+
+    # 排序链接：保留现有筛选条件（点列头不丢筛选），首点 desc、再点 asc
+    base_params = {
+        k: v
+        for k, v in {
+            "contract_q": contract_q, "customer_q": customer_q,
+            "date_from": date_from, "date_to": date_to, "method": method,
+        }.items()
+        if v
+    }
+    sort_links = {}
+    for key, _label in sort_options:
+        new_order = "asc" if (key == sort and order == "desc") else "desc"
+        sort_links[key] = "/payments?" + urlencode({**base_params, "sort": key, "order": new_order})
+
     payment_photos = photo_svc.photos_by_payment(db, [p.id for p in payments])
     total = round(sum(p.amount or 0 for p in payments), 2)
     month = today_str()[:7]
@@ -85,6 +141,10 @@ def list_payments(
             "date_to": date_to,
             "method": method,
         },
+        sort=sort,
+        order=order,
+        sort_options=sort_options,
+        sort_links=sort_links,
         methods=METHODS,
         can_edit=has_perm(user, "payment:edit"),
         can_refund=has_perm(user, "payment:refund"),

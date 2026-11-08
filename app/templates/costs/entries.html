@@ -44,7 +44,7 @@
       <tr>
         {% set arr = '▲' if order == 'asc' else '▼' %}
         <th class="sortable"><a href="{{ sort_links['spent_at'] }}">日期{% if sort == 'spent_at' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
-        <th>房号</th>
+        <th class="sortable"><a href="{{ sort_links['room'] }}">房号{% if sort == 'room' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
         <th class="sortable"><a href="{{ sort_links['category'] }}">费用项目{% if sort == 'category' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
         <th class="sortable"><a href="{{ sort_links['amount'] }}">金额{% if sort == 'amount' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
         <th class="sortable"><a href="{{ sort_links['supplier'] }}">供应商{% if sort == 'supplier' %}<span class="sort-arrow">{{ arr }}</span>{% endif %}</a></th>
