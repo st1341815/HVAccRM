@@ -36,8 +36,14 @@ if ! command -v docker >/dev/null 2>&1; then
     || { echo "MARKER=APK_FAIL"; : > "$DIR/pullmark_APK_FAIL.txt"; exit 0; }
 fi
 
-# 1) 先把当前线上镜像留作回滚点（失败不影响流程）
-docker image tag hvaccrm:local "hvaccrm:pre-$VER" 2>&1 || echo "no current image to tag"
+# 1) 先把当前线上镜像留作回滚点。
+#    ⚠️ `pre-X.Y.Z` 的语义是「升级到 X.Y.Z 之前的镜像」，本地 build 流程可能已经写过同名 tag
+#    并指向上一版（如 pre-1.12.10 = v1.12.9）。这里绝不覆盖它，否则回滚点会被顶成「新镜像」。
+BK="hvaccrm:pre-$VER"
+if docker image inspect "$BK" >/dev/null 2>&1; then
+  BK="hvaccrm:pre-$VER-localbuild"
+fi
+docker image tag hvaccrm:local "$BK" 2>&1 || echo "no current image to tag"
 
 # 2) 拉 CI 产出的镜像
 docker image pull "$IMG" 2>&1
