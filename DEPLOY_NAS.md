@@ -95,6 +95,26 @@ trim-cli --profile home --allow-insecure-http docker container create \
 > `trim-cli docker container create --cmd` 会按空格拆分成数组，**不能直接传带空格的命令**；
 > 因此把逻辑写成脚本（`scripts/nas_build.sh`、`scripts/nas_debug.sh`）再 `--cmd sh --cmd /path/script.sh`。
 
+### 3.1 兜底：`docker:cli` 拉不下来时用 alpine 当执行器
+
+2026-11-15 实测：NAS 上历史镜像被清空后，`docker image pull docker:cli` 与 `docker:27-cli`
+**始终不成功**（`image ls` 里永远不出现），而同一时间 `alpine:3.20`、`python:3.12-slim` 都能拉成功
+—— 不是网络问题，是 fnOS 对这几个 tag 的拉取有问题。
+
+兜底方案（已落地为 `scripts/alpine_build.sh`，上传到 `/vol1/1000/Docker/Hvaccrm/` 后执行）：
+
+```bash
+trim-cli --profile home --allow-insecure-http docker container create \
+  --image alpine:3.20 --name crm-build-alpine \
+  --mount /var/run/docker.sock:/var/run/docker.sock:rw \
+  --mount /vol1/1000:/vol1/1000:rw \
+  --cmd sh --cmd /vol1/1000/Docker/Hvaccrm/alpine_build.sh --start --yes
+```
+
+脚本做的事：把 `/etc/apk/repositories` 换成清华源 → `apk add docker-cli docker-cli-compose docker-cli-buildx`
+→ `docker version` 验通 → `sh compose_build.sh`（build + up + health 文件名通道原样复用）。
+apk 用默认 `dl-cdn.alpinelinux.org` 会卡死，**换源是必须的**。
+
 ## 4. 调试经验（踩过的坑）
 
 | 现象 | 原因 | 处理 |
