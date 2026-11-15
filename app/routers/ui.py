@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import current_user_or_redirect
 from ..db import get_db
-from ..models import ChangeOrder, Contract, ContractCost, Customer, Payment, Photo, Task, User, today_str
+from ..models import ChangeOrder, Contract, ContractCost, Customer, Payment, Task, User, today_str
 from ..permissions import can_see_amount, customer_scope_conditions, has_perm, task_scope_conditions
 from ..services import finance as finance_svc
 from ..services import search as search_svc
@@ -120,13 +120,6 @@ def dashboard(
     for c in new_customers:
         source_dist[c.source or "未填写"] = source_dist.get(c.source or "未填写", 0) + 1
 
-    recent_photos = []
-    if customers:
-        ids = [c.id for c in customers]
-        recent_photos = list(
-            db.scalars(select(Photo).where(Photo.customer_id.in_(ids)).order_by(Photo.id.desc()).limit(8)).all()
-        )
-
     return render(
         request,
         "dashboard.html",
@@ -139,7 +132,6 @@ def dashboard(
         show_money=show_money,
         in_progress=in_progress,
         source_dist=sorted(source_dist.items(), key=lambda kv: kv[1], reverse=True),
-        recent_photos=recent_photos,
         customers_map={c.id: c for c in customers},
         show_task_widgets=has_perm(user, "task:view"),
     )
