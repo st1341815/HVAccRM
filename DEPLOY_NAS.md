@@ -62,7 +62,47 @@ ls -lt data/backups | head                               # 备份列表
 
 容器内时间线：`entrypoint.sh` → `python -m app.bootstrap`（Alembic 迁移 + FTS5 + 9 工序 + admin）→ `uvicorn 0.0.0.0:8000`。
 
-## 3. 无需 SSH 时的远程部署方式（本次使用）
+## 3. 镜像从哪来：两条路线，优先 A
+
+| 路线 | 做法 | 何时用 | 代价 |
+|---|---|---|---|
+| **A. 拉 CI 预构建镜像**（首选） | `git tag vX.Y.Z && git push --tags` → GitHub Actions 构建推 `13uncle/hvaccrm:X.Y.Z` → NAS `docker pull` + tag + `compose up -d --no-build` | 常态发布；NAS 历史镜像被清空 | 依赖 CI 成功 + 拉 900 MB；NAS 零编译 |
+| **B. NAS 本地 build** | 上传源码 → `compose_build.sh` | CI 挂了 / 代码还没进 tag / 需要本地热修 | 吃 NAS CPU 内存；需要 `docker:cli` 执行器（现已拉不下来，见 §3.1） |
+
+> 为什么 A 更稳：`docker:cli`、`python:3.12-slim` 这些构建依赖都可能被 NAS 的镜像清理带走
+> （2026-11-15 就发生过，`docker:cli` 之后再也拉不回来），而**产物镜像本身**在 Docker Hub 上是
+> 现成的，只需要 `pull`。CI 与本地 build 用的是同一个 `Dockerfile`，产物等价。
+
+### 3.0 路线 A 的具体命令
+
+```bash
+# 1) 提交代码并打 tag（确保工作区干净，app/__init__.py 里 __version__ 已是 X.Y.Z）
+git commit -am "feat: ...（vX.Y.Z）"
+git push origin main
+git tag vX.Y.Z && git push origin vX.Y.Z      # 这一步触发 .github/workflows/dockerhub.yml
+
+# 2) 等 Actions 跑完（CI 门禁：ruff + pytest 全过才推镜像）
+#    绿色后 Docker Hub 上出现 13uncle/hvaccrm:X.Y.Z 与 :latest
+
+# 3) NAS 侧拉取并切换（脚本已固化：scripts/nas_pull_deploy.sh）
+trim-cli --profile home --allow-insecure-http file upload /vol1/1000/Docker/Hvaccrm \
+  ./scripts/nas_pull_deploy.sh --overwrite replace --yes
+trim-cli --profile home --allow-insecure-http docker container create \
+  --image alpine:3.20 --name crm-pull \
+  --mount /var/run/docker.sock:/var/run/docker.sock:rw \
+  --mount /vol1/1000:/vol1/1000:rw \
+  --cmd sh --cmd /vol1/1000/Docker/Hvaccrm/nas_pull_deploy.sh --cmd X.Y.Z --start --yes
+
+# 4) 读回结果（文件名即数据，沙箱连不上映射端口也能看）
+trim-cli --profile home --allow-insecure-http file ls /vol1/1000/Docker/Hvaccrm | grep -E 'pullmark_|health_'
+# 期望：health_statusokdbtrueversionX.Y.Z.txt（pullmark_* 出现即失败，文件名里带原因）
+```
+
+`nas_pull_deploy.sh` 会先把当前 `hvaccrm:local` 打成 `hvaccrm:pre-X.Y.Z` 回滚点，再 pull、
+retag、`compose up -d --no-build`，最后做 health 检查并删掉 Docker Hub 名的那层引用
+（`hvaccrm:local` 仍指向同一 image ID，不多占磁盘）。
+
+### 3.1 路线 B：无需 SSH 时的远程构建
 
 NAS 上未开 SSH 时，用 `trim-cli`（fnOS CLI）完成上传、解压与镜像构建：
 
@@ -95,7 +135,10 @@ trim-cli --profile home --allow-insecure-http docker container create \
 > `trim-cli docker container create --cmd` 会按空格拆分成数组，**不能直接传带空格的命令**；
 > 因此把逻辑写成脚本（`scripts/nas_build.sh`、`scripts/nas_debug.sh`）再 `--cmd sh --cmd /path/script.sh`。
 
-### 3.1 兜底：`docker:cli` 拉不下来时用 alpine 当执行器
+### 3.2 执行器兜底：`docker:cli` 拉不下来时用 alpine 顶替
+
+**路线 A 和 B 都受这条影响** —— NAS 上没有 SSH、也没有 docker CLI，任何 `pull` / `tag` /
+`compose up` 都得靠一个挂宿主 `docker.sock` 的容器代跑。
 
 2026-11-15 实测：NAS 上历史镜像被清空后，`docker image pull docker:cli` 与 `docker:27-cli`
 **始终不成功**（`image ls` 里永远不出现），而同一时间 `alpine:3.20`、`python:3.12-slim` 都能拉成功
