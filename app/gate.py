@@ -37,9 +37,9 @@ from dataclasses import dataclass, field
 from hashlib import sha256
 
 from fastapi import Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response
 
-from . import net
+from . import errors, net
 from .config import get_settings
 from .utils import safe_next
 
@@ -199,13 +199,14 @@ class Decision:
     security: dict = field(default_factory=dict)
 
 
-def _not_found() -> JSONResponse:
-    """与「路由不存在」时 FastAPI 的响应**逐字节一致**，不做任何提示。
+def _not_found(path: str) -> Response:
+    """与「路由不存在」时的响应**逐字节一致**，不做任何提示。
 
     这样可以避免「门牌拦截」和「真的没这个页面」在响应上出现可区分的差异
     （差异本身就是一种指纹，等于告诉扫描器「这里有东西」）。
+    页面走统一的静态 404 页、`/api/*` 走 JSON，都由 `errors.not_found` 决定。
     """
-    return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return errors.not_found(path)
 
 
 def _entry_token(path: str) -> str | None:
@@ -239,7 +240,7 @@ def evaluate(request: Request, cfg: dict, *, secure: bool) -> Decision:
             "安全入口字符串不正确：ip=%s host=%s ua=%r",
             net.client_ip(request), net.host_of(request), (request.headers.get("user-agent") or "")[:80],
         )
-        return Decision(_not_found(), _state(external, secure, gated=True))
+        return Decision(_not_found(path), _state(external, secure, gated=True))
 
     passed = False
     if gated and not is_public_path(path):
@@ -248,7 +249,7 @@ def evaluate(request: Request, cfg: dict, *, secure: bool) -> Decision:
                 "安全入口拦截：%s %s ip=%s host=%s",
                 request.method, path, net.client_ip(request), net.host_of(request),
             )
-            return Decision(_not_found(), _state(external, secure, gated=True))
+            return Decision(_not_found(path), _state(external, secure, gated=True))
         passed = True
 
     return Decision(None, _state(external, secure, gated=gated, passed=passed))

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>404 · 页面不存在</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+    background: #f5f6f8;
+    color: #2c3038;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 100%; max-width: 24rem; text-align: center; }
+  .code {
+    margin: 0;
+    font-size: 5rem;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: .08em;
+    color: #cdd2da;
+    font-variant-numeric: tabular-nums;
+  }
+  h1 { margin: 1.5rem 0 .625rem; font-size: 1.0625rem; font-weight: 600; letter-spacing: .01em; }
+  p { margin: 0; color: #6b7280; font-size: .9375rem; }
+  .hint { margin-top: .375rem; font-size: .875rem; color: #9ba2ad; }
+  .back {
+    display: inline-block;
+    margin-top: 2rem;
+    padding: .5rem 1.25rem;
+    border: 1px solid #d6dae1;
+    border-radius: 999px;
+    background: #fff;
+    color: #4b5261;
+    font-size: .875rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .back:hover { border-color: #9ba2ad; color: #2c3038; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #191c20; color: #e4e7ec; }
+    .code { color: #3d434b; }
+    p { color: #9ba2ad; }
+    .hint { color: #737a86; }
+    .back { background: #23272c; border-color: #363b42; color: #c2c8d2; }
+    .back:hover { border-color: #555c66; color: #e4e7ec; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="code">404</p>
+    <h1>页面不存在</h1>
+    <p>访问的地址有误，或该页面已被移除。</p>
+    <p class="hint">请检查链接是否完整、拼写是否正确。</p>
+    <a class="back" href="/">回到首页</a>
+  </div>
+</body>
+</html>

@@ -4,7 +4,8 @@
 1. **内网不能被误伤**——NAS 直连 `192.168.11.8:8090` 必须照常可用；
 2. **外网必须被挡住**——包括「反代不在 TRUSTED_PROXIES 里、客户端 IP 看着是私网」这种
    最容易漏判的场景（靠 Host 信号兜住），以及 NAT 回流（内网 IP + 公网域名）；
-3. **拦住时不能泄露信息**——响应必须与「路由不存在」逐字节一致（404 + `{"detail":"Not Found"}`）。
+3. **拦住时不能泄露信息**——响应必须与「路由不存在」逐字节一致（同一张无指纹的静态
+   404 页面，`app/errors.py` 是唯一出口），且不含「入口」提示与产品名。
 
 另外覆盖 Cookie 签名：入口字符串一改，旧 Cookie 立即失效。
 """
@@ -15,7 +16,7 @@ from hashlib import sha256
 
 from starlette.requests import Request
 
-from app import gate
+from app import errors, gate
 from app.config import get_settings
 
 CFG = {"enabled": True, "path": "sec-entry-13", "cookie_days": 30, "bypass_private": True, "ready": True}
@@ -102,8 +103,22 @@ def test_external_without_cookie_is_404_like_missing_route():
     decision = gate.evaluate(make_request(client="8.8.8.8", host="crm.example.com"), CFG, secure=True)
     resp = decision.response
     assert resp is not None and resp.status_code == 404
+    # 与「路由不存在」逐字节一致：同一个 errors.not_found 出口
+    assert resp.body == errors.not_found("/").body
+    assert resp.headers["content-type"].startswith("text/html")
+    body = resp.body.decode()
+    for leak in ("入口", "HVAccRM", "/static/", "sec-entry"):
+        assert leak not in body  # 不提示，也不带产品指纹
+
+
+def test_gate_blocks_api_with_json_not_html():
+    """/api/* 被门牌拦住时仍要 JSON —— 和「真的没有这个接口」保持一致。"""
+    resp = gate.evaluate(
+        make_request(client="8.8.8.8", host="crm.example.com", path="/api/customers"), CFG, secure=True
+    ).response
+    assert resp is not None and resp.status_code == 404
+    assert resp.headers["content-type"].startswith("application/json")
     assert resp.body == b'{"detail":"Not Found"}'
-    assert "入口" not in resp.body.decode()  # 不提示，避免暴露
 
 
 def test_external_with_cookie_passes():

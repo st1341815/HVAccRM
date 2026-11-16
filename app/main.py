@@ -12,8 +12,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import __version__
+from . import __version__, errors
 from .auth import NotAuthenticated, load_user, router as auth_router
 from .bootstrap import configure_logging, ensure_fts, run_migrations, seed_admin, seed_stages
 from .config import get_settings, set_timezone
@@ -54,6 +55,25 @@ def _is_https(request: Request) -> bool:
     if proto in ("http", "ws"):
         return False
     return str(request.url.scheme) == "https"
+
+
+def _apply_security_headers(response: Response, *, secure: bool, path: str) -> Response:
+    """统一补齐安全响应头。
+
+    抽成函数是必须的：中间件里有**两个出口**——安全入口（门牌）拦截时在这里直接
+    结束请求，放行时在 `call_next` 之后收尾。两个出口给出的头必须完全一样，
+    否则「被门牌挡住」和「真的没这个页面」就能靠 `Strict-Transport-Security`
+    这类头的有无被区分开。
+    """
+    if path.startswith("/static"):
+        return response
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    hsts = int(get_settings().hsts_max_age or 0)
+    if hsts > 0 and secure:
+        response.headers.setdefault("Strict-Transport-Security", f"max-age={hsts}")
+    return response
 
 
 @asynccontextmanager
@@ -184,12 +204,7 @@ async def auth_middleware(request: Request, call_next):
     decision = gate_mod.evaluate(request, gate_mod.config(), secure=secure)
     request.state.security = decision.security
     if decision.response is not None:
-        response = decision.response
-        if not path.startswith("/static"):
-            response.headers.setdefault("X-Content-Type-Options", "nosniff")
-            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-            response.headers.setdefault("Referrer-Policy", "same-origin")
-        return response
+        return _apply_security_headers(decision.response, secure=secure, path=path)
     request.state.user = None
     if not _is_exempt(path):
         with session_scope() as db:
@@ -207,14 +222,7 @@ async def auth_middleware(request: Request, call_next):
         ):
             return RedirectResponse("/account/password?forced=1", status_code=303)
     response = await call_next(request)
-    if not path.startswith("/static"):
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "same-origin")
-        hsts = int(get_settings().hsts_max_age or 0)
-        if hsts > 0 and secure:
-            response.headers.setdefault("Strict-Transport-Security", f"max-age={hsts}")
-    return response
+    return _apply_security_headers(response, secure=secure, path=path)
 
 
 app.include_router(auth_router)
@@ -306,6 +314,28 @@ def _safe_validation_errors(exc: RequestValidationError) -> list:
         except (TypeError, ValueError):
             safe.append({k: (str(v) if k in ("msg", "type", "input") else v) for k, v in item.items()})
     return safe
+
+
+@app.exception_handler(StarletteHTTPException)
+async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """接住 **Starlette 层面**抛出的 HTTPException —— 主要是「路由不存在」的 404。
+
+    为什么需要它：FastAPI 注册的 `HTTPException` 处理器挂在 `fastapi.HTTPException`
+    上，而路由没匹配上时 Starlette 抛的是它的父类 `StarletteHTTPException`。按 MRO
+    查找规则，父类实例命不中挂在子类上的处理器，于是落到 FastAPI 内置处理器 ——
+    直接回 `{"detail":"Not Found"}` 裸 JSON（用户反馈「像坏掉了」）。
+
+    项目代码自己的 `raise HTTPException(...)` 是 `fastapi.HTTPException` 实例，
+    MRO 里子类排在前面，仍然走上面的 `http_exception_handler`，行为不变。
+
+    这里只接管 404 的「页面」形态；`/api/*` 由 `errors.not_found` 保持 JSON，
+    其余状态码沿用内置处理器的输出。
+    """
+    if exc.status_code == 404:
+        return errors.not_found(request.url.path)
+    return JSONResponse(
+        {"detail": exc.detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None)
+    )
 
 
 @app.exception_handler(RequestValidationError)
