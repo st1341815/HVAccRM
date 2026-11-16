@@ -45,6 +45,7 @@ _PUBLIC_IPS = [
 SUBS: list[tuple[str, str]] = [
     # 真实域名 → 文档域名
     (re.escape("crm." + _SUFFIX), "crm." + EXAMPLE),
+    (re.escape("c." + _SUFFIX), "crm." + EXAMPLE),   # 2026-11 起的正式域名（云主机反代）
     (re.escape("1." + _SUFFIX), "old." + EXAMPLE),
     (re.escape(_SUFFIX), EXAMPLE),
     (r"1\.13uncle\.top", "old.example.org"),

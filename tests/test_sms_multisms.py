@@ -37,7 +37,7 @@ def _http_error(code: int, payload: dict) -> urllib.error.HTTPError:
 
 
 CREDS = {
-    "multisms_base": "http://192.168.11.21:8080",
+    "multisms_base": "http://192.168.1.21:8080",
     "multisms_ak": "ak_test123",
     "multisms_sk": "sk_secret456",
     "multisms_tpl": "verify_code",
@@ -141,9 +141,9 @@ def test_trailing_slash_stripped(monkeypatch):
         return _FakeResp(json.dumps({"success": True}).encode())
 
     monkeypatch.setattr(sms_svc.urllib.request, "urlopen", fake_urlopen)
-    creds = dict(CREDS, multisms_base="http://192.168.11.21:8080/")
+    creds = dict(CREDS, multisms_base="http://192.168.1.21:8080/")
     sms_svc._send_multisms(creds, "13800138000", "123456")
-    assert captured["url"] == "http://192.168.11.21:8080/openapi/v1/sms/send"
+    assert captured["url"] == "http://192.168.1.21:8080/openapi/v1/sms/send"
 
 
 # ---------------------------------------------------------------- 错误映射

@@ -18,3 +18,10 @@ build/
 .localrun*/
 .pytest-config/
 .pytest-data/
+
+# 脱敏工具的 filter-repo 规则：**内容必须是真实值原文**（filter-repo 用字面替换，
+# 无法用占位符），所以这份文件永远不能进公开仓库，只能本地生成、本地用完即弃。
+scripts/replace-text.txt
+
+# 本地运维备忘（含真实域名/IP/反代链路），只留在部署机，不进仓库
+*.local.md

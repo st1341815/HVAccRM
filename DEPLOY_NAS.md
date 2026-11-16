@@ -9,7 +9,7 @@
 | 项 | 值 |
 | --- | --- |
 | 当前版本 | **v1.12.4**（2026-11-08，核算页「结算日」可排序）；回滚 tag `hvaccrm:pre-1.12.4`（= v1.12.3 镜像），`pre-1.12.3`（v1.12.2）、`pre-1.12.2`（v1.12.1）、`pre-1.12.1`（v1.12.0）继续保留 |
-| 访问地址 | 外网 `https://<your-domain>:8443` · 局域网 `http://<nas-ip>:8090` |
+| 访问地址 | 外网 `https://<your-domain>`（443 标准端口，云主机反代终止 TLS，再回源到 NAS） · 局域网 `http://<nas-ip>:8090` |
 | 容器名 / 镜像 | `hvaccrm` / `hvaccrm:local`（约 908 MB：多阶段构建 + 容器内 chromium，非 root） |
 | 挂载 | `<data-directory>/Docker/Hvaccrm/data → /data`、`<data-directory>/Docker/Hvaccrm/config → /config:ro` |
 | 环境变量 | `TZ=Asia/Shanghai`、`APP_SECRET_KEY`、`ADMIN_USER/ADMIN_PASS`、`DB_PATH=/data/crm.db`、`DATA_DIR=/data`、`CONFIG_DIR=/config`、`LOG_LEVEL=INFO` |

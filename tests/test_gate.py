@@ -1,7 +1,7 @@
 """安全入口（外网门牌）判定测试。
 
 锁定三件事：
-1. **内网不能被误伤**——NAS 直连 `192.168.11.8:8090` 必须照常可用；
+1. **内网不能被误伤**——NAS 直连 `192.168.1.8:8090` 必须照常可用；
 2. **外网必须被挡住**——包括「反代不在 TRUSTED_PROXIES 里、客户端 IP 看着是私网」这种
    最容易漏判的场景（靠 Host 信号兜住），以及 NAT 回流（内网 IP + 公网域名）；
 3. **拦住时不能泄露信息**——响应必须与「路由不存在」逐字节一致（同一张无指纹的静态
@@ -25,7 +25,7 @@ CFG = {"enabled": True, "path": "sec-entry-13", "cookie_days": 30, "bypass_priva
 def make_request(
     *,
     client: str = "192.168.1.2",
-    host: str = "192.168.11.8:8090",
+    host: str = "192.168.1.8:8090",
     path: str = "/",
     cookie: str | None = None,
     xff: str | None = None,
@@ -43,7 +43,7 @@ def make_request(
     return Request(
         {
             "type": "http", "method": method, "path": path, "raw_path": path.encode(),
-            "root_path": "", "scheme": "http", "server": ("192.168.11.8", 8090),
+            "root_path": "", "scheme": "http", "server": ("192.168.1.8", 8090),
             "client": (client, 54321), "headers": headers, "query_string": query,
         }
     )
