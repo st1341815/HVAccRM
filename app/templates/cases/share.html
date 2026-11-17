@@ -42,6 +42,7 @@
     </div>
     <div class="share-qr" id="share-qr" hidden>
       <img id="share-qr-img" data-src="/cases/share/{{ case.share_token }}/qrcode.svg"
+           data-base="{{ settings.public_base_url or '' }}"
            src="/cases/share/{{ case.share_token }}/qrcode.svg"
            alt="分享二维码" width="180" height="180">
       <p class="muted small">让对方用微信扫一扫打开</p>
@@ -53,10 +54,11 @@
 
 <script>
 (function () {
-  // ---- 二维码：内容按「当前浏览器地址」生成（复制链接由 layout.html 统一处理）----
+  // ---- 二维码：优先用后台配置的对外域名（PUBLIC_BASE_URL），未配置时才跟随当前地址 ----
+  // 否则在内网/后台预览这条分享页时，二维码会编码成内网 IP，客户扫不开。
   var qrImg = document.getElementById('share-qr-img');
   if (qrImg) {
-    var qrBase = location.origin;
+    var qrBase = (qrImg.getAttribute('data-base') || '').trim() || location.origin;
     qrImg.src = qrImg.getAttribute('data-src') + '?base=' + encodeURIComponent(qrBase);
   }
   var qrBtn = document.querySelector('.js-qr-toggle');

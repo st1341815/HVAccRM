@@ -83,9 +83,13 @@
 </div>
 {% endif %}
 <script>
-// 「复制链接」统一处理：**用当前浏览器地址的 origin 重写**，不写死域名。
-// 原因：公网域名可能被微信拦截、内网穿透（DDNSTO）域名是浮动的，
-// 只有「用户此刻打开这个页面的域名/IP + 端口」才是真正的有效地址。
+// 「复制链接」统一处理：**以链接自身的 origin 为准**，不写死域名。
+// 规则：
+//   1. data-url 是绝对地址（形如 https://www.2ii.cn/...）→ 原样保留其域名。
+//      后端已按 PUBLIC_BASE_URL 生成对外地址，前端不得改写，否则配置了对外域名
+//      也会被当前访问入口（内网 IP / 后台域名）覆盖掉。
+//   2. data-url 是相对地址（/cases/share/...）或没有 → 用当前浏览器地址的 origin，
+//      保持「公网域名可能被微信拦截、内网穿透域名浮动」时的原有灵活性。
 document.addEventListener('click', function (e) {
   var btn = e.target.closest && e.target.closest('.js-copy');
   if (!btn) return;
@@ -93,7 +97,7 @@ document.addEventListener('click', function (e) {
   var url = raw;
   try {
     var u = new URL(raw, location.origin);
-    url = location.origin + u.pathname + u.search;
+    url = u.origin + u.pathname + u.search;
   } catch (err) {}
   var old = btn.textContent;
   function done() { btn.textContent = '已复制'; setTimeout(function () { btn.textContent = old; }, 1500); }
