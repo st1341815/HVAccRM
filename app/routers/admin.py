@@ -98,6 +98,7 @@ def overview(
         sms_provider_labels=sms_svc.PROVIDER_LABELS,
         sms_masked={k: sms_svc.mask_secret(v) for k, v in sms_cfg["creds"].items()},
         gate_cfg=settings_svc.get_gate_config(db),
+        wx_cfg=settings_svc.get_wx_config(db),
         site_base=site_base(request),
     )
 
@@ -733,6 +734,38 @@ def sms_test_send(
         log_action(db, user, "sms_test", "app_settings", None, ip=client_ip(request), commit=True)
         return redirect("/admin#sms", "测试短信已发送，请查收手机")
     return redirect("/admin#sms", f"测试短信发送失败：{err}", "err")
+
+
+@router.post("/wx/settings")
+def save_wx_settings(
+    request: Request,
+    enabled: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    """小程序案例同步总开关（由 NAS 定时任务读取 app_settings.wx.enabled）。
+
+    关闭只停止后续推送：已同步到云端的案例、图片、以及客户手中的分享卡片都保持可用，
+    避免「关一下开关把已发出去的链接全变失效」。
+    """
+    settings_svc.save_wx_config(db, enabled=bool(enabled))
+    log_action(
+        db,
+        user,
+        "update",
+        "wx_settings",
+        None,
+        new={"enabled": bool(enabled)},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    message = (
+        "小程序同步已开启：NAS 定时任务会自动推送变更"
+        if enabled
+        else "小程序同步已关闭：不再推送新变更，云端已有数据保持不变"
+    )
+    return redirect("/admin#wx", message)
 
 
 @router.get("/permissions")

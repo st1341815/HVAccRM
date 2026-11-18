@@ -174,6 +174,39 @@
   </div>
 </section>
 
+<section class="card" id="wx">
+  <h2>微信小程序同步</h2>
+  <form method="post" action="/admin/wx/settings" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="field-grid">
+      <label class="checkline check-pair"><input type="checkbox" name="enabled" value="1" {{ 'checked' if wx_cfg.enabled else '' }}> 启用定时同步</label>
+    </div>
+
+    <div class="gate-preview">
+      当前状态：
+      {% if wx_cfg.enabled %}<span class="badge ok">同步中</span>{% else %}<span class="badge">已关闭</span>{% endif %}
+      · 最近同步：{{ wx_cfg.last_sync_at or '尚未执行' }}
+      {% if wx_cfg.last_sync_result %}<span class="muted small">（{{ wx_cfg.last_sync_result }}）</span>{% endif %}
+    </div>
+
+    <div class="module-actions">
+      <button type="submit">保存设置</button>
+    </div>
+  </form>
+
+  <div class="module-notes">
+    <h3>说明</h3>
+    <ul>
+      <li><b>同步方向</b>：NAS 主动推送至微信云开发（出站 HTTPS），小程序端只读。不暴露 NAS，不需要备案域名与 443 端口。</li>
+      <li><b>推送内容</b>：仅已脱敏的案例字段与压缩后的图片；客户姓名、电话、金额、完整房号永不离开本机。</li>
+      <li><b>触发方式</b>：NAS 定时任务每 5 分钟比对一次内容指纹，只推送新增或变更的案例。</li>
+      <li><b>关闭影响</b>：停止后续推送，云端已有数据与客户手中的分享卡片保持可用，不会被删除。</li>
+      <li><b>时效</b>：案例修改后约 5 分钟内出现在小程序案例库。</li>
+    </ul>
+  </div>
+</section>
+
 <section class="card">
   <h2>最近备份</h2>
   <table class="tight">

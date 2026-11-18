@@ -64,6 +64,12 @@ _STATIC_DEFAULTS: dict[str, str] = {
     "gate.path": "",                # 自定义字符串（/s/<这里>）；空 = 视为未配置
     "gate.cookie_days": "30",       # 入口 Cookie 有效期（天）
     "gate.bypass_private": "1",     # 1 = 内网（私网 IP + 私网 Host）免检
+    # ---- 微信小程序案例同步 ----
+    # 由 NAS 上的定时任务（scripts/wx_sync.sh → wx_push.py --sync）读取。
+    # 关 = 定时同步整体停用，已推送到云端的数据不受影响，也不会被删除。
+    "wx.enabled": "0",
+    "wx.last_sync_at": "",          # 由同步脚本回写：最近一次成功同步时间
+    "wx.last_sync_result": "",      # 由同步脚本回写：最近一次摘要（新增/更新/删除/失败数）
 }
 
 
@@ -212,3 +218,21 @@ def save_gate_config(db: Session, *, enabled: bool, path: str, cookie_days: int,
     set_(db, "gate.path", path)
     set_(db, "gate.cookie_days", str(max(1, min(365, int(cookie_days)))))
     set_(db, "gate.bypass_private", "1" if bypass_private else "0")
+
+
+def get_wx_config(db: Session) -> dict:
+    """微信小程序案例同步配置（类型化）。
+
+    开关只影响 NAS 侧定时任务是否执行推送；关闭时不会删除云端既有数据，
+    避免「关一下开关把客户手上的分享卡片全变失效」。
+    """
+    raw = all_settings(db)
+    return {
+        "enabled": raw.get("wx.enabled", "0") == "1",
+        "last_sync_at": raw.get("wx.last_sync_at", "") or "",
+        "last_sync_result": raw.get("wx.last_sync_result", "") or "",
+    }
+
+
+def save_wx_config(db: Session, *, enabled: bool) -> None:
+    set_(db, "wx.enabled", "1" if enabled else "0")
