@@ -1,6 +1,6 @@
 # HVAccRM 移动端（Android）
 
-HVAccRM 的安卓客户端，测试版 **v0.1.1**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
+HVAccRM 的安卓客户端，测试版 **v0.1.2**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
 
 ---
 
@@ -107,6 +107,7 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 | 外链/电话 | 非本站链接交给系统浏览器，`tel:` / `mailto:` / 微信 scheme 交给对应 App |
 | 离线兜底 | 主文档加载失败 → 本地 offline.html，带「重新连接」「改服务器地址」 |
 | 悬浮球 | 刷新 / 服务器地址 / 清除缓存（保留登录）/ 关于；3 秒无操作自动变淡，可拖动 |
+| 安全入口 | 服务端开了「系统 → 安全入口」时，App 启动先自动走 `/s/<入口>` 换 30 天 Cookie，之后无感；入口串可单独填，也可直接把 `…/s/xxx` 粘进地址栏 |
 | 明文 HTTP | 已开 `usesCleartextTraffic`，内网 `http://IP:8090` 可用 |
 
 ### 三个踩过的坑（改代码前务必看）
@@ -136,5 +137,6 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| 0.1.2 | 2026-11-21 | 支持服务端「安全入口」：设置页新增入口串输入（也可从 `…/s/xxx` 自动拆解），启动自动过门牌换 30 天 Cookie，测试连接同步走门牌；入口串错误时明确提示，主文档 404 自动弹窗引导 |
 | 0.1.1 | 2026-11-21 | 修 Android 15 全屏/edge-to-edge 下状态栏遮挡主导航：新增 `EdgeToEdge` inset 适配（含 IME）、WebView 改 margin 让位、根布局深色配白图标、设置页改深色系统图标。API 34 无回归 |
 | 0.1.0 | 2026-11-21 | 首个测试版：WebView 壳 + 原生拍照/选图上传 + 服务器地址配置与测试连接 + 返回键/下载/外链/离线兜底 + 悬浮球菜单 |

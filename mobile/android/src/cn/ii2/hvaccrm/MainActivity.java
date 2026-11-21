@@ -29,6 +29,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -62,6 +63,8 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraOutUri;
     private String serverUrl;
+    /** 安全入口字符串（服务端「系统 → 安全入口」），空 = 服务端没开门牌。 */
+    private String gateEntry;
     private long lastBackPressedAt = 0;
 
     /** 系统栏 inset（px）：Android 15 强制 edge-to-edge，内容必须自己让位。 */
@@ -70,6 +73,8 @@ public class MainActivity extends Activity {
     private int insetsRight = 0;
     private int insetsBottom = 0;
     private boolean fabPlaced = false;
+    /** 404 提示节流，避免每个子资源都弹一次。 */
+    private long gateHintAt = 0;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable dimFab = new Runnable() {
@@ -84,6 +89,7 @@ public class MainActivity extends Activity {
         buildUi();
         configureWeb();
 
+        gateEntry = Prefs.getGateOrNull(this);
         String saved = Prefs.getServerOrNull(this);
         if (saved == null) {
             // 首次启动：先给个本地欢迎页，同时把用户推到设置界面填地址
@@ -330,6 +336,28 @@ public class MainActivity extends Activity {
                     showOffline(error != null ? String.valueOf(error.getDescription()) : "网络不可用");
                 }
             }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                // 服务端开了安全入口时，没过门牌的一切页面都是 404（刻意的伪装）。
+                // 首次配置的人看到「404 页面不存在」只会以为地址写错了，这里主动点破。
+                if (request == null || !request.isForMainFrame() || errorResponse == null) return;
+                if (errorResponse.getStatusCode() != 404) return;
+                String u = request.getUrl() != null ? request.getUrl().toString() : "";
+                if (!u.endsWith("/") && u.indexOf("/s/") < 0) return;
+                if (Prefs.isPrivateHost(serverUrl)) return;
+                if (System.currentTimeMillis() - gateHintAt < 60000) return;
+                gateHintAt = System.currentTimeMillis();
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("打不开这个页面（404）")
+                        .setMessage("服务端开了「安全入口」：外网访问必须先过门牌，否则一律返回 404"
+                                + "（伪装成「页面不存在」，就是为了不告诉扫描器这里藏着系统）。\n\n"
+                                + "当前入口：" + (gateEntry == null || gateEntry.isEmpty() ? "（未配置）" : gateEntry)
+                                + "\n\n去「服务器地址」把入口串填上即可。")
+                        .setPositiveButton("去设置", (d, w) -> openSettings())
+                        .setNegativeButton("知道了", null)
+                        .show();
+            }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
@@ -446,7 +474,23 @@ public class MainActivity extends Activity {
             showOffline("当前无网络连接");
             return;
         }
-        web.loadUrl(serverUrl + "/");
+        web.loadUrl(entryUrl());
+    }
+
+    /**
+     * 该打开的起始地址。
+     *
+     * 服务端开了「安全入口」时，外网访问 `/` 一律 404（这是刻意做成和「路由不存在」一样的
+     * 伪装），必须先 GET `/s/<入口>`，服务端 303 回首页并下发一枚 30 天的签名 Cookie。
+     * App 每次都从入口进：代价只是一个 303，换来 Cookie 永远不会在某个早上突然过期。
+     *
+     * 内网地址不用走（服务端按 IP 免检），所以只在公网 + 配了入口时才拼。
+     */
+    private String entryUrl() {
+        if (gateEntry == null || gateEntry.isEmpty() || Prefs.isPrivateHost(serverUrl)) {
+            return serverUrl + "/";
+        }
+        return serverUrl + "/s/" + Uri.encode(gateEntry) + "?next=/";
     }
 
     private void reloadPage() {
@@ -494,7 +538,7 @@ public class MainActivity extends Activity {
         String ua = web.getSettings().getUserAgentString();
         new AlertDialog.Builder(this)
                 .setTitle("暖通CRM 移动端")
-                .setMessage("版本：0.1.0（测试版）\n"
+                .setMessage("版本：0.1.2（测试版）\n"
                         + "当前服务器：" + serverUrl + "\n\n"
                         + "承载内核：" + System.getProperty("http.agent") + "\n\n"
                         + "提示：长按/轻点左侧悬浮球可刷新页面或切换服务器。")
@@ -607,6 +651,7 @@ public class MainActivity extends Activity {
             String saved = Prefs.getServerOrNull(this);
             if (saved != null) {
                 serverUrl = saved;
+                gateEntry = Prefs.getGateOrNull(this);
                 loadHome();
             }
             return;

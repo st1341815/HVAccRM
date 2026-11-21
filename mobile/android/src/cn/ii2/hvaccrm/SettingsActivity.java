@@ -35,6 +35,7 @@ public class SettingsActivity extends Activity {
     private static final int MUTED = 0xFF6B7280;
 
     private EditText input;
+    private EditText gateInput;
     private TextView hint;
     private Button testBtn;
     private Button saveBtn;
@@ -108,6 +109,32 @@ public class SettingsActivity extends Activity {
         quick.addView(wan, lp(0, dp(40), 1f, dp(8), 0, 0, 0));
         box.addView(quick, lp(-1, -2, 0, 0, 0, dp(12)));
 
+        TextView gateLabel = new TextView(this);
+        gateLabel.setText("安全入口（可选）");
+        gateLabel.setTextSize(14);
+        gateLabel.setTextColor(FG);
+        box.addView(gateLabel, lp(-1, -2, 0, 0, 0, dp(4)));
+
+        gateInput = new EditText(this);
+        String g0 = Prefs.getGateOrNull(this);
+        gateInput.setText(g0 == null ? "" : g0);
+        gateInput.setTextSize(16);
+        gateInput.setTextColor(FG);
+        gateInput.setSingleLine(true);
+        gateInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        gateInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        gateInput.setHint("没开门牌就留空，例如 your-gate");
+        box.addView(gateInput, lp(-1, -2, 0, 0, 0, dp(4)));
+
+        TextView gateTip = new TextView(this);
+        gateTip.setText("服务端在「系统 → 安全入口」里设过入口串就填这里。"
+                + "App 启动时自动过门牌、记住 30 天，不用每次手输；内网地址不用填。\n"
+                + "也可以直接把 …/s/your-gate 粘进地址栏，会自动拆开。");
+        gateTip.setTextSize(12);
+        gateTip.setTextColor(MUTED);
+        gateTip.setLineSpacing(dp(2), 1f);
+        box.addView(gateTip, lp(-1, -2, 0, 0, 0, dp(10)));
+
         hint = new TextView(this);
         hint.setTextSize(13);
         hint.setTextColor(MUTED);
@@ -162,8 +189,10 @@ public class SettingsActivity extends Activity {
     // ---------------------------------------------------------------- 动作
 
     private void save() {
-        String raw = input.getText().toString();
-        String url = Prefs.normalize(raw);
+        // 地址里粘了 /s/xxx 的话，拆成「站点地址 + 入口串」，别把入口串留在 base 里
+        String[] parts = Prefs.splitGate(input.getText().toString());
+        String url = parts[0];
+        String gate = parts[1] != null ? parts[1] : Prefs.cleanGate(gateInput.getText().toString());
         try {
             new URL(url);
         } catch (Exception e) {
@@ -171,38 +200,82 @@ public class SettingsActivity extends Activity {
             return;
         }
         Prefs.setServer(this, url);
+        Prefs.setGate(this, gate);
         setResult(RESULT_OK, new Intent().putExtra(EXTRA_CURRENT, url));
         finish();
     }
 
     private void testConnection() {
-        String url = Prefs.normalize(input.getText().toString());
+        final String[] parts = Prefs.splitGate(input.getText().toString());
+        final String url = parts[0];
+        final String gate = parts[1] != null ? parts[1] : Prefs.cleanGate(gateInput.getText().toString());
+        final boolean gated = gate != null && !Prefs.isPrivateHost(url);
+
         testBtn.setEnabled(false);
         testBtn.setText("测试中…");
         hint.setTextColor(MUTED);
-        hint.setText("正在连接 " + url + " …");
+        hint.setText(gated ? "正在过安全入口，再连接 " + url + " …" : "正在连接 " + url + " …");
 
         new Thread(() -> {
             final String[] msg = new String[2]; // [文本, "ok"/"fail"]
+            final String[] cookie = new String[1];
             HttpURLConnection conn = null;
             try {
-                URL u = new URL(url + "/health");
-                conn = (HttpURLConnection) u.openConnection();
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
-                conn.setRequestMethod("GET");
-                conn.setInstanceFollowRedirects(false);
-                int code = conn.getResponseCode();
-                String body = readSnippet(conn.getInputStream(), 200);
-                if (code >= 200 && code < 300) {
-                    msg[0] = "✓ 连接成功（HTTP " + code + "）\n" + body;
-                    msg[1] = "ok";
-                } else if (code >= 300 && code < 400) {
-                    msg[0] = "△ 服务端返回跳转（HTTP " + code + "）\n地址可能少了 / 或证书/反代有问题。";
-                    msg[1] = "fail";
-                } else {
-                    msg[0] = "✗ 服务端返回 HTTP " + code + "\n" + body;
-                    msg[1] = "fail";
+                // 第一跳：服务端开了安全入口时，必须先 GET /s/<入口> 换 Cookie。
+                // 否则 /health 会和其它所有页面一样被回成 404 —— 门牌的伪装就是「当它不存在」。
+                if (gated) {
+                    conn = (HttpURLConnection) new URL(url + "/s/" + gate).openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(8000);
+                    conn.setInstanceFollowRedirects(false);
+                    int gc = conn.getResponseCode();
+                    String sc = conn.getHeaderField("Set-Cookie");
+                    conn.disconnect();
+                    conn = null;
+                    if (gc == 404) {
+                        msg[0] = "✗ 安全入口不正确（HTTP 404）\n"
+                                + "服务端把「过门牌」和「页面不存在」回成同一个 404，"
+                                + "出现这个基本就是入口串对不上。\n"
+                                + "把「系统 → 安全入口」里那条原样复制过来。";
+                        msg[1] = "fail";
+                    } else if (sc != null && sc.contains("crm_gate=")) {
+                        cookie[0] = sc.split(";")[0].trim();
+                    } else if (gc >= 500) {
+                        msg[0] = "✗ 过安全入口失败（HTTP " + gc + "）";
+                        msg[1] = "fail";
+                    }
+                }
+
+                if (msg[1] == null) {
+                    URL u = new URL(url + "/health");
+                    conn = (HttpURLConnection) u.openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(8000);
+                    conn.setRequestMethod("GET");
+                    conn.setInstanceFollowRedirects(false);
+                    if (cookie[0] != null) conn.setRequestProperty("Cookie", cookie[0]);
+                    int code = conn.getResponseCode();
+                    String body;
+                    try {
+                        body = readSnippet(conn.getInputStream(), 200);
+                    } catch (Exception ex) {
+                        body = readSnippet(conn.getErrorStream(), 200);
+                    }
+                    if (code >= 200 && code < 300) {
+                        msg[0] = "✓ 连接成功（HTTP " + code + "）\n" + body
+                                + (gated ? "\n安全入口：已通过" : "");
+                        msg[1] = "ok";
+                    } else if (code == 404 && gated) {
+                        msg[0] = "△ 入口通了，但 /health 仍是 404\n"
+                                + "入口串没问题，是服务端那边没有 /health 路由。";
+                        msg[1] = "fail";
+                    } else if (code >= 300 && code < 400) {
+                        msg[0] = "△ 服务端返回跳转（HTTP " + code + "）\n地址可能少了 / 或证书/反代有问题。";
+                        msg[1] = "fail";
+                    } else {
+                        msg[0] = "✗ 服务端返回 HTTP " + code + "\n" + body;
+                        msg[1] = "fail";
+                    }
                 }
             } catch (Exception e) {
                 msg[0] = "✗ 连不上：" + e.getClass().getSimpleName()
