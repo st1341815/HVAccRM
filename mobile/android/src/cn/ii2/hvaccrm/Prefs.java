@@ -14,8 +14,11 @@ final class Prefs {
     private static final String KEY_SERVER = "server_url";
     private static final String KEY_GATE = "gate_entry";
 
-    /** 默认指向外网域名（记忆里确认过的正式入口），内网可自行改成 http://192.168.1.8:8090 */
-    static final String DEFAULT_SERVER = "https://crm.example.com:8443";
+    /**
+     * 首次启动的占位地址。刻意用 example.com —— 这是 IANA 永久保留的示例域名，
+     * 永远不可能指向真实主机。真实地址只存在用户自己的设置里，不进 APK。
+     */
+    static final String DEFAULT_SERVER = "https://crm.example.com";
 
     private Prefs() {}
 

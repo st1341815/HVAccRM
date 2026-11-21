@@ -534,11 +534,20 @@ public class MainActivity extends Activity {
         startActivityForResult(i, REQ_SETTINGS);
     }
 
+    /** 从 APK 元数据读版本号，免得每次发版还在代码里改一遍。 */
+    private String appVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
     private void showAbout() {
         String ua = web.getSettings().getUserAgentString();
         new AlertDialog.Builder(this)
                 .setTitle("暖通CRM 移动端")
-                .setMessage("版本：0.1.2（测试版）\n"
+                .setMessage("版本：" + appVersion() + "（测试版）\n"
                         + "当前服务器：" + serverUrl + "\n\n"
                         + "承载内核：" + System.getProperty("http.agent") + "\n\n"
                         + "提示：长按/轻点左侧悬浮球可刷新页面或切换服务器。")

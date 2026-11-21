@@ -82,8 +82,9 @@ public class SettingsActivity extends Activity {
 
         TextView desc = new TextView(this);
         desc.setText("填 CRM 的访问地址即可，http:// 或 https:// 都能用。\n"
-                + "· 家里/公司局域网：http://192.168.1.8:8090\n"
-                + "· 外网（需域名可用）：https://crm.example.com:8443");
+                + "· 局域网：http://192.168.1.100:8090\n"
+                + "· 外网：https://crm.example.com（端口按你的部署来，如 :8443）\n"
+                + "（以上只是格式示例，请换成你自己的地址）");
         desc.setTextSize(13);
         desc.setTextColor(MUTED);
         desc.setLineSpacing(dp(3), 1f);
@@ -96,15 +97,15 @@ public class SettingsActivity extends Activity {
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         input.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        input.setHint("https://crm.example.com:8443");
+        input.setHint("https://crm.example.com");
         box.addView(input, lp(-1, -2, 0, 0, 0, dp(10)));
 
         LinearLayout quick = new LinearLayout(this);
         quick.setOrientation(LinearLayout.HORIZONTAL);
         Button lan = smallButton("用内网地址");
-        lan.setOnClickListener(v -> input.setText("http://192.168.1.8:8090"));
+        lan.setOnClickListener(v -> input.setText("http://192.168.1.100:8090"));
         Button wan = smallButton("用外网域名");
-        wan.setOnClickListener(v -> input.setText("https://crm.example.com:8443"));
+        wan.setOnClickListener(v -> input.setText("https://crm.example.com"));
         quick.addView(lan, new LinearLayout.LayoutParams(0, dp(40), 1f));
         quick.addView(wan, lp(0, dp(40), 1f, dp(8), 0, 0, 0));
         box.addView(quick, lp(-1, -2, 0, 0, 0, dp(12)));

@@ -1,6 +1,6 @@
 # HVAccRM 移动端（Android）
 
-HVAccRM 的安卓客户端，测试版 **v0.1.2**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
+HVAccRM 的安卓客户端，测试版 **v0.1.3**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
 
 ---
 
@@ -70,7 +70,7 @@ unzip -q /tmp/pf.zip -d $SDK/platforms # → platforms/android-35
 ./build.sh release    # release.keystore 签名（首次会自动生成，口令 KS_PASS，默认 hvaccrm2026）
 ```
 
-**为什么不用 Gradle**：AGP 要从 `maven.google.com` 拉依赖，内网/国内常连不通；这个壳只有 4 个 Java 文件，用 `aapt2 + javac + d8 + apksigner` 手工串起来，10 秒出包，且**完全离线可重复构建**。
+**为什么不用 Gradle**：AGP 要从 `maven.google.com` 拉依赖，内网/国内常连不通；这个壳只有 5 个 Java 文件，用 `aapt2 + javac + d8 + apksigner` 手工串起来，10 秒出包，且**完全离线可重复构建**。
 
 ⚠️ **`.debug.keystore` 必须留在工程根目录、绝不进 build/**。build/ 每次 `rm -rf`，密钥一旦跟着重建，签名就变了，用户手机上会 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，只能卸载重装（配置和登录态全丢）。
 
@@ -88,8 +88,8 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 
 | 场景 | 填什么 |
 |---|---|
-| 家里/公司局域网 | `http://192.168.1.8:8090` |
-| 外网（链路正常时） | `https://crm.example.com:8443` |
+| 家里/公司局域网 | `http://<内网IP>:8090` |
+| 外网（链路正常时） | `https://<你的域名>[:端口]` |
 
 点「测试连接」会当场请求 `/health`：绿色 ✓ 表示通，红色 ✗ 会给出原因（连不上 / 跳转 / HTTP 错误码）。保存后可在 **右下角悬浮球 → 服务器地址** 随时改回来。
 
@@ -137,6 +137,10 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| 0.1.3 | 2026-11-21 | 脱敏：界面里的示例地址、占位符、安全入口示例全部换成 IANA 保留的 `example.com` 与 `192.168.1.100`，真实域名/内网 IP/入口串不再进 APK；关于页版本号改为读 APK 元数据 |
 | 0.1.2 | 2026-11-21 | 支持服务端「安全入口」：设置页新增入口串输入（也可从 `…/s/xxx` 自动拆解），启动自动过门牌换 30 天 Cookie，测试连接同步走门牌；入口串错误时明确提示，主文档 404 自动弹窗引导 |
+| 0.1.1 | 2026-11-21 | 修 Android 15 全屏/edge-to-edge 下状态栏遮挡主导航：新增 `EdgeToEdge` inset 适配（含 IME）、WebView 改 margin 让位、根布局深色配白图标、设置页改深色系统图标。API 34 无回归 |
+| 0.1.0 | 2026-11-21 | 首个测试版：WebView 壳 + 原生拍照/选图上传 + 服务器地址配置与测试连接 + 返回键/下载/外链/离线兜底 + 悬浮球菜单 |
+：设置页新增入口串输入（也可从 `…/s/xxx` 自动拆解），启动自动过门牌换 30 天 Cookie，测试连接同步走门牌；入口串错误时明确提示，主文档 404 自动弹窗引导 |
 | 0.1.1 | 2026-11-21 | 修 Android 15 全屏/edge-to-edge 下状态栏遮挡主导航：新增 `EdgeToEdge` inset 适配（含 IME）、WebView 改 margin 让位、根布局深色配白图标、设置页改深色系统图标。API 34 无回归 |
 | 0.1.0 | 2026-11-21 | 首个测试版：WebView 壳 + 原生拍照/选图上传 + 服务器地址配置与测试连接 + 返回键/下载/外链/离线兜底 + 悬浮球菜单 |
