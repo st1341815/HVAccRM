@@ -1,6 +1,6 @@
 # HVAccRM 移动端（Android）
 
-HVAccRM 的安卓客户端，测试版 **v0.1.0**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
+HVAccRM 的安卓客户端，测试版 **v0.1.1**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
 
 ---
 
@@ -37,6 +37,7 @@ mobile/android/
     ├── MainActivity.java        # WebView + 进度条 + 悬浮球 + 拍照/下载/返回键
     ├── SettingsActivity.java    # 服务器地址 + 现场「测试连接」
     ├── SimpleFileProvider.java  # 最小 ContentProvider，给系统相机写照片用
+    ├── EdgeToEdge.java          # 系统栏 inset 适配（Android 15 强制 edge-to-edge 的兜底）
     └── Prefs.java               # 服务器地址持久化
 ```
 
@@ -108,10 +109,16 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 | 悬浮球 | 刷新 / 服务器地址 / 清除缓存（保留登录）/ 关于；3 秒无操作自动变淡，可拖动 |
 | 明文 HTTP | 已开 `usesCleartextTraffic`，内网 `http://IP:8090` 可用 |
 
-### 两个踩过的坑（改代码前务必看）
+### 三个踩过的坑（改代码前务必看）
 
 1. **`<queries>` 不可省**。targetSdk ≥ 30 有包可见性限制，manifest 里不声明 `IMAGE_CAPTURE` 的话，`intent.resolveActivity()` 永远返回 null，App 会误判「设备没有相机」→ **拍照入口直接消失**。模拟器实测过，真机一样。
 2. **WebView 焦点**。未获焦点的 WebView 会把第一次点击吃掉（只用来取焦），表现是「点上传没反应，要点两下」。`onPageFinished` / `onWindowFocusChanged` 里都要 `requestFocus()`。
+3. **Android 15 强制 edge-to-edge（状态栏压住导航）**。`targetSdk=35` 起，API 35 系统**强制**把窗口铺到状态栏和导航栏底下，主题里的 `android:statusBarColor` / `navigationBarColor` 直接失效（这两个属性在 35 上被废弃）。不自己处理 inset 的话，网页顶部的汉堡菜单/主导航就被信号栏压住——本机 API 34 模拟器测不出来，必须用 API 35 镜像复现。
+   - 处理方式见 `EdgeToEdge.java`：监听 `systemBars | displayCutout | ime`，把 inset 落到 WebView 的 **margin**（不是 padding，WebView 会用自己的背景涂掉 padding 区域）。
+   - 根布局底色设 `#353A41`，让状态栏/手势条区域透出深色，配合 `windowLightStatusBar=false` 的白色图标。
+   - 设置页是浅底，单独用 `SettingsTheme` 把系统图标切成深色。
+   - **inset 里必须带上 `ime`**：edge-to-edge 下 `windowSoftInputMode=adjustResize` 不再生效，不自己让位，网页输入框会被键盘盖住。
+   - API 34 上系统已让位、inset 回调为 0，所以同一份代码在两端都不会出现双重留白（已实测）。
 
 ---
 
@@ -129,4 +136,5 @@ adb install -r dist/hvaccrm-mobile-0.1.0-debug.apk
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| 0.1.1 | 2026-11-21 | 修 Android 15 全屏/edge-to-edge 下状态栏遮挡主导航：新增 `EdgeToEdge` inset 适配（含 IME）、WebView 改 margin 让位、根布局深色配白图标、设置页改深色系统图标。API 34 无回归 |
 | 0.1.0 | 2026-11-21 | 首个测试版：WebView 壳 + 原生拍照/选图上传 + 服务器地址配置与测试连接 + 返回键/下载/外链/离线兜底 + 悬浮球菜单 |

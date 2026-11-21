@@ -64,6 +64,13 @@ public class MainActivity extends Activity {
     private String serverUrl;
     private long lastBackPressedAt = 0;
 
+    /** 系统栏 inset（px）：Android 15 强制 edge-to-edge，内容必须自己让位。 */
+    private int insetsLeft = 0;
+    private int insetsTop = 0;
+    private int insetsRight = 0;
+    private int insetsBottom = 0;
+    private boolean fabPlaced = false;
+
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable dimFab = new Runnable() {
         @Override public void run() { if (fab != null) fab.setAlpha(0.35f); }
@@ -123,7 +130,8 @@ public class MainActivity extends Activity {
 
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFFEFEBE3);
+        // 深色底：edge-to-edge 后状态栏/手势条区域露出这个颜色，配主题里的白色系统图标
+        root.setBackgroundColor(0xFF353A41);
 
         web = new WebView(this);
         root.addView(web, new FrameLayout.LayoutParams(
@@ -158,6 +166,44 @@ public class MainActivity extends Activity {
         setupFab();
 
         setContentView(root);
+        EdgeToEdge.apply(root, new EdgeToEdge.OnInsets() {
+            @Override public void onInsets(int l, int t, int r, int b) {
+                applySystemInsets(l, t, r, b);
+            }
+        });
+    }
+
+    /** 把系统栏尺寸落到各子控件上：网页留白、进度条下移、悬浮球避开状态栏。 */
+    private void applySystemInsets(int l, int t, int r, int b) {
+        insetsLeft = l;
+        insetsTop = t;
+        insetsRight = r;
+        insetsBottom = b;
+
+        // 用 margin 而不是 padding：WebView 会用自己的背景把 padding 区域涂掉，
+        // 只有缩小它的 frame 才能让 root 的深色透出来，白色系统图标才看得见。
+        if (web != null) {
+            FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) web.getLayoutParams();
+            p.leftMargin = l;
+            p.topMargin = t;
+            p.rightMargin = r;
+            p.bottomMargin = b;
+            web.setLayoutParams(p);
+        }
+
+        if (bar != null) {
+            FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) bar.getLayoutParams();
+            p.topMargin = t;
+            bar.setLayoutParams(p);
+        }
+
+        if (fab != null && !fabPlaced) {
+            // 只摆一次；之后位置归用户拖动
+            FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) fab.getLayoutParams();
+            p.topMargin = t + dp(56);
+            fab.setLayoutParams(p);
+            fabPlaced = true;
+        }
     }
 
     /** 悬浮球：可拖动，轻点弹菜单，静止 4 秒后变淡免得挡内容。 */
@@ -187,10 +233,11 @@ public class MainActivity extends Activity {
                         if (Math.abs(dx) > slop || Math.abs(dy) > slop) moved = true;
                         if (moved) {
                             View parent = (View) v.getParent();
-                            int maxLeft = parent.getWidth() - v.getWidth();
-                            int maxTop = parent.getHeight() - v.getHeight();
-                            lp.leftMargin = Math.max(0, Math.min(maxLeft, startLeft + dx));
-                            lp.topMargin = Math.max(0, Math.min(maxTop, startTop + dy));
+                            int minL = insetsLeft, minT = insetsTop;
+                            int maxL = Math.max(minL, parent.getWidth() - insetsRight - v.getWidth());
+                            int maxT = Math.max(minT, parent.getHeight() - insetsBottom - v.getHeight());
+                            lp.leftMargin = Math.max(minL, Math.min(maxL, startLeft + dx));
+                            lp.topMargin = Math.max(minT, Math.min(maxT, startTop + dy));
                             v.setLayoutParams(lp);
                         }
                         return true;

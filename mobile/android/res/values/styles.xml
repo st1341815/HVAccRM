@@ -2,9 +2,18 @@
 <resources>
     <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@color/brand_bg</item>
+        <!-- API 34 及以下生效；API 35+ 被系统强制 edge-to-edge 忽略，改由 EdgeToEdge.java 兜底 -->
         <item name="android:statusBarColor">@color/brand_bar</item>
         <item name="android:navigationBarColor">@color/brand_bar</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <!-- 设置页是浅色底，系统图标得反过来用深色，否则白字压浅底看不清 -->
+    <style name="SettingsTheme" parent="@style/AppTheme">
+        <item name="android:windowBackground">@color/brand_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

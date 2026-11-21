@@ -48,7 +48,18 @@ public class SettingsActivity extends Activity {
         if (TextUtils.isEmpty(current)) current = Prefs.getServerOrNull(this);
         if (TextUtils.isEmpty(current)) current = Prefs.DEFAULT_SERVER;
 
-        setContentView(buildView(current));
+        final View content = buildView(current);
+        setContentView(content);
+        // Android 15 强制 edge-to-edge：不自己让位，顶部标题会被信号栏压住
+        EdgeToEdge.apply(content, new EdgeToEdge.OnInsets() {
+            @Override public void onInsets(int l, int t, int r, int b) {
+                content.setPadding(l, t, r, b);
+                if (content instanceof ViewGroup) {
+                    // 滚动时内容可以滑到状态栏底下，视觉更连贯
+                    ((ViewGroup) content).setClipToPadding(false);
+                }
+            }
+        });
     }
 
     private int dp(float v) {
