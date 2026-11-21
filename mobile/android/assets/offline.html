@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>连接失败</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #efebe3; color: #353a41;
+    font: 16px/1.65 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 24px calc(20px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-right));
+  }
+  .card {
+    width: 100%; max-width: 420px; background: #fff; border-radius: 18px;
+    padding: 28px 22px; box-shadow: 0 8px 30px rgba(53,58,65,.10); text-align: center;
+  }
+  .icon { font-size: 34px; line-height: 1; margin-bottom: 12px; }
+  h1 { font-size: 19px; margin: 0 0 10px; }
+  p { margin: 0 0 6px; color: #6b7280; font-size: 14px; word-break: break-all; }
+  .box { margin-top: 16px; padding: 12px; border-radius: 10px; background: #f7f5f1;
+    font-size: 13px; color: #6b7280; text-align: left; word-break: break-all; }
+  .box b { color: #353a41; }
+  a.btn {
+    display: block; margin-top: 16px; padding: 14px; border-radius: 12px;
+    background: #353a41; color: #fff; text-decoration: none; font-size: 15px;
+  }
+  a.btn.ghost { background: #f3f0ea; color: #353a41; margin-top: 10px; }
+  ul { text-align: left; font-size: 13px; color: #6b7280; padding-left: 18px; margin: 10px 0 0; }
+  li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">⚠️</div>
+  <h1>连不上服务器</h1>
+  <p id="reason">网络异常</p>
+
+  <div class="box">
+    当前地址：<b id="server">—</b>
+  </div>
+
+  <a class="btn" href="crmapp://reload">重试</a>
+  <a class="btn ghost" href="crmapp://settings">修改服务器地址</a>
+
+  <ul>
+    <li>手机是否连着 Wi-Fi / 流量？</li>
+    <li>服务器（NAS）是否开机、容器是否在跑？</li>
+    <li>在外网时要用外网域名，回家里局域网可改用内网地址。</li>
+  </ul>
+</div>
+<script>
+  (function () {
+    function q(name) {
+      var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
+      return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+    }
+    var r = q('reason');
+    if (r) document.getElementById('reason').textContent = r;
+    var s = q('server');
+    if (s) document.getElementById('server').textContent = s;
+  })();
+</script>
+</body>
+</html>

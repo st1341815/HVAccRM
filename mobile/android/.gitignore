@@ -1,0 +1,6 @@
+# 构建产物
+build/
+dist/
+
+# 签名密钥（绝不入库）
+*.keystore

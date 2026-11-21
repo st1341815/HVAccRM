@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>暖通CRM</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #efebe3; color: #353a41;
+    font: 16px/1.65 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 24px calc(20px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-right));
+  }
+  .card {
+    width: 100%; max-width: 420px; background: #fff; border-radius: 18px;
+    padding: 28px 22px; box-shadow: 0 8px 30px rgba(53,58,65,.10); text-align: center;
+  }
+  .logo { width: 72px; height: 72px; border-radius: 18px; background: #353a41; color: #fff;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { margin: 0 0 8px; color: #6b7280; font-size: 14px; }
+  .hint { font-size: 13px; color: #9a8f80; margin-top: 14px; }
+  a.btn {
+    display: block; margin-top: 20px; padding: 14px; border-radius: 12px;
+    background: #353a41; color: #fff; text-decoration: none; font-size: 16px;
+  }
+  a.btn.ghost { background: #f3f0ea; color: #353a41; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">⌂</div>
+    <h1>暖通CRM 移动端</h1>
+    <p>连接你自托管的 HVAccRM 服务器</p>
+    <a class="btn" href="crmapp://settings">填写服务器地址</a>
+    <a class="btn ghost" href="crmapp://reload">我已填好，重新连接</a>
+    <div class="hint">局域网用 http://192.168.1.8:8090<br>外网用 https://crm.example.com:8443</div>
+  </div>
+</body>
+</html>

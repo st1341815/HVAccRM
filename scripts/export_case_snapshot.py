@@ -32,8 +32,8 @@
 
 CDN 约定
 --------
-    --base https://img.2ii.cn/    →  JSON 里的图片 URL 为
-                                    https://img.2ii.cn/cases/<id>/<f>
+    --base https://img.example.com/    →  JSON 里的图片 URL 为
+                                    https://img.example.com/cases/<id>/<f>
     images/ 目录结构与之一一对应，直接 rsync/上传即可。
 """
 from __future__ import annotations
@@ -318,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--db", default="/data/crm.db", help="CRM 的 sqlite 库路径")
     p.add_argument("--media", default="", help="媒体目录（默认 <db 同级>/media）")
     p.add_argument("--out", default="dist/miniapp", help="输出目录")
-    p.add_argument("--base", default="https://img.2ii.cn/", help="图片 CDN 前缀")
+    p.add_argument("--base", default="https://img.example.com/", help="图片 CDN 前缀")
     p.add_argument("--copy-images", action="store_true", help="复制并压缩图片到 <out>/images")
     p.add_argument("--max-edge", type=int, default=1600, help="图片长边上限，默认 1600")
     p.add_argument("--include-disabled", action="store_true", help="包含已失效/已过期案例")

@@ -85,7 +85,7 @@
 <script>
 // 「复制链接」统一处理：**以链接自身的 origin 为准**，不写死域名。
 // 规则：
-//   1. data-url 是绝对地址（形如 https://www.2ii.cn/...）→ 原样保留其域名。
+//   1. data-url 是绝对地址（形如 https://www.example.com/...）→ 原样保留其域名。
 //      后端已按 PUBLIC_BASE_URL 生成对外地址，前端不得改写，否则配置了对外域名
 //      也会被当前访问入口（内网 IP / 后台域名）覆盖掉。
 //   2. data-url 是相对地址（/cases/share/...）或没有 → 用当前浏览器地址的 origin，

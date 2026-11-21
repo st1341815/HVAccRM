@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 取自现有 PWA manifest / app.css 的莫兰迪配色，保持品牌一致 -->
+    <color name="brand_bar">#353A41</color>
+    <color name="brand_bg">#EFEBE3</color>
+    <color name="brand_accent">#8C7A66</color>
+</resources>
