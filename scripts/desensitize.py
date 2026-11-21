@@ -27,6 +27,7 @@ _TUNNEL_NAME = "example-net"
 _TUNNEL_DOMAIN = _TUNNEL_NAME + ".com"
 _PHONE = "1895515" + "1111"
 _LAN_PREFIX = "192.168.11" + "."
+_GATE_PATH = "unit" + "315"   # 服务端「安全入口」的入口串
 
 
 def _ip(parts: list[str]) -> str:
@@ -60,6 +61,8 @@ SUBS: list[tuple[str, str]] = [
     (re.escape(_PUBLIC_IPS[4]), "208.67.220.220"),
     # 手机号
     (re.escape(_PHONE), "13800000000"),
+    # 安全入口串（App 端的提示语里出现过，等于把门牌印在安装包上）
+    (re.escape(_GATE_PATH), "your-gate"),
     # 内网段：保留主机位，192.168.1.x → 192.168.1.x
     (re.escape(_LAN_PREFIX), "192.168.1."),
 ]
@@ -94,10 +97,22 @@ def rules_as_filter_repo() -> str:
 
 def main() -> None:
     targets: list[Path] = []
-    for base in (ROOT / "app", ROOT / "docs", ROOT / "tests", ROOT / "scripts"):
+    # ⚠️ 新模块加进来必须同步加到这里，否则它的真实值永远不会被扫到
+    for base in (ROOT / "app", ROOT / "docs", ROOT / "tests", ROOT / "scripts", ROOT / "mobile"):
         for p in base.rglob("*"):
-            if p.is_file() and "__pycache__" not in str(p):
-                targets.append(p)
+            if not p.is_file() or "__pycache__" in str(p):
+                continue
+            # 替换规则表本身就是真实值原文（filter-repo 只做字面替换），
+            # 扫它等于把规则左值也替换掉，规则会失效
+            if p.name == "replace-text.txt":
+                continue
+            # 构建产物与依赖目录不扫：耗时且内容由源码派生
+            rel = str(p.relative_to(ROOT))
+            if "/build/" in rel or "/dist/" in rel or "/node_modules/" in rel or "/.venv/" in rel:
+                continue
+            if p.suffix.lower() in (".apk", ".idsig", ".dex", ".zip", ".jar", ".png", ".jpg", ".webp"):
+                continue
+            targets.append(p)
     for name in ("README.md", "DEVELOPING.md", "DEPLOY_NAS.md", "CHANGELOG.md",
                  "docker-compose.yml", ".env.example", "pyproject.toml"):
         p = ROOT / name
