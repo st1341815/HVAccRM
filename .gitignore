@@ -25,3 +25,8 @@ scripts/replace-text.txt
 
 # 本地运维备忘（含真实域名/IP/反代链路），只留在部署机，不进仓库
 *.local.md
+
+# 设计预览：PNG 由 preview.html 重新渲染即可产出，调试中间产物同样不入库
+docs/design-preview/*.png
+docs/design-preview/_*.html
+docs/design-preview/dom.txt

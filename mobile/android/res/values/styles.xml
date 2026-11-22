@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
-        <item name="android:windowBackground">@color/brand_bg</item>
+        <!-- 冷启动第一帧就用深墨：主界面 root 是 #353A41，窗口底色若还是暖纸会在启动瞬间闪一下浅色 -->
+        <item name="android:windowBackground">@color/brand_bar</item>
         <!-- API 34 及以下生效；API 35+ 被系统强制 edge-to-edge 忽略，改由 EdgeToEdge.java 兜底 -->
         <item name="android:statusBarColor">@color/brand_bar</item>
         <item name="android:navigationBarColor">@color/brand_bar</item>

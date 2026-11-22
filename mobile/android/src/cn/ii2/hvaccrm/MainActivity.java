@@ -8,7 +8,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -18,7 +24,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,12 +42,14 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.Locale;
 
 /**
  * HVAccRM 移动端主界面。
@@ -75,6 +85,14 @@ public class MainActivity extends Activity {
     private boolean fabPlaced = false;
     /** 404 提示节流，避免每个子资源都弹一次。 */
     private long gateHintAt = 0;
+
+    // ---- 启动加载层：WebView 拿到首字节前整屏只有 root 的深墨色，用户会以为死机 ----
+    private FrameLayout loading;
+    private TextView loadTitle;
+    private TextView loadAddr;
+    private TextView loadSecs;
+    private View loadBarFill;
+    private long loadStartAt = 0;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable dimFab = new Runnable() {
@@ -113,8 +131,19 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // 从设置页/相册/系统对话框回来时把读秒续上，否则秒数会停在离开那一刻
+        if (loading != null && loading.getVisibility() == View.VISIBLE) {
+            ui.removeCallbacks(loadTicker);
+            ui.postDelayed(loadTicker, 100);
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
+        ui.removeCallbacks(loadTicker); // 后台别空转读秒
         CookieManager.getInstance().flush(); // 确认登录 Cookie 落盘，避免杀进程后掉登录
     }
 
@@ -132,6 +161,160 @@ public class MainActivity extends Activity {
 
     private int dp(float v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    // ---------------------------------------------------------------- 启动加载层
+
+    /**
+     * 读秒 + 分级文案。
+     *
+     * WebView 从「按下图标」到「看到首屏」之间可能空好几秒，这段时间屏幕上只有 root 的
+     * 深墨色 —— 用户分不清是在加载、卡住、还是已经崩了。这里把「在做什么」和「已经等了
+     * 多久」摊开写出来，并用文案阈值把「慢」和「坏」区分开：3 秒内不说话，8 秒提示慢，
+     * 20 秒直接让他去查服务器。
+     */
+    private final Runnable loadTicker = new Runnable() {
+        @Override public void run() {
+            if (loading == null || loading.getVisibility() != View.VISIBLE) return;
+            long ms = SystemClock.elapsedRealtime() - loadStartAt;
+            loadSecs.setText(String.format(Locale.US, "%.1f 秒", ms / 1000f));
+            if (ms >= 20000) {
+                loadTitle.setText("连不上，检查服务器或网络");
+            } else if (ms >= 8000) {
+                loadTitle.setText("网络较慢，还在等…");
+            } else if (ms >= 3000) {
+                loadTitle.setText("正在打开页面…");
+            }
+            ui.postDelayed(this, 100);
+        }
+    };
+
+    private void showLoading(String title) {
+        if (loading == null) return;
+        loadStartAt = SystemClock.elapsedRealtime();
+        loadTitle.setText(title);
+        loadAddr.setText(serverUrl == null ? "" : serverUrl);
+        loadSecs.setText("0.0 秒");
+        if (loadBarFill != null) loadBarFill.setScaleX(0f);
+        loading.animate().cancel();
+        loading.setAlpha(1f);
+        loading.setVisibility(View.VISIBLE);
+        ui.removeCallbacks(loadTicker);
+        ui.postDelayed(loadTicker, 100);
+    }
+
+    private void hideLoading() {
+        if (loading == null || loading.getVisibility() != View.VISIBLE) return;
+        ui.removeCallbacks(loadTicker);
+        loading.animate().cancel();
+        loading.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() {
+            @Override public void run() {
+                if (loading != null) loading.setVisibility(View.GONE);
+            }
+        }).start();
+    }
+
+    private View buildLoading() {
+        loading = new FrameLayout(this);
+        loading.setBackgroundColor(0xFF353A41);
+        loading.setClickable(true);   // 吃掉点击，否则会穿透到下面的 WebView
+        loading.setVisibility(View.GONE);
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        col.addView(new DuctMark(this), new LinearLayout.LayoutParams(dp(72), dp(72)));
+
+        loadTitle = new TextView(this);
+        loadTitle.setText("正在连接…");
+        loadTitle.setTextSize(15);
+        loadTitle.setTextColor(0xFFF7F5F1);
+        loadTitle.setGravity(Gravity.CENTER);
+        loadTitle.setSingleLine(true);
+        loadTitle.setLetterSpacing(0.03f);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tlp.topMargin = dp(28);
+        col.addView(loadTitle, tlp);
+
+        loadAddr = new TextView(this);
+        loadAddr.setTextSize(11);
+        loadAddr.setTextColor(0xFF9AA4AD);
+        loadAddr.setGravity(Gravity.CENTER);
+        loadAddr.setSingleLine(true);
+        loadAddr.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        loadAddr.setTypeface(Typeface.MONOSPACE);   // 等宽：l/1/0/O 不念错
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                dp(240), ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.topMargin = dp(8);
+        col.addView(loadAddr, alp);
+
+        // 细进度条：轨道 + 填充两层，靠 scaleX 表示百分比。
+        // 不用系统 horizontal ProgressBar —— 它的最小高度压不到 3dp，会撑成一条粗杠。
+        FrameLayout track = new FrameLayout(this);
+        GradientDrawable tgb = new GradientDrawable();
+        tgb.setCornerRadius(dp(2));
+        tgb.setColor(0x33FFFFFF);
+        track.setBackground(tgb);
+        loadBarFill = new View(this);
+        GradientDrawable fgb = new GradientDrawable();
+        fgb.setCornerRadius(dp(2));
+        fgb.setColor(0xFF8C7A66);
+        loadBarFill.setBackground(fgb);
+        loadBarFill.setPivotX(0f);
+        loadBarFill.setScaleX(0f);
+        track.addView(loadBarFill, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(168), dp(3));
+        blp.topMargin = dp(22);
+        col.addView(track, blp);
+
+        loadSecs = new TextView(this);
+        loadSecs.setText("0.0 秒");
+        loadSecs.setTextSize(11);
+        loadSecs.setTextColor(0xFF8C7A66);
+        loadSecs.setGravity(Gravity.CENTER);
+        loadSecs.setSingleLine(true);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        slp.topMargin = dp(10);
+        col.addView(loadSecs, slp);
+
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.gravity = Gravity.CENTER;
+        loading.addView(col, clp);
+        return loading;
+    }
+
+    /**
+     * 品牌弯管标记：24 单位网格描边路径，与设计规格 A.6 图标 1 同源。
+     * 用 Canvas 画而非放图片 —— 一个路径在任意 dp 下都能保持线宽比例，也不用加资源文件。
+     */
+    private static class DuctMark extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+
+        DuctMark(Context c) { super(c); }
+
+        @Override protected void onDraw(Canvas cv) {
+            float s = Math.min(getWidth(), getHeight());
+            float pad = s * 0.13f;
+            float u = (s - pad * 2) / 24f;
+            cv.translate(pad, pad);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(u * 2.4f);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeJoin(Paint.Join.ROUND);
+            p.setColor(0xFFEFEBE3);
+            path.reset();
+            path.moveTo(u * 4.5f, u * 20f);
+            path.lineTo(u * 4.5f, u * 10.5f);
+            path.arcTo(new RectF(u * 4.5f, u * 4.5f, u * 16.5f, u * 16.5f), 180f, 90f, false);
+            path.lineTo(u * 20f, u * 4.5f);
+            cv.drawPath(path, p);
+        }
     }
 
     private void buildUi() {
@@ -171,6 +354,10 @@ public class MainActivity extends Activity {
         root.addView(fab, flp);
         setupFab();
 
+        // 加载层最后加：按 addView 顺序盖住 WebView、进度条和悬浮球
+        root.addView(buildLoading(), new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
         setContentView(root);
         EdgeToEdge.apply(root, new EdgeToEdge.OnInsets() {
             @Override public void onInsets(int l, int t, int r, int b) {
@@ -201,6 +388,11 @@ public class MainActivity extends Activity {
             FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) bar.getLayoutParams();
             p.topMargin = t;
             bar.setLayoutParams(p);
+        }
+
+        if (loading != null) {
+            // 加载层自身全屏铺满（深色要顶到状态栏），只给内部内容让出安全区
+            loading.setPadding(l, t, r, b);
         }
 
         if (fab != null && !fabPlaced) {
@@ -321,8 +513,15 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                // 只对远程页面显示：welcome/offline 是本地瞬时页面，闪一层加载层反而更糟
+                if (url != null && url.startsWith("http")) showLoading("正在连接…");
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 bar.setVisibility(View.GONE);
+                hideLoading();
                 // WebView 没拿到焦点时，第一次点击只会用来"取焦"，页面根本收不到 ——
                 // 现场表现就是「点了拍照没反应，要点两下」。这里每次加载完成都主动取焦。
                 view.setFocusable(true);
@@ -368,6 +567,11 @@ public class MainActivity extends Activity {
                 } else {
                     bar.setVisibility(View.VISIBLE);
                     bar.setProgress(p);
+                }
+                // 加载层里那条细进度条跟着走：有百分比比纯转圈更能安抚人
+                if (loadBarFill != null && loading != null
+                        && loading.getVisibility() == View.VISIBLE) {
+                    loadBarFill.setScaleX(Math.max(p, 1) / 100f);
                 }
             }
 
@@ -515,6 +719,7 @@ public class MainActivity extends Activity {
 
     private void showOffline(String reason) {
         bar.setVisibility(View.GONE);
+        hideLoading();
         String page = "file:///android_asset/offline.html?reason="
                 + Uri.encode(reason == null ? "" : reason)
                 + "&server=" + Uri.encode(serverUrl);

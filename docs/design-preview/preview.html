@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HVAccRM 安卓壳层 · 双方向对比</title>
+<style>
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:#D7DAD6;font-family:"Noto Sans CJK SC","PingFang SC",system-ui,sans-serif;padding:40px 36px 56px;}
+  .board-hd{max-width:1240px;margin:0 auto 28px;}
+  .board-hd h1{margin:0;font-size:24px;font-weight:700;color:#2A2E33;letter-spacing:-.2px;}
+  .board-hd p{margin:6px 0 0;font-size:13px;color:#5A5F5C;}
+
+  .band{max-width:1240px;margin:34px auto 14px;display:flex;align-items:baseline;gap:12px;}
+  .band-t{font-size:17px;font-weight:700;color:#2A2E33;}
+  .band-a .band-t{color:#3A3F46;}
+  .band-b .band-t{color:#33544A;}
+  .band-s{font-size:12px;color:#5A5F5C;}
+
+  .grid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(3,360px);gap:32px;}
+  .cap{font-size:12px;font-weight:600;color:#42474D;margin-bottom:8px;letter-spacing:.2px;white-space:nowrap;}
+  .cap span{font-weight:400;color:#6A6F6C;}
+
+  /* ---------- 手机框 ---------- */
+  .phone{width:360px;height:780px;border-radius:26px;overflow:hidden;position:relative;
+    background:#EFEBE3;display:flex;flex-direction:column;
+    box-shadow:0 1px 2px rgba(0,0,0,.06),0 18px 40px rgba(0,0,0,.16);}
+
+  /* ---------- 状态栏 ---------- */
+  .sb{height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11px;font-weight:600;}
+  .sb.dark{background:#353A41;color:#F7F5F1;}
+  .sb.light{background:#EFEBE3;color:#353A41;}
+  .sb-r{display:flex;gap:3px;align-items:center;}
+  .sb-r i{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.85;display:block;}
+  .sb-r b{width:14px;height:7px;border:1px solid currentColor;border-radius:2px;display:block;opacity:.85;}
+
+  /* ================= 方向 A ================= */
+  .a-hdr{flex:none;height:56px;background:#353A41;display:flex;align-items:center;gap:10px;padding:0 16px;}
+  .a-hdr .t{font-size:15px;font-weight:600;color:#fff;letter-spacing:.2px;white-space:nowrap;}
+
+  .a-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:32px 16px 0;min-height:0;}
+  .a-card{width:100%;background:#FBF9F5;border:1px solid #E2DBD0;border-radius:12px;
+    box-shadow:0 1px 2px rgba(53,58,65,.05);padding:24px 20px;text-align:center;}
+  .a-logo{width:72px;height:72px;border-radius:18px;background:#353A41;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+  .a-h1{font-size:22px;font-weight:700;line-height:30px;color:#353A41;margin:20px 0 0;white-space:nowrap;}
+  .a-sub{font-size:13px;line-height:20px;color:#5E5A52;margin:8px auto 0;max-width:240px;}
+
+  .a-infob{position:relative;background:#F1EFE9;border-radius:10px;padding:12px 14px;text-align:left;margin-top:20px;}
+  .a-infob::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:16px;background:#8C7A66;border-radius:1px;}
+  .eb{font-size:11px;font-weight:600;letter-spacing:.5px;color:#6F6152;white-space:nowrap;}
+  .addr{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .addr span{font-family:"Noto Sans Mono CJK SC",monospace;font-size:13px;color:#353A41;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+
+  .a-pri{display:flex;align-items:center;justify-content:center;height:48px;border-radius:10px;
+    background:#353A41;color:#fff;font-size:15px;font-weight:600;letter-spacing:.3px;margin-top:24px;white-space:nowrap;}
+  .a-sec{display:flex;align-items:center;justify-content:center;height:48px;border-radius:10px;
+    background:#FBF9F5;border:1px solid #E2DBD0;color:#353A41;font-size:15px;font-weight:500;margin-top:12px;white-space:nowrap;}
+  .a-foot{flex:none;padding:20px 22px 24px;text-align:center;font-size:12px;line-height:18px;color:#5E5A52;}
+
+  .a-main{flex:1;padding:24px 16px 0;min-height:0;}
+  .a-ic56{width:56px;height:56px;border-radius:28px;background:#F7EDED;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+  .a-h19{font-size:19px;font-weight:600;line-height:26px;color:#353A41;margin:16px 0 0;white-space:nowrap;}
+  .a-reason{font-size:13px;line-height:20px;color:#5E5A52;margin:8px auto 0;max-width:272px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .a-card2{background:#FBF9F5;border:1px solid #E2DBD0;border-radius:12px;padding:16px;margin-top:16px;text-align:left;}
+  .chk{display:flex;gap:10px;margin-top:10px;align-items:flex-start;}
+  .chk:first-of-type{margin-top:12px;}
+  .num{flex:none;width:18px;height:18px;border-radius:9px;background:#F3F0EA;color:#6F6152;font-size:10px;
+    font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .chk p{margin:0;font-size:12px;line-height:19px;color:#5E5A52;}
+
+  .a-set{padding:20px 16px 0;}
+  .a-scard{background:#FBF9F5;border:1px solid #E2DBD0;border-radius:12px;padding:18px 16px;margin-bottom:16px;}
+  .flabel{font-size:12px;font-weight:600;color:#353A41;letter-spacing:.3px;white-space:nowrap;
+    display:flex;align-items:center;gap:8px;}
+  .pill{height:18px;border-radius:9px;background:#F3F0EA;color:#6F6152;font-size:10px;
+    display:inline-flex;align-items:center;padding:0 6px;font-weight:500;}
+  .fdesc{font-size:12px;line-height:18px;color:#5E5A52;margin:4px 0 0;}
+  .a-input{height:48px;border-radius:10px;background:#F1EFE9;border:1px solid #E2DBD0;padding:0 14px;
+    display:flex;align-items:center;font-family:"Noto Sans Mono CJK SC",monospace;font-size:15px;
+    color:#353A41;margin-top:12px;white-space:nowrap;overflow:hidden;}
+  .a-input.ph{color:#9A8F80;}
+  .chips{display:flex;gap:8px;margin-top:10px;}
+  .chip{height:40px;border-radius:20px;background:#F3F0EA;color:#5E5A52;font-size:13px;font-weight:500;
+    display:flex;align-items:center;padding:0 14px;white-space:nowrap;}
+
+  .a-res{position:relative;background:#E6ECE1;border-radius:10px;padding:12px 14px 12px 16px;margin-bottom:20px;}
+  .a-res::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:16px;background:#4F7059;border-radius:1px;}
+  .res-t{font-size:13px;font-weight:600;color:#4F7059;white-space:nowrap;}
+  .res-s{font-size:12px;line-height:18px;color:#5E5A52;margin-top:2px;white-space:nowrap;}
+
+  .a-test{height:48px;border-radius:10px;background:#FBF9F5;border:1px solid #E2DBD0;display:flex;
+    align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#353A41;white-space:nowrap;}
+  .a-save{height:48px;border-radius:10px;background:#353A41;color:#fff;display:flex;align-items:center;
+    justify-content:center;font-size:15px;font-weight:600;margin-top:12px;white-space:nowrap;}
+  .a-tip{font-size:12px;line-height:18px;color:#5E5A52;text-align:center;margin-top:12px;white-space:nowrap;}
+
+  /* ================= 方向 B ================= */
+  .b-wrap{flex:1;display:flex;flex-direction:column;padding:40px 24px 0;min-height:0;}
+  .b-wrap.tight{padding-top:32px;}
+  .b-logo{width:48px;height:48px;border-radius:14px;background:#353A41;display:flex;align-items:center;justify-content:center;flex:none;}
+  .b-used{font-size:11px;font-weight:600;letter-spacing:1.6px;color:#6F6152;margin-top:28px;white-space:nowrap;}
+  .b-used.red{color:#9C5245;}
+  .b-rule{width:24px;height:2px;border-radius:1px;background:#8C7A66;margin-top:10px;}
+  .b-rule.red{background:#9C5245;}
+  .b-title{font-size:30px;font-weight:700;line-height:38px;color:#353A41;margin-top:14px;white-space:nowrap;}
+  .b-title.h24{font-size:24px;line-height:32px;margin-top:14px;}
+  .b-sub{font-size:14px;line-height:22px;color:#5E5A52;margin-top:12px;max-width:26ch;}
+  .b-pri{height:52px;border-radius:14px;background:#3E6152;color:#fff;display:flex;align-items:center;
+    justify-content:center;font-size:15px;font-weight:600;letter-spacing:.3px;margin-top:32px;white-space:nowrap;}
+  .b-txt{height:48px;display:flex;align-items:center;gap:6px;color:#353A41;font-size:15px;font-weight:500;
+    margin-top:8px;white-space:nowrap;}
+  .b-strip{border-top:1px solid #E3DDD1;border-bottom:1px solid #E3DDD1;padding:12px 0;margin-top:28px;}
+  .b-strip .eb{letter-spacing:1.2px;}
+  .b-foot{font-size:12px;line-height:18px;color:#5E5A52;margin-top:24px;white-space:nowrap;}
+
+  .b-ic44{width:44px;height:44px;border-radius:22px;background:#F7EBE6;display:flex;align-items:center;justify-content:center;flex:none;}
+  .b-vol{background:#fff;border:1px solid #E3DDD1;border-radius:12px;padding:12px 14px;margin-top:24px;}
+  .b-vol-hd{display:flex;align-items:center;justify-content:space-between;}
+  .b-vol-hd .eb{letter-spacing:.6px;}
+  .copy-lnk{font-size:12px;font-weight:600;color:#3E6152;white-space:nowrap;}
+  .b-list{margin-top:12px;}
+  .b-item{display:flex;gap:10px;padding:12px 0;border-top:1px solid #EDE8DF;align-items:flex-start;}
+  .b-item:first-child{border-top:none;padding-top:0;}
+  .b-item .idx{flex:none;width:22px;font-family:"Noto Sans Mono CJK SC",monospace;font-size:11px;color:#8C7A66;line-height:20px;}
+  .b-item p{margin:0;font-size:13px;line-height:20px;color:#5E5A52;}
+
+  .b-set{padding:0 20px;display:flex;flex-direction:column;}
+  .b-head{padding-top:24px;}
+  .b-head .b-title{margin-top:14px;}
+  .grp{margin-top:24px;}
+  .b-label{font-size:12px;font-weight:600;color:#353A41;white-space:nowrap;display:flex;align-items:center;gap:8px;}
+  .b-input{height:50px;border-radius:12px;background:#fff;border:1px solid #E3DDD1;padding:0 14px;
+    display:flex;align-items:center;font-family:"Noto Sans Mono CJK SC",monospace;font-size:14px;
+    color:#353A41;margin-top:8px;white-space:nowrap;overflow:hidden;}
+  .b-input.ph{color:#9A8F80;}
+  .b-input.focus{border:2px solid #3E6152;padding:0 13px;}
+  .b-chip{height:40px;border-radius:20px;background:#fff;border:1px solid #E3DDD1;color:#3E6152;
+    font-size:13px;font-weight:500;display:flex;align-items:center;padding:0 14px;white-space:nowrap;}
+  .b-chip .pill{background:#F1EDE4;color:#6F6152;height:16px;font-size:9px;margin-left:6px;padding:0 5px;}
+  .hair{height:1px;background:#E3DDD1;margin:20px -20px 0;}
+
+  .b-res{position:relative;background:#E8EFEA;border-radius:12px;padding:12px 14px 12px 16px;margin-top:24px;}
+  .b-res::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:2px;height:16px;background:#3E6152;border-radius:1px;}
+  .b-res .res-t{color:#3E6152;}
+
+  .b-acts{margin-top:16px;}
+  .b-save{height:52px;border-radius:14px;background:#3E6152;color:#fff;display:flex;align-items:center;
+    justify-content:center;font-size:15px;font-weight:600;letter-spacing:.3px;white-space:nowrap;}
+  .b-test{height:50px;border-radius:14px;background:#fff;border:1px solid #E3DDD1;display:flex;align-items:center;
+    justify-content:center;font-size:15px;font-weight:500;color:#353A41;margin-top:10px;white-space:nowrap;}
+  .b-status{display:flex;align-items:center;gap:8px;margin-top:12px;}
+  .dot{width:6px;height:6px;border-radius:3px;background:#3E6152;flex:none;}
+  .b-status span{font-family:"Noto Sans Mono CJK SC",monospace;font-size:11px;color:#5E5A52;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .b-tip{font-size:12px;line-height:18px;color:#5E5A52;margin-top:10px;white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<div class="board-hd">
+  <h1>HVAccRM 安卓壳层 · 三页双方向</h1>
+  <p>360 × 780dp · 示例值全量脱敏 · 方向 A 零新增色 / 方向 B 引入墨松绿 + 砖红</p>
+</div>
+
+<!-- ============ 方向 A ============ -->
+<div class="band band-a"><span class="band-t">方向 A「延续暖纸」</span><span class="band-s">现有 token 精修，不引入新色</span></div>
+<div class="grid">
+
+  <!-- A1 welcome -->
+  <div>
+    <div class="cap">① 首次引导页 <span>welcome.html</span></div>
+    <div class="phone">
+      <div class="sb dark"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="a-hdr">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#F7F5F1" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span class="t">HVAccRM</span>
+      </div>
+      <div class="a-stage">
+        <div class="a-card">
+          <div class="a-logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#EFEBE3" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="a-h1">暖通 CRM</h2>
+          <p class="a-sub">连接你的 HVAccRM 服务器</p>
+          <div class="a-infob">
+            <div class="eb">地址格式</div>
+            <div class="addr">
+              <span>http://192.168.1.100:8090</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8C7A66" stroke-width="1.8">
+                <rect x="8.6" y="8.6" width="10.8" height="10.8" rx="2.4"/>
+                <path d="M15.4 5.6H6.6a2 2 0 0 0-2 2v8.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="a-pri">填写服务器地址</div>
+          <div class="a-sec">重新连接</div>
+        </div>
+      </div>
+      <div class="a-foot">手机和 NAS 在同一个 Wi-Fi 时，用内网 IP 最快</div>
+    </div>
+  </div>
+
+  <!-- A2 offline -->
+  <div>
+    <div class="cap">② 连接失败页 <span>offline.html</span></div>
+    <div class="phone">
+      <div class="sb dark"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="a-hdr">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#F7F5F1" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span class="t">HVAccRM</span>
+      </div>
+      <div class="a-main">
+        <div class="a-card">
+          <div class="a-ic56">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8F4A4A" stroke-width="2.2" stroke-linecap="round">
+              <path d="M4 16.5v-5.2A3.3 3.3 0 0 1 7.3 8h2.3"/>
+              <path d="M9.6 5.4v5.2"/>
+              <path d="M14.4 5.4v5.2"/>
+              <path d="M14.4 8h2.3A3.3 3.3 0 0 1 20 11.3v5.2"/>
+            </svg>
+          </div>
+          <h2 class="a-h19">连不上服务器</h2>
+          <p class="a-reason">服务器没有响应，可能是地址写错或服务没启动。</p>
+          <div class="a-infob">
+            <div class="addr" style="justify-content:space-between;margin-top:0">
+              <span class="eb" style="flex:none">当前地址</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8C7A66" stroke-width="1.8">
+                <rect x="8.6" y="8.6" width="10.8" height="10.8" rx="2.4"/>
+                <path d="M15.4 5.6H6.6a2 2 0 0 0-2 2v8.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="addr"><span>http://192.168.1.100:8090</span></div>
+          </div>
+          <div class="a-pri">重试连接</div>
+          <div class="a-sec">修改地址</div>
+        </div>
+        <div class="a-card2">
+          <div class="eb">按这三条自查</div>
+          <div class="chk"><div class="num">1</div><p>手机和 NAS 在同一个 Wi-Fi？</p></div>
+          <div class="chk"><div class="num">2</div><p>地址里的端口是不是 8090（或你改过的那个）？</p></div>
+          <div class="chk"><div class="num">3</div><p>NAS 上的 hvaccrm 容器还在运行吗？</p></div>
+        </div>
+      </div>
+      <div style="height:24px;flex:none"></div>
+    </div>
+  </div>
+
+  <!-- A3 settings -->
+  <div>
+    <div class="cap">③ 服务器设置页 <span>SettingsActivity · 测试成功态</span></div>
+    <div class="phone">
+      <div class="sb dark"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="a-hdr" style="gap:4px;padding-left:8px">
+        <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M14.2 5.4 7.6 12l6.6 6.6" stroke="#F7F5F1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="t" style="font-size:17px">服务器设置</span>
+      </div>
+      <div class="a-set">
+        <div class="a-scard">
+          <div class="flabel">服务器地址</div>
+          <p class="fdesc">填 NAS 地址，带 http:// 和端口号。</p>
+          <div class="a-input">http://192.168.1.100:8090</div>
+          <div class="chips">
+            <div class="chip">用内网 IP</div>
+            <div class="chip">用域名</div>
+          </div>
+        </div>
+        <div class="a-scard">
+          <div class="flabel">安全入口 <span class="pill">可选</span></div>
+          <p class="fdesc">服务端设过入口串才需要填。</p>
+          <div class="a-input ph">没开门牌就留空</div>
+        </div>
+        <div class="a-res">
+          <div class="res-t">连接成功</div>
+          <div class="res-s">HTTP 200 · 安全入口已通过</div>
+        </div>
+        <div class="a-test">测试连接</div>
+        <div class="a-save">保存并进入</div>
+        <div class="a-tip">保存后会立刻尝试连接一次</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方向 B ============ -->
+<div class="band band-b"><span class="band-t">方向 B「品牌向前一步」</span><span class="band-s">墨松绿 #3E6152 + 砖红 #9C5245 · 盘管螺旋 logo · 眉标版式</span></div>
+<div class="grid">
+
+  <!-- B1 welcome -->
+  <div>
+    <div class="cap">① 首次引导页 <span>无顶栏 · 左对齐</span></div>
+    <div class="phone">
+      <div class="sb light"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="b-wrap">
+        <div class="b-logo">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <path id="coil1" stroke="#F7F5F1" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="b-used">HVACRM · 自托管</div>
+        <div class="b-rule"></div>
+        <h2 class="b-title">连上你的<br>暖通工具台</h2>
+        <p class="b-sub">客户、工地、报价都在你自己的 NAS 上，App 只是个窗口。</p>
+        <div class="b-pri">填写服务器地址</div>
+        <div class="b-txt">重新连接
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9.8 5.4 16.4 12l-6.6 6.6" stroke="#8C7A66" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="b-strip">
+          <div class="eb">地址长这样</div>
+          <div class="addr" style="margin-top:6px">
+            <span>http://192.168.1.100:8090</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8C7A66" stroke-width="1.8">
+              <rect x="8.6" y="8.6" width="10.8" height="10.8" rx="2.4"/>
+              <path d="M15.4 5.6H6.6a2 2 0 0 0-2 2v8.8" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="b-foot">内网用 IP，出门用域名。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B2 offline -->
+  <div>
+    <div class="cap">② 连接失败页 <span>眉标三级递进 + 发丝线清单</span></div>
+    <div class="phone">
+      <div class="sb light"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="b-wrap tight">
+        <div class="b-ic44">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9C5245" stroke-width="2.2" stroke-linecap="round">
+            <path d="M4 16.5v-5.2A3.3 3.3 0 0 1 7.3 8h2.3"/>
+            <path d="M9.6 5.4v5.2"/>
+            <path d="M14.4 5.4v5.2"/>
+            <path d="M14.4 8h2.3A3.3 3.3 0 0 1 20 11.3v5.2"/>
+          </svg>
+        </div>
+        <div class="b-used red" style="margin-top:20px">连接失败</div>
+        <div class="b-rule red"></div>
+        <h2 class="b-title h24">连不上服务器</h2>
+        <p class="b-sub" style="font-size:14px;line-height:21px">服务器没有响应。地址写错、端口不对、或者 NAS 上的容器停了。</p>
+        <div class="b-vol">
+          <div class="b-vol-hd">
+            <span class="eb">当前地址</span>
+            <span class="copy-lnk">复制</span>
+          </div>
+          <div class="addr" style="margin-top:6px"><span style="font-size:13.5px">http://192.168.1.100:8090</span></div>
+        </div>
+        <div class="b-pri" style="margin-top:16px">重试连接</div>
+        <div class="b-txt">修改地址
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9.8 5.4 16.4 12l-6.6 6.6" stroke="#8C7A66" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="eb" style="margin-top:32px">按这三条自查</div>
+        <div class="b-list">
+          <div class="b-item"><div class="idx">01</div><p>手机和 NAS 在同一个 Wi-Fi？</p></div>
+          <div class="b-item"><div class="idx">02</div><p>端口是不是 8090（或你改过的那个）？</p></div>
+          <div class="b-item"><div class="idx">03</div><p>NAS 上的 hvaccrm 容器还在运行吗？</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B3 settings -->
+  <div>
+    <div class="cap">③ 服务器设置页 <span>无顶栏 · 主操作在上</span></div>
+    <div class="phone">
+      <div class="sb light"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+      <div class="b-set">
+        <div class="b-head">
+          <div class="b-used" style="margin-top:0">连接</div>
+          <div class="b-rule"></div>
+          <h2 class="b-title" style="font-size:26px;line-height:34px">服务器</h2>
+          <p class="b-sub" style="font-size:13px;line-height:20px">填 NAS 地址。手机和 NAS 同一 Wi-Fi 时用内网 IP。</p>
+        </div>
+        <div class="grp">
+          <div class="b-label">服务器地址</div>
+          <div class="b-input focus">http://192.168.1.100:8090</div>
+          <div class="chips" style="margin-top:8px">
+            <div class="b-chip">用内网 IP</div>
+            <div class="b-chip">用域名</div>
+          </div>
+        </div>
+        <div class="hair"></div>
+        <div class="grp">
+          <div class="b-label">安全入口 <span class="pill">可选</span></div>
+          <div class="b-input ph">没开门牌就留空</div>
+        </div>
+        <div class="b-res">
+          <div class="res-t">连接成功</div>
+          <div class="res-s">HTTP 200 · 安全入口已通过</div>
+        </div>
+        <div class="b-acts">
+          <div class="b-save">保存并进入</div>
+          <div class="b-test">仅测试连接</div>
+        </div>
+        <div class="b-status">
+          <div class="dot"></div>
+          <span>当前生效 · http://192.168.1.100:8090</span>
+        </div>
+        <div class="b-tip">保存后会立刻尝试连接一次</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    function spiral(turns, r0, r1, n){
+      var d = [];
+      for (var i=0;i<=n;i++){
+        var t=i/n, a=t*turns*2*Math.PI, r=r0+(r1-r0)*t;
+        var x=12+r*Math.cos(a), y=12+r*Math.sin(a);
+        d.push((i?'L':'M')+x.toFixed(2)+' '+y.toFixed(2));
+      }
+      return d.join('');
+    }
+    var p = document.getElementById('coil1');
+    if (p) p.setAttribute('d', spiral(2, 1.6, 8.0, 180));
+  })();
+</script>
+</body>
+</html>
