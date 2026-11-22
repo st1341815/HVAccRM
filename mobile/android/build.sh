@@ -35,10 +35,16 @@ echo "==> 1/6 编译资源 (aapt2 compile)"
 "$BT/aapt2" compile --dir res -o "$OUT/res/resources.zip"
 
 echo "==> 2/6 链接资源并生成 R.java (aapt2 link)"
+# ⚠️ aapt2 link 的 --version-code/--version-name 只是「manifest 没声明时的默认值」：
+# manifest 里一旦显式写了这两个属性，命令行参数会被**静默忽略**（v0.1.4 就这么打出了
+# 文件名 0.1.4、包内 versionName 0.1.3 的 APK）。所以先把版本号 sed 进一份临时 manifest。
+sed -e "s/android:versionCode=\"[0-9]*\"/android:versionCode=\"$VERSION_CODE\"/" \
+    -e "s/android:versionName=\"[^\"]*\"/android:versionName=\"$VERSION_NAME\"/" \
+    AndroidManifest.xml > "$OUT/AndroidManifest.xml"
 "$BT/aapt2" link \
   -o "$OUT/base.apk" \
   -I "$PLATFORM" \
-  --manifest AndroidManifest.xml \
+  --manifest "$OUT/AndroidManifest.xml" \
   --java "$OUT/gen" \
   -A assets \
   --min-sdk-version 24 \
@@ -106,6 +112,17 @@ else
 fi
 
 "$BT/apksigner" verify --print-certs "$APK" | head -5
+
+# 版本号自检：aapt2 的 --version-* 可能被 manifest 硬编码压制，静默打出旧版本号。
+# 这种错只有装上手机才会暴露（文件名骗得过所有人，包内还是老值），所以打包后必须拦一道。
+BADGING="$("$BT/aapt2" dump badging "$APK" | head -1)"
+case "$BADGING" in
+  *"versionCode='$VERSION_CODE'"*"versionName='$VERSION_NAME'"*) ;;
+  *) echo "❌ 版本号未写入 APK（期望 versionName=$VERSION_NAME versionCode=$VERSION_CODE）"
+     echo "   $BADGING"
+     exit 1 ;;
+esac
+
 echo
-echo "✅ 构建完成: $APK ($(du -h "$APK" | cut -f1))"
+echo "✅ 构建完成: $APK ($(du -h "$APK" | cut -f1)) · versionName=$VERSION_NAME versionCode=$VERSION_CODE"
 echo "   安装: adb install -r \"$APK\"   或把 APK 传到手机点击安装"

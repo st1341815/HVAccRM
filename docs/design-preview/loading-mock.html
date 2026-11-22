@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DCDFDC;font-family:"Noto Sans CJK SC",system-ui,sans-serif;
+       display:flex;gap:34px;padding:40px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .cap{font-size:13px;color:#555;font-weight:600}
+  .phone{width:360px;height:780px;border-radius:26px;overflow:hidden;background:#353A41;
+         box-shadow:0 20px 50px rgba(0,0,0,.18);display:flex;flex-direction:column}
+  .sb{height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;
+      padding:0 18px;font-size:11px;font-weight:600;color:#F7F5F1;background:#353A41}
+  .sb-r{display:flex;gap:3px;align-items:center}
+  .sb-r i{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.8}
+  .sb-r b{width:14px;height:7px;border:1px solid currentColor;border-radius:2px;opacity:.8}
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+         padding-bottom:40px}
+  .mark{width:72px;height:72px;display:flex;align-items:center;justify-content:center}
+  .title{margin-top:28px;font-size:15px;color:#F7F5F1;letter-spacing:.03em;white-space:nowrap}
+  .addr{margin-top:8px;font-family:"Noto Sans Mono CJK SC",monospace;font-size:11px;
+        color:#9AA4AD;white-space:nowrap;max-width:240px;overflow:hidden;
+        text-overflow:ellipsis;direction:rtl;text-align:center}
+  .track{margin-top:22px;width:168px;height:3px;border-radius:2px;background:rgba(255,255,255,.2);
+         overflow:hidden}
+  .fill{height:100%;border-radius:2px;background:#8C7A66}
+  .secs{margin-top:10px;font-size:11px;color:#8C7A66;white-space:nowrap}
+</style></head>
+<body>
+
+<div class="col"><div class="cap">刚启动 · 1.4 秒</div>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+  <div class="stage">
+    <div class="mark"><svg width="62" height="62" viewBox="0 0 24 24" fill="none">
+      <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#EFEBE3" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+    <div class="title">正在连接…</div>
+    <div class="addr">http://192.168.1.100:8090</div>
+    <div class="track"><div class="fill" style="width:14%"></div></div>
+    <div class="secs">1.4 秒</div>
+  </div>
+</div></div>
+
+<div class="col"><div class="cap">变慢了 · 9.3 秒</div>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+  <div class="stage">
+    <div class="mark"><svg width="62" height="62" viewBox="0 0 24 24" fill="none">
+      <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#EFEBE3" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+    <div class="title">网络较慢，还在等…</div>
+    <div class="addr">http://192.168.1.100:8090</div>
+    <div class="track"><div class="fill" style="width:63%"></div></div>
+    <div class="secs">9.3 秒</div>
+  </div>
+</div></div>
+
+<div class="col"><div class="cap">大概率有问题 · 21.6 秒</div>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span class="sb-r"><i></i><i></i><b></b></span></div>
+  <div class="stage">
+    <div class="mark"><svg width="62" height="62" viewBox="0 0 24 24" fill="none">
+      <path d="M4.5 20V10.5A6 6 0 0 1 10.5 4.5H20" stroke="#EFEBE3" stroke-width="2.4" stroke-linecap="round"
+            opacity=".55"/></svg></div>
+    <div class="title">连不上，检查服务器或网络</div>
+    <div class="addr">http://192.168.1.100:8090</div>
+    <div class="track"><div class="fill" style="width:88%"></div></div>
+    <div class="secs">21.6 秒</div>
+  </div>
+</div></div>
+
+</body></html>
