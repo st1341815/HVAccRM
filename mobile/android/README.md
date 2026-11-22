@@ -1,6 +1,6 @@
 # HVAccRM 移动端（Android）
 
-HVAccRM 的安卓客户端，测试版 **v0.1.3**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
+HVAccRM 的安卓客户端，测试版 **v0.1.5**。纯 WebView 壳 + 原生能力增强，**零 AndroidX / 零 Gradle / 零 npm 依赖**，一个 `./build.sh` 出 APK。
 
 ---
 

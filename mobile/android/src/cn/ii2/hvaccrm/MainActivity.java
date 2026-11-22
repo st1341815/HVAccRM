@@ -30,6 +30,7 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.URLUtil;
@@ -87,7 +88,14 @@ public class MainActivity extends Activity {
     private long gateHintAt = 0;
 
     // ---- 启动加载层：WebView 拿到首字节前整屏只有 root 的深墨色，用户会以为死机 ----
+    private FrameLayout root;
     private FrameLayout loading;
+    /** 加载阶段：0 初始化壳 / 1 连服务器 / 2 收页面。文案由「阶段 + 总时长」共同决定。 */
+    private static final int PHASE_BOOT = 0;
+    private static final int PHASE_CONNECT = 1;
+    private static final int PHASE_PAGE = 2;
+    private int loadPhase = PHASE_BOOT;
+    private long loadShownAt = 0;
     private TextView loadTitle;
     private TextView loadAddr;
     private TextView loadSecs;
@@ -104,18 +112,44 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildUi();
-        configureWeb();
 
+        // Prefs 只是两次 SharedPreferences 读，很快 —— 提前取出来，加载层才好显示「连的是哪儿」。
         gateEntry = Prefs.getGateOrNull(this);
         String saved = Prefs.getServerOrNull(this);
-        if (saved == null) {
+        serverUrl = (saved == null) ? Prefs.DEFAULT_SERVER : saved;
+        final boolean firstRun = (saved == null);
+
+        // ---- 第一阶段：只把加载层推上屏 ----
+        // 这一步必须极轻。WebView 首次初始化（加载 WebView provider）在主线程上能吃掉好几秒，
+        // 那几秒里如果屏幕上只有 root 的深墨色，用户看到的就是「开屏黑屏」。
+        buildShell();
+        resetLoadTimer();
+        showLoading();
+
+        // ---- 第二阶段：等第一帧真正画完，再去建 WebView ----
+        loading.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                loading.getViewTreeObserver().removeOnPreDrawListener(this);
+                loading.post(new Runnable() {
+                    @Override public void run() { initWeb(firstRun); }
+                });
+                return true;
+            }
+        });
+    }
+
+    /** WebView 的重活都在这儿：首次初始化、配置、发起加载。调用时加载层已经在屏幕上了。 */
+    private void initWeb(boolean firstRun) {
+        buildWeb();
+        configureWeb();
+        loadPhase = PHASE_CONNECT;
+
+        if (firstRun) {
             // 首次启动：先给个本地欢迎页，同时把用户推到设置界面填地址
-            serverUrl = Prefs.DEFAULT_SERVER;
             web.loadUrl("file:///android_asset/welcome.html");
+            hideLoading();
             openSettings();
         } else {
-            serverUrl = saved;
             loadHome();
         }
         cleanOldCameraFiles();
@@ -178,21 +212,34 @@ public class MainActivity extends Activity {
             if (loading == null || loading.getVisibility() != View.VISIBLE) return;
             long ms = SystemClock.elapsedRealtime() - loadStartAt;
             loadSecs.setText(String.format(Locale.US, "%.1f 秒", ms / 1000f));
+            // 文案按「总等待时长」分级 —— 用户关心的是从点图标到现在过了多久，
+            // 而不是「初始化花了 3 秒、连接花了 2 秒」这种分阶段账。
             if (ms >= 20000) {
                 loadTitle.setText("连不上，检查服务器或网络");
-            } else if (ms >= 8000) {
+            } else if (ms >= 10000) {
                 loadTitle.setText("网络较慢，还在等…");
-            } else if (ms >= 3000) {
+            } else if (loadPhase == PHASE_PAGE) {
                 loadTitle.setText("正在打开页面…");
+            } else if (loadPhase == PHASE_CONNECT) {
+                loadTitle.setText("正在连接服务器…");
+            } else {
+                loadTitle.setText("正在启动…");
             }
             ui.postDelayed(this, 100);
         }
     };
 
-    private void showLoading(String title) {
-        if (loading == null) return;
+    /** 把计时归零。只在「真正开始一轮等待」时调用（开机、重试），切阶段不重置。 */
+    private void resetLoadTimer() {
         loadStartAt = SystemClock.elapsedRealtime();
-        loadTitle.setText(title);
+        loadShownAt = loadStartAt;
+    }
+
+    private void showLoading() {
+        if (loading == null) return;
+        // 每次「从隐藏转显示」都算一次新的等待：秒表归零，最小显示时长重新计。
+        // 否则第二页起 loadShownAt 还是上次的值，hideLoading 的 450ms 保护会失效、加载层闪一下就没。
+        if (loading.getVisibility() != View.VISIBLE) resetLoadTimer();
         loadAddr.setText(serverUrl == null ? "" : serverUrl);
         loadSecs.setText("0.0 秒");
         if (loadBarFill != null) loadBarFill.setScaleX(0f);
@@ -206,19 +253,26 @@ public class MainActivity extends Activity {
     private void hideLoading() {
         if (loading == null || loading.getVisibility() != View.VISIBLE) return;
         ui.removeCallbacks(loadTicker);
-        loading.animate().cancel();
-        loading.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() {
+        // 至少完整显示 450ms。否则「闪一下就没」看着像界面抽搐，还不如不给。
+        long delay = Math.max(0L, 450L - (SystemClock.elapsedRealtime() - loadShownAt));
+        ui.postDelayed(new Runnable() {
             @Override public void run() {
-                if (loading != null) loading.setVisibility(View.GONE);
+                if (loading == null || loading.getVisibility() != View.VISIBLE) return;
+                loading.animate().cancel();
+                loading.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() {
+                    @Override public void run() {
+                        if (loading != null) loading.setVisibility(View.GONE);
+                    }
+                }).start();
             }
-        }).start();
+        }, delay);
     }
 
-    private View buildLoading() {
+    private FrameLayout buildLoading() {
         loading = new FrameLayout(this);
         loading.setBackgroundColor(0xFF353A41);
         loading.setClickable(true);   // 吃掉点击，否则会穿透到下面的 WebView
-        loading.setVisibility(View.GONE);
+        // 注意：这里**不要**设 GONE —— 加载层是启动期的门面，开机第一帧就该在屏幕上。
 
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
@@ -317,11 +371,26 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void buildUi() {
-        FrameLayout root = new FrameLayout(this);
+    /** 第一阶段：根容器 + 加载层。只创建纯 View，绝不碰 WebView。 */
+    private void buildShell() {
+        root = new FrameLayout(this);
         // 深色底：edge-to-edge 后状态栏/手势条区域露出这个颜色，配主题里的白色系统图标
         root.setBackgroundColor(0xFF353A41);
 
+        loading = buildLoading();
+        root.addView(loading, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        setContentView(root);
+        EdgeToEdge.apply(root, new EdgeToEdge.OnInsets() {
+            @Override public void onInsets(int l, int t, int r, int b) {
+                applySystemInsets(l, t, r, b);
+            }
+        });
+    }
+
+    /** 第二阶段：WebView + 进度条 + 悬浮球，都压在加载层下面。 */
+    private void buildWeb() {
         web = new WebView(this);
         root.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -354,16 +423,10 @@ public class MainActivity extends Activity {
         root.addView(fab, flp);
         setupFab();
 
-        // 加载层最后加：按 addView 顺序盖住 WebView、进度条和悬浮球
-        root.addView(buildLoading(), new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        setContentView(root);
-        EdgeToEdge.apply(root, new EdgeToEdge.OnInsets() {
-            @Override public void onInsets(int l, int t, int r, int b) {
-                applySystemInsets(l, t, r, b);
-            }
-        });
+        // 这三个是后加进来的，会盖在加载层上面 —— 把加载层拎回最前
+        loading.bringToFront();
+        // inset 回调很可能在我们建 WebView 之前就跑完了，这里补一次，否则网页会顶到状态栏底下
+        applySystemInsets(insetsLeft, insetsTop, insetsRight, insetsBottom);
     }
 
     /** 把系统栏尺寸落到各子控件上：网页留白、进度条下移、悬浮球避开状态栏。 */
@@ -515,7 +578,10 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 // 只对远程页面显示：welcome/offline 是本地瞬时页面，闪一层加载层反而更糟
-                if (url != null && url.startsWith("http")) showLoading("正在连接…");
+                if (url != null && url.startsWith("http")) {
+                    loadPhase = PHASE_PAGE;
+                    showLoading();
+                }
             }
 
             @Override
@@ -698,6 +764,7 @@ public class MainActivity extends Activity {
     }
 
     private void reloadPage() {
+        if (web == null) return;   // 加载层还盖着、WebView 没建好时点了刷新
         String cur = web.getUrl();
         if (cur == null || cur.startsWith("file://")) loadHome();
         else {
@@ -718,8 +785,9 @@ public class MainActivity extends Activity {
     }
 
     private void showOffline(String reason) {
-        bar.setVisibility(View.GONE);
+        if (bar != null) bar.setVisibility(View.GONE);
         hideLoading();
+        if (web == null) return;
         String page = "file:///android_asset/offline.html?reason="
                 + Uri.encode(reason == null ? "" : reason)
                 + "&server=" + Uri.encode(serverUrl);
@@ -727,6 +795,7 @@ public class MainActivity extends Activity {
     }
 
     private void clearWebCache() {
+        if (web == null) return;
         web.clearCache(true);
         web.clearFormData();
         web.clearHistory();
@@ -769,6 +838,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (web == null) {   // 还没建 WebView，直接走默认退出逻辑
+            super.onBackPressed();
+            return;
+        }
         if (web.canGoBack()) {
             web.goBack();
             return;

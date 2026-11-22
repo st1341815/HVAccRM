@@ -17,8 +17,8 @@ SDK="${ANDROID_SDK:-/opt/android-sdk}"
 BT="$SDK/bt/android-14"                 # build-tools 34 解压后内部目录名是 android-14
 PLATFORM="$SDK/platforms/android-35/android.jar"
 
-VERSION_NAME="0.1.4"
-VERSION_CODE="5"
+VERSION_NAME="0.1.5"
+VERSION_CODE="6"
 APP_ID="cn.ii2.hvaccrm"
 OUT="build"
 DIST="dist"
