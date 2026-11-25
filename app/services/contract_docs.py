@@ -314,6 +314,45 @@ def _now_text() -> tuple[str, str]:
     return now.strftime("%Y-%m-%d %H:%M"), now.strftime("%Y-%m-%d")
 
 
+def _city_text(city: str | None) -> str:
+    """城市补「市」：楼盘表里存的是「合肥」，合同上要写「合肥市」。
+
+    已经在字段里写了「市 / 州 / 盟 / 地区 / 县」的不动，避免出现「合肥市市」。
+    """
+    text = (city or "").strip()
+    if text and not text.endswith(("市", "州", "盟", "地区", "县")):
+        text += "市"
+    return text
+
+
+def site_address(customer: Any) -> str:
+    """工程地点：市 + 区 + 楼盘名 + 楼栋 + 单元 + 房号。
+
+    为什么不直接用 `customer.address`：客户表单的「地址」是选填，而房号是必选。
+    2026-11 线上 11 个客户实测——**房号 11 个都有，地址 11 个全空**，
+    于是合同上「工程地点」一直是空白。所以这里优先拼房号，拼不出来才退回手填地址。
+    """
+    room = getattr(customer, "room", None)
+    if room is not None:
+        project = getattr(room, "project", None)
+        head = ""
+        if project is not None:
+            head = f"{_city_text(project.city)}{project.district or ''}{project.name or ''}"
+        tail = f"{room.building or ''}{room.unit or ''}{room.room_no or ''}"
+        site = " ".join(part for part in (head.strip(), tail.strip()) if part)
+        if site:
+            return site
+    return str(getattr(customer, "address", "") or "")
+
+
+def project_name(customer: Any) -> str:
+    """楼盘名；没挂房号时退回客户名，保证纸面上不出现空白行。"""
+    room = getattr(customer, "room", None)
+    project = getattr(room, "project", None) if room is not None else None
+    name = str(getattr(project, "name", "") or "") if project is not None else ""
+    return name or str(getattr(customer, "name", "") or "")
+
+
 def build_context(db: Session, contract: Contract, *, with_cost: bool = False) -> dict[str, str]:
     """把一份合同摊平成 `{{占位符}}` → 文本 的字典。
 
@@ -358,6 +397,16 @@ def build_context(db: Session, contract: Contract, *, with_cost: bool = False) -
         "甲方名称": escape(str(getattr(customer, "name", "") or "")),
         "甲方电话": escape(str(getattr(customer, "phone", "") or "")),
         "甲方地址": escape(str(getattr(customer, "address", "") or "")),
+        # ---- 工程地点 / 项目（房号是必选，地址是选填 → 施工地址优先拼房号）----
+        "工程地点": escape(site_address(customer)),
+        "施工地址": escape(site_address(customer)),
+        "房号": escape(str(getattr(getattr(customer, "room", None), "label", "") or "")),
+        "房号简称": escape(str(getattr(customer, "room_label_short", "") or "")),
+        "项目名称": escape(project_name(customer)),
+        "业务员": escape(
+            users.get(contract.created_by or 0, "")
+            or users.get(getattr(customer, "owner_id", 0) or 0, "")
+        ),
         "乙方名称": escape(company.get("doc.company_name", "")),
         "乙方电话": escape(company.get("doc.company_phone", "")),
         "乙方地址": escape(company.get("doc.company_address", "")),
@@ -438,7 +487,13 @@ def available_vars() -> list[tuple[str, str]]:
         ("客户名称", "客户名"),
         ("客户电话", "客户手机号"),
         ("客户微信", "客户微信"),
-        ("客户地址", "客户地址"),
+        ("客户地址", "客户手填地址（选填，可能为空）"),
+        ("工程地点", "市+区+楼盘+楼栋+单元+房号，拼不出则退回客户地址"),
+        ("施工地址", "同「工程地点」"),
+        ("房号", "楼栋-单元-房号"),
+        ("房号简称", "小区名+楼栋字母数字#房号"),
+        ("项目名称", "楼盘名（无房号时为客户名）"),
+        ("业务员", "合同创建人；没有则取客户负责人"),
         ("客户类型", "家装 / 工程 / 经销商"),
         ("甲方名称", "同客户名称"),
         ("甲方电话", "同客户电话"),
