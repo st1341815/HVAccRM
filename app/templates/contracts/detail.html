@@ -9,6 +9,12 @@
   </h1>
   <div class="actions">
     <button class="btn" onclick="stampPrintTime(); window.print()" title="打印本页（自动隐去图片与录入表单）">打印</button>
+    {# 正式文档：套模板生成的电子合同 / 结算单，和「打印本页」不是一个东西。
+       本页是给内部看的台账，纸面上带图带表单；这两个是给对方签字盖章的正式件。 #}
+    <a class="btn ghost" href="/contracts/{{ contract.id }}/print/contract"
+       title="按后台模板生成正式合同，可直接打印或存 PDF">电子合同</a>
+    <a class="btn ghost" href="/contracts/{{ contract.id }}/print/settlement"
+       title="{{ '生成结算单（已结算，可打印）' if locked else '该合同还没标记结算，点进去会提示原因' }}">结算单</a>
     <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
     <a class="btn ghost" href="/contracts">合同列表</a>
     {% if can_settle %}

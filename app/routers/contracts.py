@@ -33,6 +33,7 @@ from ..permissions import (
 from ..services import finance as finance_svc
 from ..services import search as search_svc
 from ..services import cases as cases_svc
+from ..services import contract_docs as doc_svc
 from ..services import costs as cost_svc
 from ..services import numbering as numbering_svc
 from ..services import photos as photo_svc
@@ -720,3 +721,99 @@ def delete_contract(
     db.delete(contract)  # cascade 删除合同明细/收款计划/成本/收款/增项/施工工序
     commit_retry(db)
     return redirect("/contracts", f"合同 {no} 已删除（连同其收款、成本、工序、案例与照片）")
+
+
+# ---------------------------------------------------------------- 文档打印
+def _contract_for_docs(db: Session, user: User, contract_id: int) -> Contract | None:
+    """取合同并做数据范围校验；越权返回 None（由调用方渲染 403 页）。"""
+    from ..permissions import visible_customer_ids
+
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    allowed = visible_customer_ids(db, user)
+    if allowed is not None and contract.customer_id not in allowed:
+        return None
+    return contract
+
+
+@router.get("/{contract_id}/print/contract")
+def print_contract_doc(
+    request: Request,
+    contract_id: int,
+    tpl: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("contract:view")),
+):
+    """电子合同打印页：取模板正文，填上这份合同的数据。
+
+    所有能看到该合同的人都能打（v1.13.5 需求①）；结算单才有「已结算」限制。
+    """
+    contract = _contract_for_docs(db, user, contract_id)
+    if contract is None:
+        return render(request, "403.html", status_code=403)
+
+    chosen = doc_svc.pick_template(db, tpl)
+    if chosen is None:  # 库里一条模板都没有 → 落地内置范本，别让人打开空白页
+        chosen = doc_svc.ensure_default_template(db, user.id)
+        commit_retry(db)
+
+    body, missing = doc_svc.render_contract_body(db, contract, chosen)
+    return render(
+        request,
+        "contracts/print_contract.html",
+        contract=contract,
+        body=body,
+        missing=missing,
+        # 下拉只列启用的：停用模板 pick_template 不认，列出来选了也没用
+        doc_templates=[t for t in doc_svc.list_templates(db) if t.is_active],
+        chosen=chosen,
+    )
+
+
+@router.get("/{contract_id}/print/settlement")
+def print_settlement_doc(
+    request: Request,
+    contract_id: int,
+    hide_cost: int = 0,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("contract:view")),
+):
+    """结算单打印页：仅「已标记结算」的合同可打（v1.13.5 需求②）。
+
+    `hide_cost=1` 打客户版：去掉成本、毛利与成本明细，其余不变。
+    没有 cost:view 权限的人本来也看不到成本，等价于强制客户版。
+    """
+    contract = _contract_for_docs(db, user, contract_id)
+    if contract is None:
+        return render(request, "403.html", status_code=403)
+    if not contract.is_settled:
+        return render(
+            request,
+            "contracts/print_blocked.html",
+            contract=contract,
+            reason="该合同还没标记结算，先回合同页点「标记结算」再打印结算单。",
+            status_code=409,
+        )
+
+    can_cost = has_perm(user, "cost:view") and can_see_amount(user)
+    with_cost = bool(can_cost) and not bool(hide_cost)
+    summary = finance_svc.contract_summary(db, contract)
+    profit = cost_svc.profit_summary(db, contract) if with_cost else None
+    payments = sorted(contract.payments, key=lambda p: (p.paid_at or "", p.id or 0), reverse=True)
+    costs = list(contract.costs) if with_cost else []
+    users = {u.id: u.display_name for u in db.scalars(select(User)).all()}
+
+    return render(
+        request,
+        "contracts/print_settlement.html",
+        contract=contract,
+        summary=summary,
+        profit=profit,
+        with_cost=with_cost,
+        hide_cost=bool(hide_cost),
+        can_cost=can_cost,
+        company_name=doc_svc.company_info(db).get("doc.company_name", ""),
+        total_upper=doc_svc.rmb_upper(summary.total),
+        payments_html=doc_svc.payments_table(payments, users),
+        items_html=doc_svc.items_table(contract.items),
+        costs_html=doc_svc.costs_table(costs),
+    )

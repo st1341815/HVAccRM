@@ -908,6 +908,177 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 /* 深色主题下直接打印会印出一片黑。打印一律锁回亮色、去掉侧栏，
    保证合同台账 / 对账单打出来是白纸黑字。
    注意也要覆盖 :root（亮色态），否则变量沿用屏幕上的灰底。 */
+/* ============================================================================
+   文档页：电子合同 / 结算单（/contracts/{id}/print/*）
+   ----------------------------------------------------------------------------
+   这两个页面是**独立文档**，不 extends layout.html —— 没有侧栏、没有卡片容器，
+   整页只有一张「A4 纸」。所以样式必须自带纸感：白底、黑字、行距、页边距。
+   纸张永远是白纸黑字，**不跟随深色主题**（把合同切成深灰底等于没法打印）。
+   ========================================================================== */
+.doc-body {
+  margin: 0;
+  padding: 18px 12px 60px;
+  background: var(--bg);
+  color: var(--ink);
+  /* 页面上只有一张纸，内容不宽，但屏幕要留下左右留白 */
+  min-height: 100vh;
+}
+.doc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  max-width: 210mm;
+  margin: 0 auto 14px;
+  padding: .55rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+/* CJK 在 flex 里会折行（min-content 塌成 1 字），工具条挤一挤就两行，必须 nowrap */
+.doc-toolbar > strong,
+.doc-toolbar > .btn,
+.doc-toolbar > form,
+.doc-toolbar > button { flex: 0 0 auto; white-space: nowrap; }
+.doc-toolbar select { max-width: 12rem; }
+/* 模板变量对不上时的告警条：屏幕可见，不进纸面 */
+.doc-warn {
+  display: block;
+  padding: .5rem .8rem;
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-ink);
+  border-radius: var(--radius-sm);
+  font-size: .86rem;
+}
+
+.doc-page {
+  /* 纸面底色**故意不走 --field-bg**：深色主题下把合同渲成深灰底就等于没法打印。
+     这是全站唯一的例外，等价于二维码图底必须真白（tests/test_theme.py 有白名单约定）。 */
+  --doc-paper: #ffffff;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm 15mm;
+  background: var(--doc-paper);
+  color: #111;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .14);
+  border-radius: 2px;
+  font-size: 10.5pt;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+.doc-page h1 {
+  font-size: 18pt;
+  line-height: 1.3;
+  text-align: center;
+  letter-spacing: .12em;
+  margin: 0 0 .3rem;
+  color: #111;
+}
+.doc-page h2 {
+  font-size: 12pt;
+  margin: 1.1rem 0 .45rem;
+  padding-bottom: .2rem;
+  border-bottom: 1px solid #d8d8d8;
+  color: #111;
+  /* 标题后面紧跟表格/段落，标题被留在上一页底部是最丑的一种断法 */
+  break-after: avoid;
+}
+.doc-page p { margin: 0 0 .5rem; }
+.doc-page strong { font-weight: 700; }
+.doc-head { text-align: center; margin-bottom: 1rem; }
+.doc-no { font-size: 9.5pt; color: #555; letter-spacing: .04em; }
+
+/* 甲乙方 / 工程概况：字段对齐成格子比「一行一段」省一半纸 */
+.doc-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .15rem 1.2rem;
+  margin: 0 0 .8rem;
+  padding: .55rem .8rem;
+  border: 1px solid #e6e6e6;
+  background: #fafafa;
+  font-size: 9.5pt;
+}
+.doc-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .15rem 1.2rem;
+  margin: 0 0 .6rem;
+  font-size: 9.5pt;
+}
+.doc-parties > div,
+.doc-meta > div { min-width: 0; }
+.doc-parties .lbl,
+.doc-meta .lbl { color: #666; }
+
+/* 表格：细边框 + 数字右对齐 + 合计行加重 */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: .25rem 0 .7rem;
+  font-size: 9.5pt;
+  line-height: 1.5;
+}
+.doc-table th,
+.doc-table td {
+  border: 1px solid #c9c9c9;
+  padding: .3rem .45rem;
+  vertical-align: top;
+  text-align: left;
+}
+.doc-table th {
+  background: #f2f2f2;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.doc-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.doc-table tr.sum td { font-weight: 700; background: #fafafa; }
+/* 结算单顶部的「金额对照表」：4 列表格里 th/td 交替，给 th 一点底色区分标签 */
+.doc-table.kv th { width: 14%; background: #f7f7f7; }
+.doc-table.kv td { width: 36%; }
+
+.doc-empty { color: #777; font-size: 9.5pt; margin: .2rem 0 .7rem; }
+.doc-note { color: #444; font-size: 9.5pt; }
+.doc-upper { margin: 0 0 .7rem; }
+
+/* 签字区：两块并排，留出真实手写的高度 */
+.doc-sign {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6rem;
+  margin-top: 2rem;
+  break-inside: avoid;
+}
+.sign-box {
+  border-top: 1px solid #d8d8d8;
+  padding-top: .5rem;
+  font-size: 9.5pt;
+}
+.sign-title { font-weight: 600; margin-bottom: 1.6rem; }
+.sign-line {
+  margin-top: 1rem;
+  padding-bottom: .1rem;
+  border-bottom: 1px solid #bbb;
+  color: #333;
+}
+
+@media (max-width: 760px) {
+  /* 手机上 210mm 装不下，页边距按屏幕算，别留 15mm 白边 */
+  .doc-body { padding: 10px 8px 40px; }
+  .doc-page { padding: 16px 14px; font-size: 10pt; }
+  .doc-page h1 { font-size: 15pt; }
+  /* 单列：手机上两列会把「甲方（发包方）：苏州某某暖通工程有限公司」挤成三行 */
+  .doc-parties,
+  .doc-meta,
+  .doc-sign { grid-template-columns: 1fr; }
+  .doc-table { font-size: 9pt; }
+}
+
 @media print {
   :root,
   html[data-theme="dark"] {
@@ -1017,4 +1188,26 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   table.js-stack td:not(.no-print) { display: table-cell !important; }
   table.js-stack td::before { content: none !important; }
   table.js-stack.has-sum thead tr { display: table-row !important; }
+
+  /* ---- 文档页（电子合同 / 结算单）：屏幕上那张「白纸」的阴影与留白在纸上多余 ----
+     页面正文的 padding 交给 @page 的 margin 管，这里清零，否则纸张四边白边叠两层。 */
+  .doc-body { padding: 0; background: #fff; min-height: 0; }
+  .doc-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    font-size: 10pt;
+    line-height: 1.6;
+  }
+  .doc-page h1 { font-size: 15pt; }
+  .doc-page h2 { font-size: 10.5pt; margin: .8rem 0 .3rem; }
+  .doc-parties,
+  .doc-meta { font-size: 9pt; }
+  .doc-table { font-size: 8.5pt; margin: .2rem 0 .5rem; }
+  .doc-table th,
+  .doc-table td { padding: 2px 4px; }
+  .doc-sign { margin-top: 1.2rem; }
+  .sign-title { margin-bottom: 1.1rem; }
 }

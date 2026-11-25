@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>结算单 {{ contract.no or contract.id }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/app.css?v={{ version }}">
+</head>
+<body class="doc-body">
+
+<div class="doc-toolbar no-print">
+  <a class="btn ghost" href="/contracts/{{ contract.id }}">← 返回合同</a>
+  <strong>结算单</strong>
+  {% if can_cost %}
+  <form method="get" class="inline">
+    <label class="inline-label">
+      <input type="checkbox" name="hide_cost" value="1" {{ 'checked' if hide_cost else '' }}
+             onchange="this.form.submit()">
+      打印给客户（不含成本与毛利）
+    </label>
+  </form>
+  {% endif %}
+  <button class="btn" onclick="window.print()">打印 / 存 PDF</button>
+</div>
+
+<div class="doc-page">
+  <div class="doc-head">
+    <h1>工程结算单</h1>
+    <div class="doc-no">合同编号：{{ contract.no or ('#' ~ contract.id) }}</div>
+  </div>
+
+  <div class="doc-parties">
+    <div><span class="lbl">甲方（客户）：</span>{{ contract.customer.name if contract.customer else '-' }}</div>
+    <div><span class="lbl">联系电话：</span>{{ contract.customer.phone if contract.customer and contract.customer.phone else '-' }}</div>
+    <div><span class="lbl">工程地址：</span>{{ contract.customer.address if contract.customer and contract.customer.address else '-' }}</div>
+    <div><span class="lbl">乙方（承包方）：</span>{{ company_name or '-' }}</div>
+    <div><span class="lbl">签订日期：</span>{{ contract.sign_date or '-' }}</div>
+    <div><span class="lbl">结算日期：</span>{{ contract.settled_at or '未标记' }}</div>
+    <div><span class="lbl">产品类型：</span>{{ contract.product_type or '-' }}</div>
+    <div><span class="lbl">结算状态：</span>{{ '已结算' if contract.is_settled else '未结算' }}</div>
+  </div>
+
+  <h2>一、结算金额</h2>
+  <table class="doc-table kv">
+    <tbody>
+      <tr><th>合同金额</th><td class="num">￥{{ contract.total_amount|money }}</td>
+          <th>增项合计</th><td class="num">￥{{ summary.change|money }}</td></tr>
+      <tr><th>合同额（减优惠）</th><td class="num">￥{{ summary.base|money }}</td>
+          <th>应收总额</th><td class="num"><strong>￥{{ summary.total|money }}</strong></td></tr>
+      <tr><th>已收金额</th><td class="num">￥{{ summary.received|money }}</td>
+          <th>未收金额</th><td class="num"><strong>￥{{ summary.outstanding|money }}</strong></td></tr>
+      {% if with_cost %}
+      <tr><th>成本合计</th><td class="num">￥{{ profit.cost|money }}</td>
+          <th>毛利 / 毛利率</th><td class="num">￥{{ profit.gross_profit|money }} / {{ profit.gross_margin }}%</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+  <p class="doc-upper">应收总额大写：<strong>{{ total_upper }}</strong></p>
+
+  <h2>二、收款记录</h2>
+  {{ payments_html|safe }}
+
+  <h2>三、合同明细</h2>
+  {{ items_html|safe }}
+
+  {% if with_cost %}
+  <h2>四、成本明细（内部，不对外提供）</h2>
+  {{ costs_html|safe }}
+  {% endif %}
+
+  <h2>{{ '五' if with_cost else '四' }}、结算说明</h2>
+  <p>1. 本结算单依据合同 {{ contract.no or ('#' ~ contract.id) }} 及其增项（变更单）、收款流水编制。</p>
+  <p>2. 应收总额 = 合同额（合同金额 − 优惠）+ 增项合计；未收金额 = 应收总额 − 已收金额。</p>
+  <p>3. 本结算单经双方确认签字后，作为该工程财务结算的最终依据。</p>
+  <p>4. 如有异议，请于收到本结算单之日起七日内提出，逾期视为认可。</p>
+
+  <div class="doc-sign">
+    <div class="sign-box">
+      <div class="sign-title">甲方（签字 / 盖章）</div>
+      <div class="sign-line">签字：</div>
+      <div class="sign-line">日期：　　　年　　月　　日</div>
+    </div>
+    <div class="sign-box">
+      <div class="sign-title">乙方（签字 / 盖章）</div>
+      <div class="sign-line">签字：</div>
+      <div class="sign-line">日期：　　　年　　月　　日</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('load', function () {
+    if (!location.search) setTimeout(function () { window.print(); }, 400);
+  });
+</script>
+</body>
+</html>

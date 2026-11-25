@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% block title %}合同模板{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>电子合同模板</h1>
+  <nav class="tabs inline-tabs">
+    <a href="/admin">概览</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/permissions">权限矩阵</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/stages">工序模板</a>
+    <a href="/admin/contract-templates" class="active">合同模板</a>
+    <a href="/admin/backups">备份</a>
+  </nav>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>公司抬头（合同乙方）</h2></div>
+  <p class="muted small">这里的值填进模板里的 <code>{{ '{{乙方名称}}' }}</code>、<code>{{ '{{开户行}}' }}</code> 等变量。留空则合同上对应位置空着，手写补。</p>
+  <form method="post" action="/admin/contract-templates/company">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field-grid">
+      {% for key, label in company_labels %}
+        <label class="lab"><span>{{ label }}</span><input name="{{ key }}" value="{{ company.get(key, '') }}"></label>
+      {% endfor %}
+    </div>
+    <div style="margin-top:.7rem"><button type="submit">保存抬头</button></div>
+  </form>
+</section>
+
+{% for t in templates %}
+<section class="card">
+  <form method="post" action="/admin/contract-templates/{{ t.id }}/update" id="tpl-{{ t.id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  </form>
+
+  <div class="card-head">
+    <h2>{{ t.name }}</h2>
+    {% if t.is_default %}<span class="badge ok">默认</span>{% endif %}
+    {% if not t.is_active %}<span class="badge warn">停用</span>{% endif %}
+    <div class="actions">
+      {% if not t.is_default %}
+        <form method="post" action="/admin/contract-templates/{{ t.id }}/default" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn ghost" type="submit">设为默认</button>
+        </form>
+      {% endif %}
+      <button class="btn" form="tpl-{{ t.id }}" type="submit">保存</button>
+      <form method="post" action="/admin/contract-templates/{{ t.id }}/delete" class="inline" onsubmit="return confirm('删除模板「{{ t.name }}」？已经打印出来的纸质合同不受影响。');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn danger" type="submit">删除</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="field-grid">
+    <label class="lab"><span>模板名称</span><input form="tpl-{{ t.id }}" name="name" value="{{ t.name }}" required></label>
+    <label class="checkline" style="align-self:end"><input form="tpl-{{ t.id }}" type="checkbox" name="is_active" value="1" {{ 'checked' if t.is_active else '' }}> 启用</label>
+    <label class="lab span-all"><span>正文（HTML 片段 + <code>{{ '{{变量}}' }}</code> 占位）</span>
+      <textarea form="tpl-{{ t.id }}" name="content" rows="22" spellcheck="false"
+                style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.82rem; line-height:1.5">{{ t.content }}</textarea>
+    </label>
+  </div>
+  <p class="muted small">
+    可用变量：{% for k, desc in variables %}<code title="{{ desc }}">{{ '{{' ~ k ~ '}}' }}</code> {% endfor %}
+  </p>
+  <p class="muted small">「明细表 / 收款记录 / 增项记录」是整段表格 HTML，模板里单独占一行即可。改完去任意合同详情页点「打印合同」看实际效果。</p>
+</section>
+{% endfor %}
+
+<section class="card">
+  <div class="card-head"><h2>新建 / 导入模板</h2></div>
+  <form method="post" action="/admin/contract-templates/new" class="filterbar">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="name" placeholder="模板名称，如「工程合同」" required>
+    <button type="submit">＋ 新建（以内置范本为底稿）</button>
+  </form>
+  <form method="post" action="/admin/contract-templates/upload" enctype="multipart/form-data" class="filterbar" style="margin-top:.6rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="file" name="file" accept=".html,.htm,.txt,.md,.markdown" required>
+    <input name="name" placeholder="导入后的模板名（留空用文件名）">
+    <button class="btn ghost" type="submit">↑ 上传导入</button>
+  </form>
+  <p class="muted small">支持 .html / .txt / .md。Word 文档请先「另存为 → 网页(.htm)」再上传；PDF 扫描件不适合当合同正文，挂到合同的扫描件附件里更合适。</p>
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block title %}结算单 · 合同 {{ contract.no or contract.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>暂时不能打印结算单</h1>
+</div>
+
+<section class="card">
+  <p>合同 <strong>{{ contract.no or ('#' ~ contract.id) }}</strong>（{{ contract.customer.name if contract.customer else '-' }}）当前状态是
+    <span class="badge">{{ '已结算' if contract.is_settled else '未结算' }}</span>。</p>
+  <p>{{ reason }}</p>
+  <p class="muted small">结算单是财务关账凭证，只有标记结算之后才有意义——未结算时金额还可能变（增项、退款、追加收款）。</p>
+  <div class="actions" style="margin-top:1rem">
+    <a class="btn ghost" href="/contracts/{{ contract.id }}">← 回合同页</a>
+    <a class="btn ghost" href="/contracts/{{ contract.id }}/print/contract">打印电子合同</a>
+  </div>
+</section>
+{% endblock %}

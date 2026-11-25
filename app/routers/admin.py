@@ -20,7 +20,17 @@ from ..csrf import csrf_protect
 from .. import gate as gate_mod
 from ..config import get_settings
 from ..db import SessionLocal, commit_retry, engine, get_db
-from ..models import AuditLog, Customer, Photo, StageTemplate, Task, User, now_iso, today_str
+from ..models import (
+    AuditLog,
+    ContractTemplate,
+    Customer,
+    Photo,
+    StageTemplate,
+    Task,
+    User,
+    now_iso,
+    today_str,
+)
 from ..permissions import (
     DEFAULT_SCOPE,
     ROLE_LABELS,
@@ -31,6 +41,7 @@ from ..permissions import (
 from ..scheduler import reload_backup_jobs
 from ..security import generate_totp_secret, hash_password, password_problem
 from ..services import backup as backup_svc
+from ..services import contract_docs as doc_svc
 from ..services import photos as photo_svc
 from ..services import search as search_svc
 from ..services import settings as settings_svc
@@ -778,3 +789,190 @@ def permissions_page(request: Request, user: User = Depends(require("admin:user"
         all_perms=ALL_PERMISSIONS,
         scopes=SCOPES,
     )
+
+
+# ---------------------------------------------------------- 电子合同模板
+@router.get("/contract-templates")
+def contract_templates_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+):
+    """电子合同模板管理：列表 + 编辑 + 上传导入 + 公司抬头。
+
+    库里一条都没有时落地内置范本——用户第一次点进来就能看到一份能用的正文，
+    在它基础上改比对着空白框写快得多。
+    """
+    if doc_svc.default_template(db) is None:
+        doc_svc.ensure_default_template(db, user.id)
+        commit_retry(db)
+    return render(
+        request,
+        "admin/contract_templates.html",
+        templates=doc_svc.list_templates(db),
+        company=doc_svc.company_info(db),
+        company_labels=doc_svc.company_labels(),
+        variables=doc_svc.available_vars(),
+    )
+
+
+@router.post("/contract-templates/new")
+def contract_template_new(
+    request: Request,
+    name: str = Form(...),
+    content: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    name = name.strip()
+    if not name:
+        return redirect("/admin/contract-templates", "模板名不能为空", "err")
+    if db.scalars(select(ContractTemplate).where(ContractTemplate.name == name)).first():
+        return redirect("/admin/contract-templates", f"模板「{name}」已存在", "err")
+    row = ContractTemplate(
+        name=name,
+        content=content or doc_svc.DEFAULT_TEMPLATE,
+        is_default=0,
+        is_active=1,
+        created_by=user.id,
+    )
+    db.add(row)
+    db.flush()
+    log_action(
+        db, user, "create", "contract_templates", row.id,
+        new={"name": row.name, "content_len": len(row.content or "")},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    return redirect("/admin/contract-templates", f"模板「{name}」已新建")
+
+
+@router.post("/contract-templates/{template_id}/update")
+def contract_template_update(
+    request: Request,
+    template_id: int,
+    name: str = Form(...),
+    content: str = Form(""),
+    is_active: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    row = db.get(ContractTemplate, template_id)
+    if row is None:
+        return redirect("/admin/contract-templates", "模板不存在", "err")
+    before = {"name": row.name, "content_len": len(row.content or ""), "is_active": row.is_active}
+    row.name = (name or row.name).strip()[:120]
+    row.content = content or row.content
+    row.is_active = 1 if is_active else 0
+    row.updated_at = now_iso()
+    log_action(db, user, "update", "contract_templates", row.id, old=before, new=row, ip=client_ip(request))
+    commit_retry(db)
+    return redirect("/admin/contract-templates", f"模板「{row.name}」已保存")
+
+
+@router.post("/contract-templates/{template_id}/delete")
+def contract_template_delete(
+    request: Request,
+    template_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    row = db.get(ContractTemplate, template_id)
+    if row is None:
+        return redirect("/admin/contract-templates", "模板不存在", "err")
+    total = db.scalar(select(func.count()).select_from(ContractTemplate)) or 0
+    if total <= 1:
+        return redirect("/admin/contract-templates", "至少保留一份模板，否则电子合同没法打印", "err")
+    name = row.name
+    log_action(
+        db, user, "delete", "contract_templates", row.id,
+        old={"name": name, "content_len": len(row.content or "")},
+        ip=client_ip(request),
+    )
+    db.delete(row)
+    commit_retry(db)
+    return redirect("/admin/contract-templates", f"模板「{name}」已删除")
+
+
+@router.post("/contract-templates/{template_id}/default")
+def contract_template_default(
+    request: Request,
+    template_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    row = db.get(ContractTemplate, template_id)
+    if row is None:
+        return redirect("/admin/contract-templates", "模板不存在", "err")
+    doc_svc.set_default(db, row.id)
+    commit_retry(db)
+    return redirect("/admin/contract-templates", f"「{row.name}」已设为默认模板")
+
+
+@router.post("/contract-templates/upload")
+async def contract_template_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    name: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    """上传 .html / .txt / .md 导入成新模板。
+
+    只收文本：PDF 与 Word 里的排版带不进网页，硬转出来是废的——
+    那种需求应该是「扫描件挂到合同下面」，不是「当合同正文」。
+    """
+    raw = await file.read()
+    if len(raw) > 512 * 1024:
+        return redirect("/admin/contract-templates", "文件超过 512KB，模板正文不该这么大", "err")
+    suffix = (Path(file.filename or "").suffix or "").lower()
+    if suffix not in (".html", ".htm", ".txt", ".md", ".markdown"):
+        return redirect(
+            "/admin/contract-templates",
+            f"不支持 {suffix or '该'} 格式：模板只能上传 .html / .txt / .md（PDF、Word 请在 Word 里另存为网页再传）",
+            "err",
+        )
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("gbk", errors="replace")
+    if not text.strip():
+        return redirect("/admin/contract-templates", "文件是空的", "err")
+
+    title = (name or Path(file.filename or "").stem or "上传的模板").strip()[:120]
+    base, n = title, 2
+    while db.scalars(select(ContractTemplate).where(ContractTemplate.name == title)).first():
+        title = f"{base} {n}"
+        n += 1
+    row = ContractTemplate(name=title, content=text, is_default=0, is_active=1, created_by=user.id)
+    db.add(row)
+    db.flush()
+    log_action(
+        db, user, "create", "contract_templates", row.id,
+        new={"name": row.name, "content_len": len(row.content or ""), "source": file.filename},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    return redirect("/admin/contract-templates", f"已从 {file.filename} 导入模板「{title}」")
+
+
+@router.post("/contract-templates/company")
+async def contract_company_save(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:setting")),
+    _csrf: None = Depends(csrf_protect),
+):
+    """公司抬头（模板里 {{乙方名称}} / {{开户行}} 等变量的取值）。"""
+    form = await request.form()
+    data = {key: str(form.get(key) or "") for key, _ in doc_svc.company_labels()}
+    before = doc_svc.company_info(db)
+    doc_svc.save_company_info(db, data)
+    log_action(db, user, "update", "contract_company", None, old=before, new=data, ip=client_ip(request))
+    commit_retry(db)
+    return redirect("/admin/contract-templates", "公司抬头已保存")

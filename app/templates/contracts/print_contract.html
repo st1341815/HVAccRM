@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>电子合同 {{ contract.no or contract.id }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/app.css?v={{ version }}">
+</head>
+<body class="doc-body">
+
+{# 屏幕上的工具条：打印时由 .no-print 隐藏，不会出现在纸上。 #}
+<div class="doc-toolbar no-print">
+  <a class="btn ghost" href="/contracts/{{ contract.id }}">← 返回合同</a>
+  <strong>电子合同</strong>
+  <span class="muted small">{{ chosen.name if chosen else '未选择模板' }}</span>
+  {% if doc_templates|length > 1 %}
+  <form method="get" class="inline">
+    <label class="inline-label">切换模板
+      <select name="tpl" onchange="this.form.submit()">
+        {% for t in doc_templates %}
+        <option value="{{ t.id }}" {{ 'selected' if chosen and t.id == chosen.id else '' }}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+  {% endif %}
+  <button class="btn" onclick="window.print()">打印 / 存 PDF</button>
+</div>
+
+{% if missing %}
+<div class="doc-toolbar no-print doc-warn">
+  模板里有 {{ missing|length }} 个认不出的变量：{{ missing|join('、') }}
+  —— 请到「系统管理 → 电子合同模板」里核对，否则纸面上这些位置会是空的。
+</div>
+{% endif %}
+
+<div class="doc-page">
+  {{ body|safe }}
+</div>
+
+<script>
+  // 从「打印 → 电子合同」点进来就是要打，等字体/布局稳定后直接弹系统打印面板。
+  // 打完按 Esc 即可回到文档，工具条上还有「打印 / 存 PDF」可以再来一次。
+  window.addEventListener('load', function () {
+    if (!location.search) setTimeout(function () { window.print(); }, 400);
+  });
+</script>
+</body>
+</html>

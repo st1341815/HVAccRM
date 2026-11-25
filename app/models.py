@@ -644,6 +644,29 @@ class SmsCode(Base):
     created_at = Column(String, nullable=False, default=now_iso)
 
 
+# ------------------------------------------------------------ 电子合同模板
+class ContractTemplate(Base):
+    """电子合同正文模板（带 `{{占位符}}`），后台维护、打印时填数据。
+
+    为什么存库不存文件：模板是「业务文本」——要能在线改、要知道谁改的、
+    要能随时回滚到另一份。存文件就得管路径、管上传、管权限，收益不大。
+
+    渲染刻意**不用 Jinja**：模板正文是用户写的，写坏一个 `{%` 就能让整页 500。
+    走 services/contract_docs.py 里的纯字符串替换，坏了只是少填几个值。
+    """
+
+    __tablename__ = "contract_templates"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)       # 模板名，如「标准工程合同」
+    content = Column(Text, nullable=False)      # 正文：HTML + {{占位符}}
+    is_default = Column(Integer, default=0)     # 1 = 打印电子合同时默认用这份
+    is_active = Column(Integer, default=1)
+    created_by = Column(Integer)                # 仅记录，不建外键（与 settled_by 同风格）
+    created_at = Column(String, default=now_iso)
+    updated_at = Column(String, default=now_iso, onupdate=now_iso)
+
+
 # 标准 9 个施工工序（文档 6.5）
 DEFAULT_STAGES = [
     ("上门勘测", 1, 1, 1, "勘测记录 + 现场照"),
