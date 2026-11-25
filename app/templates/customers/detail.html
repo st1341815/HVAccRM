@@ -172,7 +172,15 @@
     <tbody>
     {% for c, s, p in plan_rows %}
       <tr>
-        <td>{{ c.product_type or '-' }}</td>
+        <td>
+          {# 产品名直接链到关联合同详情：客户页看到「这单是什么」，下一句永远是「合同长什么样」。
+             产品为空时不摆一个点不动「-」，退回合同编号，保证这一格永远可点。 #}
+          {% if c.product_type %}
+            <a href="/contracts/{{ c.id }}" title="查看合同 {{ c.no }}">{{ c.product_type }}</a>
+          {% else %}
+            <a href="/contracts/{{ c.id }}" class="muted" title="该合同未填产品，查看合同 {{ c.no }}">{{ c.no }}</a>
+          {% endif %}
+        </td>
         <td>{{ c.sign_date }}</td>
         <td>{{ s.total|money }}</td><td>{{ s.received|money }}</td>
         <td class="{{ 'red' if s.outstanding > 0 else '' }}">{{ s.outstanding|money }}</td>
