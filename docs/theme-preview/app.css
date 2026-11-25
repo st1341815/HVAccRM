@@ -1,0 +1,811 @@
+/* HVAccRM 样式表
+   约定：
+   - 所有业务类名保持不变（模板无需改动）
+   - 行背景走 --row-bg 变量，避免斑马纹与「告警行/置灰行」互相覆盖
+   - 移动端：顶栏导航横向滚动、筛选条整行堆叠、KPI 两列、
+     宽表格由 layout 里的脚本打上 .js-stack 后变成「标签+值」卡片
+*/
+
+/* ⚠️ 全局兜底：让 HTML 的 hidden 属性真正生效。
+   浏览器默认的 [hidden]{display:none} 属于 **UA 样式表**，任何作者样式里的
+   `.foo { display: flex }` 都能盖过它 —— 结果就是「el.hidden = true 没反应」。
+   （本项目已两次踩这个坑：灯箱 .lightbox 一次、分享页 .share-qr 一次。）
+   以后凡是「设置 display 又被 hidden 控制的元素」都不用再单独写 .x[hidden]。 */
+[hidden] { display: none !important; }
+
+:root {
+  /* 莫兰迪色系：低饱和、暖灰基调（安静工具台方向）
+     命名分层：paper=暖纸灰阶 / brand=灰蓝品牌 / *-ink=语义文字深档 / sidebar=深色侧栏
+     所有组件只引用这里的变量，不再出现裸色值 */
+  /* 暖纸灰阶 */
+  --bg: #efebe3;
+  --card: #fbf9f5;
+  --paper-2: #f7f4ee;                /* 斑马纹 */
+  --paper-3: #f1efe9;                /* 图片底/代码底等更浅填充 */
+  --ink: #45423c;                    /* 主文字 */
+  --muted: #6f6b64;                  /* 弱化文字 AA 达标 */
+  --line: #e5dfd5;                   /* 发丝线 */
+  --card-border: #e2dbd0;            /* 卡片/面板边框略深，分层更清晰 */
+  /* 品牌灰蓝 */
+  --brand: #6c7f91;                  /* 装饰：图标/边框/进度条/选中底 */
+  --brand-dark: #596b7c;
+  --brand-strong: #5b6f83;           /* 实心按钮底（白字对比度达标） */
+  --brand-ink: #4f6376;              /* 链接/强调文字 */
+  --brand-50: #e9edf1;               /* 选中底/ghost 底 */
+  --brand-50-hover: #dde4ea;         /* ghost 悬停 */
+  --brand-200: #b9c7d4;              /* 焦点环/侧栏指示条 */
+  /* 语义色（浅底 + 深字 + 边框三档） */
+  --danger-ink: #8f4a4a;
+  --danger-bg: #f7eded;
+  --danger-border: #e6c9c9;
+  --success-ink: #4f7059;
+  --success-bg: #e6ece1;
+  --success-border: #c3d2c0;
+  --warning-ink: #7d6540;
+  --warning-bg: #f4eedf;
+  --warning-border: #dfd0a8;
+  /* 深色侧栏（纯色，不用渐变） */
+  --sidebar-bg: #3a3f47;
+  --sidebar-fg: #d6d2ca;             /* 侧栏导航文字 */
+  --sidebar-fg-muted: #a8adb4;       /* 侧栏次要文字 */
+  --sidebar-hover: rgba(255, 255, 255, .08);
+  --sidebar-active: rgba(255, 255, 255, .10);
+  /* 尺度 */
+  --row-hover: #f6f3ed;              /* 表格行悬浮 */
+  --radius-sm: 6px;                  /* 控件级：按钮/输入/小卡 */
+  --radius-md: 8px;                  /* 面板内小块 */
+  --radius: 10px;                    /* 卡片/面板级 */
+  --shadow-md: 0 4px 14px -2px rgb(74 71 66 / .12), 0 1px 3px rgb(74 71 66 / .07);  /* 仅弹层/浮起元素用 */
+}
+* { box-sizing: border-box; }
+/* 图片兜底：任何未单独约束的图片都不超过容器宽度（手机端溢出的根因防线） */
+img { max-width: 100%; height: auto; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
+}
+a { color: var(--brand-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.4rem; margin: 0 0 .6rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .6rem; }
+h3 { font-size: .95rem; margin: 1rem 0 .4rem; }
+
+/* ---------------------------------------------------------------- 顶栏 */
+/* 侧边栏布局 */
+.app { display: flex; min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; height: 100vh;
+  flex: 0 0 232px;
+  display: flex; flex-direction: column;
+  padding: 1.1rem .85rem .9rem;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+}
+.sidebar .brand { display: flex; align-items: center; gap: .55rem; font-size: 1.14rem; font-weight: 800; letter-spacing: .02em; padding: .1rem .55rem 1rem; color: #fff; }
+.sidebar .brand svg { width: 1.35rem; height: 1.35rem; flex: 0 0 auto; color: var(--brand-200); }
+.sidebar nav { display: flex; flex-direction: column; gap: .12rem; flex: 1; overflow-y: auto; scrollbar-width: thin; }
+.sidebar nav a {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .7rem; border-radius: var(--radius-sm);
+  color: var(--sidebar-fg); font-size: .95rem;
+  transition: background-color .15s ease, color .15s ease;
+}
+.sidebar nav a:hover { background: var(--sidebar-hover); color: #fff; text-decoration: none; }
+.sidebar nav a.active { background: var(--sidebar-active); color: #fff; font-weight: 600; box-shadow: inset 2px 0 0 var(--brand-200); }
+.sidebar nav a .ico { width: 1.3rem; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.sidebar nav a .ico svg { width: 1.1rem; height: 1.1rem; display: block; }
+.sidebar .me { border-top: 1px solid rgba(255, 255, 255, .08); padding-top: .8rem; margin-top: .4rem; }
+.sidebar .me .who { font-size: .9rem; color: #fff; font-weight: 600; }
+.sidebar .me .role { font-size: .78rem; color: var(--sidebar-fg-muted); }
+.sidebar .me-links { display: flex; gap: .4rem; margin-top: .55rem; }
+.sidebar .me-links a { color: var(--sidebar-fg); font-size: .85rem; padding: .32rem .6rem; border-radius: var(--radius-sm); transition: background-color .15s ease, color .15s ease; }
+.sidebar .me-links a:hover { background: var(--sidebar-hover); color: #fff; text-decoration: none; }
+/* 登出改成 POST 表单后，按钮要长得像同排的链接 */
+button.linklike {
+  background: none; border: 0; margin: 0; padding: .32rem .6rem; cursor: pointer;
+  font: inherit; font-size: .85rem; line-height: inherit; text-align: left;
+  color: var(--sidebar-fg); border-radius: var(--radius-sm);
+  transition: background-color .15s ease, color .15s ease;
+}
+button.linklike:hover { background: var(--sidebar-hover); color: #fff; }
+.sidebar .me-links form { margin: 0; display: contents; }
+.sidebar-toggle {
+  display: none; position: fixed; top: .7rem; left: .7rem; z-index: 60;
+  width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);
+  background: var(--sidebar-bg); color: #fff; font-size: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, .08);
+  align-items: center; justify-content: center;
+}
+.scrim { display: none; position: fixed; inset: 0; background: rgba(22, 24, 27, .45); z-index: 55; }
+
+/* 桌面端：折叠侧边栏按钮（平板小屏腾出内容区） */
+.collapse-btn {
+  margin-left: auto; flex: 0 0 auto;
+  width: 1.7rem; height: 1.7rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--sidebar-fg); border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: var(--radius-sm); font-size: 1.05rem; line-height: 1; cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, transform .15s ease;
+}
+.collapse-btn:hover { background: rgba(255, 255, 255, .09); color: #fff; }
+/* 折叠态：侧边栏收窄成图标栏（只显示图标与品牌标识） */
+body.sidebar-collapsed .sidebar { flex-basis: 66px; padding-left: .5rem; padding-right: .5rem; }
+body.sidebar-collapsed .sidebar .brand { justify-content: center; }
+body.sidebar-collapsed .sidebar .brand span { display: none; }
+body.sidebar-collapsed .sidebar .collapse-btn { margin-left: 0; transform: scaleX(-1); }
+body.sidebar-collapsed .sidebar nav a { justify-content: center; gap: 0; padding: .58rem 0; font-size: 0; }
+body.sidebar-collapsed .sidebar .me { display: none; }
+
+.wrap { flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto; padding: 1.2rem 1.5rem; }
+.foot { text-align: center; color: var(--muted); font-size: .78rem; padding: 1.5rem 0; }
+/* 页脚安全等级徽章：小圆点 + 文案，颜色只用语义色的墨色，不抢视线 */
+.foot-sep { margin: 0 .35rem; color: var(--card-border); }
+.sec-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .05rem .5rem; border-radius: 999px; font-size: .74rem; border: 1px solid transparent; }
+.sec-badge i { width: .42rem; height: .42rem; border-radius: 50%; background: currentColor; display: inline-block; }
+.sec-badge.high { color: var(--success-ink); background: var(--success-bg); border-color: #cfdcc8; }
+.sec-badge.mid { color: var(--warning-ink); background: var(--warning-bg); border-color: #e3d6b8; }
+.sec-badge.low { color: var(--danger-ink); background: var(--danger-bg); border-color: var(--danger-border); }
+/* 对外分享页的版权/ICP 声明（两行居中，与内部版本页脚区分） */
+.foot-legal { padding: 1.1rem 0 1.6rem; font-size: .74rem; line-height: 1.9; }
+.foot-legal div { margin: 0; white-space: normal; }
+.foot-legal-icp { color: var(--muted); }
+
+.card {
+  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+  padding: 1rem; margin-bottom: 1rem; overflow-x: auto;
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+@media (max-width: 900px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+.page-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.page-head .actions { display: flex; gap: .5rem; align-items: center; margin-left: auto; flex-wrap: wrap; }
+/* 页头操作区里的 tab 导航：去掉自带的下边距，避免与同排按钮垂直错位 */
+.page-head .actions .tabs { margin-bottom: 0; }
+
+/* 卡片内标题行（如客户详情的「收款明细/成本明细」）：标题在左，操作按钮与金额汇总推到最右 */
+.card-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .7rem; }
+.card-head h2 { margin: 0; }
+.card-head .actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; flex-wrap: wrap; }
+/* 金额汇总：数字加粗、稍大于正文，靠近最右侧 */
+.head-sum { font-size: .88rem; color: var(--muted); white-space: nowrap; }
+.head-sum strong { font-size: 1.08rem; font-weight: 700; color: var(--ink); }
+
+/* 详情页顶部信息条 */
+.meta {
+  display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; align-items: center;
+  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+  padding: .55rem .85rem; margin-bottom: 1rem; font-size: .88rem;
+}
+.meta .badge { margin-right: .15rem; }
+
+/* ---------------------------------------------------------------- 指标卡 */
+.kpis { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+/* KPI 行内的操作按钮：推到最右、底部对齐（手机端 grid 下自然落在右下角） */
+.kpis .kpi-actions { margin-left: auto; align-self: flex-end; display: flex; }
+.kpi { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: .65rem 1rem .7rem; min-width: 8.5rem; }
+.kpi-num { display: block; font-size: 1.45rem; font-weight: 700; line-height: 1.25; }
+.kpi-label { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+.kpi.alert .kpi-num { color: var(--danger-ink); }
+.kpis.compact .kpi { padding: .35rem .7rem .4rem; min-width: 5.5rem; }
+.kpis.compact .kpi-num { font-size: 1.1rem; }
+/* 说明型卡片（如备份页「智能跳过重复备份」）：弱底色 + 左侧细线，与操作区区分 */
+.card.note-card { background: var(--paper-3); border-color: var(--line); border-left: 2px solid var(--brand-200); padding: .7rem .9rem; }
+.card.note-card strong { font-size: .88rem; }
+/* 施工看板：筛选结果标签与数字合并一行 */
+.kpi-inline { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; }
+.kpi-inline .kpi-num { display: inline; }
+
+/* ---------------------------------------------------------------- 表格 */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .8rem; color: var(--muted); font-weight: 600; white-space: nowrap; vertical-align: middle; }
+/* 可排序列的表头：点标题切换升降序 */
+th.sortable { padding: 0; }
+th.sortable a { display: block; padding: .45rem .5rem; color: inherit; text-decoration: none; }
+th.sortable a:hover { color: var(--brand); }
+.sort-arrow { font-size: .72rem; margin-left: .2rem; opacity: .85; }
+/* 案例列表表头：CJK 默认会在任意两字间折行，强制不折行避免「4 字变 3+1 两行」 */
+table.cases-table th { white-space: nowrap; }
+table.tight th, table.tight td { padding: .35rem .45rem; font-size: .88rem; }
+table.kv th { width: 9rem; color: var(--muted); font-weight: 600; background: none; }
+/* 施工看板表格列宽：工序容纳 6 个中文字符，产品类型 / 状态各 4 个。
+   用 rem（相对根字号）而非 em，避免表头（.8rem）与单元格（.88rem）字号不同导致列宽不一致。
+   表头加 nowrap：CJK 文字默认可在任意两字之间折行，auto 布局下 min-content 会塌缩成 1 字，
+   即使给了 width 仍可能被挤窄导致「产品类型」折成两行；nowrap 强制表头不折行。 */
+table.tasks th:nth-child(2), table.tasks td:nth-child(2) { width: 6.2rem; }
+table.tasks th:nth-child(3), table.tasks td:nth-child(3) { width: 4.4rem; }
+table.tasks th:nth-child(6), table.tasks td:nth-child(6) { width: 4.4rem; }
+table.tasks th { white-space: nowrap; }
+/* 表头内的汇总行（如利润核算「按合同核算」的合计行）：加粗 + 浅底与明细区分。
+   注意单元格用 td（不是 th），避免被 th 的 .8rem / 灰色字覆盖；数字列不折行（含 - 的金额会断行）。 */
+tr.sum-row td {
+  font-weight: 700; color: var(--ink);
+  background: var(--paper-3); border-bottom: 2px solid var(--brand-200);
+  white-space: nowrap;
+}
+tr.sum-row td.sum-label { color: var(--muted); }
+tbody tr { background: var(--row-bg, transparent); }
+tbody tr:nth-child(even) { --row-bg: var(--paper-2); }
+tr.row-alert { --row-bg: var(--danger-bg); }
+tr.row-alert td { background: var(--danger-bg); }
+/* 成本未录入：整行文字标红提醒 */
+tr.row-no-cost td { color: var(--danger-ink); }
+tr.row-muted { --row-bg: transparent; }
+tr.row-muted td { opacity: .55; }
+td.nowrap, th.nowrap { white-space: nowrap; }
+.stage-main { white-space: nowrap; }
+.center { text-align: center; }
+.red { color: var(--danger-ink); }
+.ok-text { color: var(--success-ink); }
+.muted { color: var(--muted); }
+.small { font-size: .82rem; }
+.break { word-break: break-word; overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------------- 表单 */
+form.stack { display: flex; flex-direction: column; gap: .6rem; }
+
+/* 登录页短信验证码（外网）：输入框 + 获取按钮同一行，倒计时态按钮置灰 */
+.sms-row { display: flex; gap: .4rem; }
+.sms-row input { flex: 1 1 auto; min-width: 0; }
+.sms-row .sms-send { flex: 0 0 auto; white-space: nowrap; }
+.sms-row .sms-send:disabled { opacity: .55; cursor: not-allowed; }
+form.tight-stack { gap: .3rem; }
+form.inline { display: inline-flex; gap: .3rem; align-items: center; }
+label { display: block; font-size: .85rem; color: var(--ink); }
+.checkline { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.checkline select { flex: 0 0 auto; min-width: 5.5rem; }
+/* 同一逻辑行的若干控件（如「周几 + 时间」）保持同行不拆开 */
+.inline-group { display: inline-flex; align-items: center; gap: .4rem; flex: 0 0 auto; }
+.task-photos { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+img.mini { width: 46px; height: 46px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); display: inline-block; vertical-align: middle; }
+/* 表格行内的凭证缩略图单元格：只显示前 3 张、**强制一行**（CJK/图片默认可换行，
+   列宽一紧就会折成两三行把行高撑起来），第 4 张起是无 img 的隐藏锚点（见模板），
+   列表里以「+N」提示，点开第一张进灯箱即可翻完这一笔的全部凭证。
+   `.card` 有 overflow-x:auto，所以 nowrap 撑宽时表格横向滚动，不会撑破页面。 */
+td.photo-cell { white-space: nowrap; }
+.task-upload { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+.picked-name { flex: 1 1 100%; word-break: break-all; }
+.task-upload button[type=submit]:disabled { opacity: .6; cursor: not-allowed; }
+.file-label { position: relative; display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; white-space: nowrap; overflow: hidden; }
+/* PWA（standalone，尤其 iOS WKWebView）下，缩到 1px 的隐藏 file input 经 label 合成点击会被
+   拒绝打开相册；改成让 input 铺满整个 label（opacity:0），用户点击直接命中 input 本身即可。 */
+.file-label input[type=file] { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.checkgrid { row-gap: .3rem; }
+.checkgrid label.checkline { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
+.checkgrid label.checkline:has(input:checked) { border-color: var(--brand); background: var(--brand-50); color: var(--brand-dark); font-weight: 600; }
+
+input, select, textarea {
+  width: 100%; padding: .4rem .5rem; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); font: inherit; line-height: 1.6; background: #fff;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand-200); outline-offset: 0; }
+input[type=file] { padding: .3rem; }
+input[type=checkbox] { width: auto; }
+button {
+  padding: .42rem .9rem; border: 0; border-radius: var(--radius-sm); background: var(--brand-strong);
+  color: #fff; font: inherit; cursor: pointer; white-space: nowrap;
+}
+button:hover { background: var(--brand-ink); }
+button.ghost { background: var(--brand-50); color: var(--brand-dark); }
+button.ghost:hover { background: var(--brand-50-hover); }
+button.danger, .btn.danger { background: var(--danger-bg); color: var(--danger-ink); border: 1px solid var(--danger-border); }
+button.danger:hover, .btn.danger:hover { background: var(--danger-border); color: var(--danger-ink); }
+button.tiny { padding: .15rem .4rem; font-size: .75rem; }
+.btn { display: inline-block; padding: .42rem .9rem; border-radius: var(--radius-sm); background: var(--brand-strong); color: #fff; white-space: nowrap; }
+.btn:hover { background: var(--brand-ink); text-decoration: none; }
+.btn.ghost { background: var(--brand-50); color: var(--brand-dark); }
+/* 合同台账「结算」列：badge 与开关按钮同一行，窄屏不折行 */
+.settle-cell { white-space: nowrap; }
+.settle-cell form.inline { margin-left: .35rem; }
+/* 页头主操作按钮：与选中 tab 同款样式（淡蓝背景 + 胶囊圆角 + 等高，和「成本明细」active 导航一致） */
+.btn-tab {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 999px;
+  padding: .3rem .8rem;
+}
+.btn-tab:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+.filterbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.filterbar input, .filterbar select { width: auto; min-width: 8rem; }
+.inline-label { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
+
+/* ------------------------------------------------ 设置类模块（系统信息页） */
+/* 两列栅格：控件成对排列，避免「一项一行 + 说明文字夹在中间」的松散布局。
+   .span-2 占满整行；<768px 退化为单列。标签文字放在 grid 第一行，控件铺满第二行。 */
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem .9rem; align-items: start; }
+.field-grid > .span-2, .field-grid > .span-all { grid-column: 1 / -1; }
+.field-grid label.lab { display: flex; flex-direction: column; gap: .25rem; min-width: 0; font-size: .85rem; color: var(--ink); }
+.field-grid label.lab > .inline-group { display: flex; align-items: center; gap: .4rem; }
+.field-grid label.lab > .inline-group > input, .field-grid label.lab > .inline-group > select { flex: 1 1 auto; min-width: 0; }
+.field-grid label.lab > .inline-group > button { flex: 0 0 auto; }
+.field-grid input.short { width: 6rem; }
+/* 模块内的主操作按钮单独一行，右侧留白，不与输入框挤在一起 */
+.module-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding-top: .15rem; }
+.module-actions button { flex: 0 0 auto; }
+/* 说明性文字统一收在模块最尾部：弱化底色 + 左侧细线，视觉上与控件区分离 */
+.module-notes { margin-top: 1rem; padding: .55rem .8rem; background: var(--paper-3); border-left: 2px solid var(--brand-200); border-radius: var(--radius-sm); }
+.module-notes h3 { margin: 0 0 .3rem; font-size: .8rem; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+.module-notes ul { margin: 0; padding-left: 1.05rem; }
+.module-notes li { font-size: .82rem; line-height: 1.65; color: var(--muted); }
+.module-notes li + li { margin-top: .15rem; }
+.module-notes li b { color: var(--ink); font-weight: 600; }
+.module-notes code { font-size: .78rem; }
+/* 安全入口：入口地址预览条（等宽可读，状态徽章右对齐换行） */
+.gate-preview { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; padding: .5rem .7rem; background: var(--paper-3); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: .82rem; color: var(--muted); }
+.gate-preview code { font-size: .82rem; color: var(--ink); word-break: break-all; }
+.gate-state { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-left: auto; }
+/* 测试短信表单与设置表单之间留出呼吸 */
+form.sms-test { margin-top: 1rem; }
+
+/* 下拉式多选（<details> 实现，无 JS 也能展开选择） */
+details.ms { border: 1px solid var(--line); border-radius: var(--radius-md); padding: .45rem .6rem; background: #fff; }
+details.ms > summary { cursor: pointer; font-size: .85rem; display: flex; align-items: center; gap: .4rem; }
+details.ms > summary::-webkit-details-marker { color: var(--muted); }
+details.ms[open] > summary { margin-bottom: .4rem; }
+details.ms .ms-picked { font-weight: 400; }
+details.ms .ms-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem .6rem; padding-top: .2rem; border-top: 1px dashed var(--line); }
+details.ms .ms-panel label.checkline { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
+details.ms .ms-panel label.checkline:has(input:checked) { border-color: var(--brand); background: var(--brand-50); color: var(--brand-dark); font-weight: 600; }
+/* 图片灯箱：点缩略图放大查看，左右切换 */
+.lightbox {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  background: rgba(17, 24, 39, .94); padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.lightbox[hidden] { display: none; }
+.lightbox img {
+  max-width: 96vw; max-height: 90vh; object-fit: contain; cursor: zoom-in;
+  transition: transform .16s ease-out; touch-action: none; background: #0b1220;
+}
+.lightbox img:active { cursor: zoom-out; }
+.lightbox .lb-close, .lightbox .lb-prev, .lightbox .lb-next {
+  position: absolute; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .16);
+  color: #fff; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.lightbox .lb-close { top: .8rem; right: .8rem; width: 2.6rem; height: 2.6rem; font-size: 1.1rem; }
+.lightbox .lb-prev, .lightbox .lb-next { top: 50%; transform: translateY(-50%); width: 2.6rem; height: 2.6rem; font-size: 1.7rem; line-height: 1; }
+.lightbox .lb-prev { left: .6rem; }
+.lightbox .lb-next { right: .6rem; }
+.lightbox .lb-close:hover, .lightbox .lb-prev:hover, .lightbox .lb-next:hover { background: rgba(255, 255, 255, .3); }
+.lightbox .lb-counter {
+  position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%);
+  color: #e5e7eb; font-size: .82rem; background: rgba(0, 0, 0, .4); padding: .15rem .7rem; border-radius: 999px;
+}
+body.lb-open { overflow: hidden; }
+
+/* 快捷筛选 chips + 视图切换（施工看板） */
+.quick-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .7rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.chips.views { margin-left: auto; }
+.chip { display: inline-block; padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: .85rem; color: var(--ink); white-space: nowrap; }
+.chip:hover { border-color: var(--brand); text-decoration: none; }
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* 按客户分组：一个工地一张卡，节点为步骤 */
+.task-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(345px, 1fr)); gap: .9rem; }
+.task-card { border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .8rem; background: #fff; }
+.task-card.is-alert { border-color: var(--danger-border); }
+.tc-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.tc-head strong { font-size: 1rem; }
+.tc-meta { margin: .1rem 0 .3rem; }
+.tc-steps { list-style: none; margin: .3rem 0 0; padding: 0; }
+.tc-step { border-top: 1px dashed var(--line); padding: .45rem 0 .55rem; }
+.tc-step.is-alert { background: var(--danger-bg); }
+.tc-step-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.tc-stage { font-weight: 600; }
+.tc-step-meta { margin-top: .1rem; }
+.tc-note { color: var(--ink); white-space: pre-line; }
+.tc-step-body { margin-top: .35rem; }
+.tc-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
+.tc-actions .tc-done { flex: 1 1 14rem; }
+.tc-actions .tc-done input { flex: 1 1 auto; min-width: 6rem; }
+.tc-actions .tc-skip-form { flex: 1 1 auto; }
+.tc-actions .tc-skip-form input { flex: 1 1 auto; min-width: 8rem; }
+
+/* 完工/跳过按钮与文本框同高：对齐 input 的 .4rem 内边距 + 1px 边框 */
+form[action$="/done"] button,
+form[action$="/skip"] button {
+  padding-top: .4rem;
+  padding-bottom: .4rem;
+  border: 1px solid transparent;
+}
+
+/* 折叠式筛选条（施工看板） */
+details.filter-collapse { padding: .4rem .6rem; }
+details.filter-collapse > summary { font-weight: 600; }
+details.filter-collapse[open] > summary { margin-bottom: .55rem; }
+details.filter-collapse .filterbar { padding-top: .1rem; }
+
+/* ---------------------------------------------------------------- 提示与标签 */
+.flash { padding: .6rem .9rem; border-radius: var(--radius-md); margin-bottom: .8rem; border: 1px solid transparent; }
+.flash.ok { background: var(--success-bg); border-color: var(--success-border); color: var(--success-ink); }
+.flash.err { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-ink); }
+.flash.warn { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-ink); }
+
+.badge { display: inline-block; padding: .05rem .45rem; border-radius: 999px; background: var(--brand-50); color: var(--brand-dark); font-size: .75rem; }
+.badge.warn { background: var(--warning-bg); color: var(--warning-ink); }
+.badge.showroom { background: #f0e2e2; color: #8f5a5a; }
+.badge.s-done { background: var(--success-bg); color: var(--success-ink); }
+.badge.s-doing { background: var(--brand-50); color: var(--brand-dark); }
+.badge.s-overdue, .badge.s-skipped { background: var(--danger-bg); color: var(--danger-ink); }
+.badge.lock { background: var(--danger-bg); color: var(--danger-ink); border: 1px solid var(--danger-border); }
+
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.tabs a { padding: .3rem .8rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
+.tabs a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.inline-tabs { margin-left: auto; }
+
+.login-card { max-width: 380px; margin: 8vh auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem; box-shadow: var(--shadow-md); }
+.stack label { display: flex; flex-direction: column; gap: .25rem; }
+/* 例外：带 .checkline 的复选行在 .stack 里必须保持横向（复选框 + 说明文字同一行）。
+   .stack label 的 column 会把它们拆成两行——此前复选框和文字是上下错开的。 */
+.stack label.checkline { display: flex; flex-direction: row; align-items: center; gap: .3rem; flex-wrap: wrap; }
+/* 并排的两个复选行（安全入口的「启用」+「内网访问免检」）：各自占一列、同处一行。
+   说明文字较长会折成两行，此时复选框要与首行文字对齐（flex-start），而不是飘到中间。 */
+.field-grid > label.checkline.check-pair { align-items: flex-start; }
+.field-grid > label.checkline.check-pair > input[type=checkbox] { margin-top: .12rem; }
+
+/* ---------------------------------------------------------------- 相册 */
+/* 照片查看页：适配屏幕放大显示 */
+.photo-view { display: flex; align-items: center; justify-content: center; padding: .8rem; }
+.photo-view img { max-width: 100%; max-height: 76vh; object-fit: contain; border-radius: var(--radius-sm); background: var(--paper-3); }
+@media (max-width: 780px) { .photo-view img { max-height: 66vh; } }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .7rem; }
+.gallery figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.gallery img { width: 100%; height: 120px; object-fit: cover; display: block; background: var(--paper-3); }
+.gallery figcaption { padding: .3rem .4rem; display: flex; flex-direction: column; gap: .1rem; }
+.gallery a span { font-size: .75rem; color: var(--muted); }
+
+.progress { height: .6rem; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: .6rem; }
+.progress span { display: block; height: 100%; background: var(--brand); }
+
+fieldset { border: 1px solid var(--line); border-radius: var(--radius-md); padding: .6rem .8rem; margin: 0; }
+legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
+.secret code { background: var(--paper-3); padding: .1rem .3rem; border-radius: var(--radius-sm); }
+.list { margin: 0; padding-left: 1.1rem; }
+.list li { margin-bottom: .25rem; }
+.actions-cell { display: flex; flex-direction: column; gap: .3rem; }
+
+/* 施工看板操作列（桌面端）：完工备注 4 字、施工日期 2 字/行、跳过原因与上排等宽 */
+@media (min-width: 781px) {
+  table.tasks td.actions-cell .tc-done input[name="notes"] { width: 4.6rem; flex: 0 0 auto; }
+  /* 「施工日期」= 2 行、每行 2 字。必须显式允许折行：.inline-label 的 white-space:nowrap 会继承下来，
+     文字不折行就撑出 2em 的盒子、被后面的日期控件盖住。2.1em 给字形舍入留 1 像素余量。 */
+  table.tasks td.actions-cell .date-text {
+    width: 2.1em; flex: 0 0 auto; line-height: 1.25;
+    white-space: normal; word-break: break-all;
+  }
+  table.tasks td.actions-cell .tc-done input[type="date"] { width: 7.5rem; flex: 0 0 auto; }
+  table.tasks td.actions-cell .tc-done .inline-label { flex: 0 0 auto; }
+  /* 跳过原因 = 完工备注(4.6rem) + 施工日期(2.1em) + 日期控件(7.5rem) + 两处 gap(0.6rem)，与上排按钮对齐 */
+  table.tasks td.actions-cell input[name="skip_reason"] { width: calc(4.6rem + 2.1em + 7.5rem + 0.6rem); flex: 0 0 auto; min-width: 0; }
+}
+
+/* ================================================================ 手机端 */
+@media (max-width: 780px) {
+  body { font-size: 15px; }
+  h1 { font-size: 1.18rem; margin-bottom: .4rem; }
+  h2 { font-size: 1rem; }
+  .wrap { padding: .7rem .7rem calc(1.2rem + env(safe-area-inset-bottom, 0px)); }
+  .card { padding: .8rem; margin-bottom: .7rem; border-radius: var(--radius); }
+
+  /* 侧边栏 → 抽屉式（点汉堡展开，加遮罩） */
+  .app { display: block; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; height: 100vh;
+    width: min(78vw, 280px); z-index: 58;
+    transform: translateX(-100%); transition: transform .24s ease;
+  }
+  body.nav-open .sidebar { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, .32); }
+  body.nav-open .scrim { display: block; }
+  .sidebar-toggle { display: flex; }
+  .collapse-btn { display: none; }
+  /* 移动端是抽屉式，折叠态样式一律失效（即便此前在桌面端折叠过） */
+  body.sidebar-collapsed .sidebar { padding-left: .85rem; padding-right: .85rem; }
+  body.sidebar-collapsed .sidebar .brand { justify-content: flex-start; }
+  body.sidebar-collapsed .sidebar .brand span { display: inline; }
+  body.sidebar-collapsed .sidebar nav a { justify-content: flex-start; gap: .6rem; padding: .58rem .7rem; font-size: .95rem; }
+  body.sidebar-collapsed .sidebar .me { display: block; }
+  .wrap { padding-top: 3.4rem; }
+
+  /* 触控目标不小于 ~40px */
+  button, .btn { min-height: 2.4rem; padding: .45rem .85rem; }
+  .tabs a { padding: .45rem .7rem; }
+
+  /* 表单：整行堆叠；16px 防止 iOS 聚焦自动放大 */
+  input, select, textarea { font-size: 16px; }
+  input[type=checkbox] { width: 1.05rem; height: 1.05rem; }
+  /* 设置类模块在手机上退化为单列，控件整行铺满（避免两列把标签挤断行） */
+  .field-grid { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  .field-grid > .span-2, .field-grid > .span-all { grid-column: auto; }
+  /* 窄屏下并排的复选行各占整行：两列会把说明文字挤成很碎的折行 */
+  .field-grid > label.checkline.check-pair { grid-column: 1 / -1; align-items: center; }
+  .field-grid > label.checkline.check-pair > input[type=checkbox] { margin-top: 0; }
+  .field-grid input.short { width: 5.5rem; }
+  .module-actions button { flex: 1 1 auto; }
+  .gate-state { margin-left: 0; }
+  .filterbar { gap: .45rem; }
+  .filterbar input, .filterbar select, .filterbar .inline-label { flex: 1 1 100%; width: 100%; min-width: 0; }
+  .filterbar button, .filterbar .btn { flex: 1 1 auto; text-align: center; }
+  .page-head { gap: .5rem; }
+  .page-head .actions { margin-left: 0; width: 100%; }
+  .page-head .actions .btn, .page-head .actions button { flex: 1 1 auto; text-align: center; }
+  .inline-tabs { margin-left: 0; }
+
+  /* 指标卡两列 */
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .kpi, .kpis.compact .kpi { min-width: 0; padding: .5rem .6rem; }
+  .kpi-num, .kpis.compact .kpi-num { font-size: 1.05rem; }
+
+  /* 宽表格 → 卡片（脚本给表格打上 .js-stack 后生效） */
+  table.js-stack { display: block; }
+  table.js-stack thead { display: none; }
+  table.js-stack tbody { display: block; }
+  table.js-stack tr {
+    display: block; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: .45rem .55rem; margin-bottom: .5rem; background: var(--row-bg, #fff);
+  }
+  table.js-stack td {
+    display: flex; justify-content: space-between; align-items: baseline; gap: .6rem;
+    border: 0; padding: .16rem 0; text-align: right; font-size: .9rem;
+    overflow-wrap: anywhere;
+  }
+  table.js-stack td::before {
+    content: attr(data-label); flex: 0 0 auto; color: var(--ink);
+    font-size: .9rem; font-weight: 700; text-align: left;
+  }
+  table.js-stack td:not([data-label])::before { content: none; }
+  /* 表头内的汇总行：卡片化模式下保留（表头其余行照常隐藏），作为「合计」卡片显示在最上方 */
+  table.js-stack.has-sum thead { display: block; }
+  table.js-stack.has-sum thead tr:not(.sum-row) { display: none; }
+  table.js-stack.has-sum thead tr.sum-row { background: var(--paper-3); border-color: var(--brand-200); }
+  table.js-stack.has-sum thead tr.sum-row td { white-space: normal; }
+  table.js-stack.has-sum thead tr.sum-row td.sum-label { text-align: left; font-size: .95rem; }
+  table.js-stack.has-sum thead tr.sum-row td:empty { display: none; }
+  table.js-stack td.actions-cell { flex-direction: column; align-items: flex-end; }
+  table.js-stack td.actions-cell form { width: 100%; justify-content: flex-end; }
+  table.js-stack td.actions-cell input { width: auto; flex: 1 1 auto; min-width: 0; font-size: 14px; }
+  table.js-stack td:has(img.mini) { align-items: center; }
+  table.js-stack td img.mini { margin-left: auto; }
+  /* 案例列表「展示图」单元格：图横向排列，操作控件排在下方 */
+  table.js-stack td.case-cell { flex-direction: column; }
+  table.js-stack td.case-cell::before { margin-bottom: .3rem; align-self: flex-start; }
+  table.js-stack td.case-cell .case-thumbs { width: 100%; align-self: stretch; }
+  table.js-stack td.case-cell img.mini { margin-left: 0; }
+  table.js-stack td.case-cell .case-actions { width: 100%; align-self: stretch; }
+  /* 手机端缩略图上的删除按钮：缩小尺寸，与图片比例协调 */
+  .case-thumb .thumb-del, .task-photos .thumb-wrap .thumb-del { width: .9rem; height: .9rem; font-size: .55rem; top: -5px; right: -5px; }
+  /* 单元格里的上传控件换行显示，避免挤爆一行 */
+  table.js-stack td .task-upload { flex-wrap: wrap; justify-content: flex-end; }
+  table.js-stack td .task-upload input[type=file] { max-width: none; font-size: 14px; }
+  table.js-stack td .task-upload .file-label { min-height: 2.2rem; }
+  table.js-stack td .task-upload button, table.js-stack td .task-upload .file-label { flex: 0 0 auto; }
+  .filterbar input[type=file] { font-size: 14px; }
+  table.kv th { width: 6.5rem; }
+
+  /* 施工看板：紧凑指标三项一行；卡片化的任务卡更好点 */
+  .kpis.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis.compact .kpi { padding: .45rem .5rem; }
+  .kpis.compact .kpi-num { font-size: 1.1rem; }
+  table.tasks.js-stack tr { padding: .5rem .6rem; }
+  table.tasks.js-stack td:first-child { font-weight: 700; font-size: .95rem; }
+  table.tasks.js-stack td:first-child .muted { font-weight: 400; }
+  table.tasks.js-stack tr.row-alert { border-color: var(--danger-border); }
+  table.tasks.js-stack td.actions-cell form { width: 100%; }
+  table.tasks.js-stack td.actions-cell button { min-height: 2.5rem; font-size: 1rem; }
+  table.tasks.js-stack td.actions-cell input { font-size: 16px; }
+  table.tasks.js-stack td .task-upload button { min-height: 2.2rem; }
+  /* 手机端卡片：取消桌面端给工序/产品类型/状态列的固定宽度（否则卡片单元格被压窄、内容靠不到右） */
+  table.tasks.js-stack td:nth-child(2),
+  table.tasks.js-stack td:nth-child(3),
+  table.tasks.js-stack td:nth-child(6) { width: auto; }
+  /* 工序单元格：主文本右对齐、不换行（跳过/备注仍在下方换行显示） */
+  table.tasks.js-stack td .stage-info { flex: 1 1 auto; text-align: right; min-width: 0; }
+  /* 产品类型 / 状态单元格：值靠右对齐 */
+  table.tasks.js-stack td .cell-val { margin-left: auto; }
+
+  /* 施工看板：chips 横向滑动、客户卡单列、相机按钮显形 */
+  .quick-row { gap: .4rem; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: .1rem; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips.views { margin-left: 0; }
+  .chip { padding: .45rem .75rem; min-height: 2.3rem; display: inline-flex; align-items: center; }
+  .task-cards { grid-template-columns: 1fr; gap: .7rem; }
+  .task-card { padding: .65rem .7rem; }
+  .tc-actions .tc-done { flex: 1 1 100%; }
+  .tc-actions .tc-done input { font-size: 16px; }
+  .tc-actions button { min-height: 2.5rem; }
+  /* 完工表单：备注伸缩占剩余，日期控件与按钮固定不换行（两个视图通用） */
+  .tc-actions .tc-done input { min-width: 0; }
+  .tc-done .inline-label { flex: 0 0 auto; }
+  .tc-done input[type="date"] { flex: 0 0 auto; }
+  .tc-done button { flex: 0 0 auto; white-space: nowrap; }
+  .tc-skip > summary { padding: .45rem .8rem; }
+
+  /* 缩略图：手机上放大便于点按 */
+  img.mini { width: 56px; height: 56px; }
+  .lightbox .lb-prev, .lightbox .lb-next { width: 3rem; height: 3rem; font-size: 2rem; }
+  .lightbox .lb-close { width: 2.8rem; height: 2.8rem; }
+  .lightbox img { max-width: 100vw; max-height: 86vh; }
+  .gallery a { display: block; }
+  .task-photos { gap: .45rem; }
+
+  /* 其它 */
+  .hide-mobile { display: none !important; }
+  .meta { padding: .5rem .6rem; font-size: .85rem; gap: .2rem .8rem; }
+  .gallery { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: .5rem; }
+  .gallery img { height: 104px; }
+  details.ms .ms-panel { grid-template-columns: repeat(2, 1fr); }
+  .login-card { margin: 4vh auto; padding: 1.1rem; }
+  .foot { padding: 1rem .5rem; }
+}
+
+/* 平板/窄桌面：筛选条更紧凑，仍可换行 */
+@media (min-width: 781px) and (max-width: 1024px) {
+  .filterbar input, .filterbar select { min-width: 6.5rem; }
+  .card { padding: .85rem; }
+}
+
+/* ================================================================ UI 视觉优化 */
+/* 平滑滚动 + 锚点避让吸顶栏 + 选中文字 + 移动端点击去高亮 */
+html { scroll-behavior: smooth; }
+section, .card, .anchor { scroll-margin-top: 4.6rem; }
+::selection { background: var(--brand-200); color: var(--ink); }
+* { -webkit-tap-highlight-color: transparent; }
+
+/* 按钮 / 链接 / chip / tabs 统一过渡与按压反馈 */
+button, .btn, .chip, .tabs a {
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+button:active, .btn:active { transform: translateY(1px); }
+
+/* 统一焦点环 */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+
+/* 指标卡：数字等宽对齐 */
+.kpi-num { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* 登录卡片更醒目 */
+.login-card h1 { font-size: 1.55rem; margin-bottom: .2rem; }
+
+/* 案例外链分享页：居中卡片，仅展示可公开字段 */
+.share-wrap { display: flex; justify-content: center; padding: 6vh 1rem; }
+.share-card { max-width: 420px; width: 100%; background: #fff; border-radius: var(--radius); padding: 1.6rem 1.5rem; }
+.share-brand { font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
+.share-title { font-size: 1.5rem; margin: .3rem 0 1rem; }
+.share-kv { width: 100%; margin-bottom: 1rem; }
+.share-foot { margin-top: 1.1rem; text-align: center; font-size: .76rem; }
+.share-gallery { display: flex; flex-direction: column; gap: .7rem; margin-bottom: 1rem; }
+.share-gallery a { display: block; }
+.share-gallery img { display: block; width: 100%; height: auto; border-radius: var(--radius); background: var(--paper-3); }
+@media (max-width: 780px) { .share-wrap { padding: 4vh .8rem; } }
+
+/* 案例列表：展示图缩略图与上传 */
+.badge.ok { background: var(--success-bg); color: var(--success-ink); }
+.case-thumbs { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.case-thumb { position: relative; display: inline-flex; align-items: center; }
+.case-thumb .thumb-del { position: absolute; top: -7px; right: -7px; width: 1.15rem; height: 1.15rem; line-height: 1; padding: 0; border-radius: 50%; font-size: .7rem; }
+/* 案例列表：默认只显示前 3 张，其余折叠在「+N 张」后 */
+.case-thumbs-fold .case-thumb:nth-child(n+4) { display: none; }
+.case-thumbs-fold.open .case-thumb:nth-child(n+4) { display: inline-flex; }
+.case-more { align-self: center; }
+/* 展示图下方的操作区：选择图片 / 上传 / 重新同步 一行排列（样式对齐施工看板） */
+.case-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; margin-top: .45rem; }
+/* 施工页：照片缩略图右上角的删除按钮（工序未完工时可删除） */
+.task-photos .thumb-wrap { position: relative; display: inline-flex; align-items: center; }
+.task-photos .thumb-wrap .thumb-del { position: absolute; top: -7px; right: -7px; width: 1.15rem; height: 1.15rem; line-height: 1; padding: 0; border-radius: 50%; font-size: .7rem; }
+.case-upload { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+.case-sync { display: inline-flex; align-items: center; }
+.share-settings { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.share-settings select { min-width: 4.5rem; }
+/* 外链管理操作列：保存 / 失效 / 恢复 三个按钮并排、等宽 */
+.share-actions { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.share-actions button { flex: 0 0 auto; }
+
+/* 表格：桌面端行悬浮提示 */
+@media (min-width: 781px) {
+  tbody tr { transition: background-color .12s ease; }
+  tbody tr:hover { --row-bg: var(--row-hover); }
+}
+
+/* 移动端：吸顶栏在窄屏也保留分隔感；操作区按钮撑满更好点按 */
+@media (max-width: 780px) {
+  .page-head .actions { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
+  .page-head .actions .btn, .page-head .actions button { width: 100%; }
+  .flash { border-radius: var(--radius-md); }
+}
+
+/* ================================================================ 可访问性与细节优化 */
+/* 焦点环覆盖 chips/tabs/可聚焦元素 */
+:where(a, button, input, select, textarea, summary, [tabindex], .chip, .tab):focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+/* 行悬浮过渡更快，扫视不拖影 */
+tbody tr { transition: background-color 120ms ease; }
+/* 减少动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}
+
+/* ================================================================ 可搜索客户选择器（新建合同） */
+.search-picker { position: relative; }
+.search-results {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+  margin: .2rem 0 0; padding: 0; list-style: none;
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+  max-height: 16rem; overflow-y: auto;
+}
+.search-results li { padding: .45rem .6rem; cursor: pointer; border-bottom: 1px solid var(--line); }
+.search-results li:last-child { border-bottom: none; }
+.search-results li:hover { background: var(--brand-50); }
+.search-results li .muted { font-size: .78rem; }
+
+/* ---------------------------------------------------------------- 分享页：工具条 + 二维码 */
+.share-tools { display: flex; gap: .45rem; justify-content: center; flex-wrap: wrap; margin: .2rem 0 .6rem; }
+.share-qr { display: flex; flex-direction: column; align-items: center; gap: .35rem; margin-bottom: .8rem; }
+.share-qr img { width: 180px; height: 180px; border-radius: var(--radius-sm); background: #fff; border: 1px solid var(--line); }
+.share-qr p { margin: 0; }
+
+/* ---------------------------------------------------------------- 分享统计 */
+.card-title { font-size: 1rem; font-weight: 600; margin: 0 0 .7rem; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.card-title .muted { font-weight: 400; }
+th.num, td.num { text-align: right; white-space: nowrap; }
+.stats-table td:first-child { font-weight: 600; }
+/* KPI 副标（如「中位停留」下的均值） */
+.kpi-sub { display: block; font-size: .66rem; color: var(--muted); margin-top: .1rem; white-space: nowrap; }
+/* 完成度 ≥80%：淡绿底，一眼看出「看完了」 */
+td.num.done { color: var(--success-ink); font-weight: 600; }
+
+/* 近 14 天柱状趋势（纯 CSS，无图表库） */
+.trend-bars { display: flex; align-items: flex-end; gap: .35rem; height: 8.5rem; padding-top: .4rem; }
+.trend-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: .15rem; }
+.trend-bar { width: 100%; max-width: 2.2rem; min-height: 2px; background: var(--brand); border-radius: var(--radius-sm) var(--radius-sm) 0 0; opacity: .85; transition: opacity .15s ease; }
+.trend-col:hover .trend-bar { opacity: 1; }
+.trend-num { font-size: .68rem; color: var(--muted); line-height: 1; }
+.trend-day { font-size: .66rem; color: var(--muted); white-space: nowrap; line-height: 1; }
+
+@media (max-width: 780px) {
+  .trend-bars { height: 6.5rem; gap: .2rem; }
+  .trend-day { font-size: .6rem; }
+  .trend-num { font-size: .6rem; }
+  .share-tools .btn { flex: 1 1 auto; }
+}
+
+/* ---------------------------------------------------------------- 外链管理：操作提示条 */
+/* 场景：曾发生过「顺手点保存 → 有效期被写成 1 天 → 客户几天后打开显示已失效」，
+   用一条暖黄提示把「保存会重算截止时间」说清楚，别再靠事后解释。 */
+.tip-line {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-ink);
+  border-radius: var(--radius-md);
+  padding: .5rem .75rem;
+  margin: 0 0 1rem;
+}
+.tip-line b { font-weight: 700; }
+@media (max-width: 780px) { .tip-line { margin-bottom: .75rem; } }
+
+/* ---------------- 分享页自定义：效果预览 ---------------- */
+.preview-box { border: 1px solid var(--card-border); border-radius: var(--radius-md); overflow: hidden; background: var(--paper-2); }
+.preview-browser { display: flex; align-items: center; gap: .4rem; padding: .45rem .7rem; background: var(--paper-3); border-bottom: 1px solid var(--card-border); }
+.preview-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--brand-200); flex: 0 0 auto; }
+.preview-url { margin-left: .4rem; font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-body { padding: 1.2rem 1.2rem .6rem; background: #fff; }
+.preview-body .share-title { font-size: 1.1rem; }
+.preview-card { margin-top: .9rem; padding: .6rem .7rem; border: 1px solid var(--card-border); border-left: 3px solid var(--brand); border-radius: var(--radius-sm); background: var(--paper-2); }
+.preview-card strong { display: block; font-size: .86rem; line-height: 1.5; }
+.preview-box .foot-legal { background: #fff; border-top: 1px solid var(--card-border); padding: .8rem 0; }

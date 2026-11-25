@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1119">
+<title>方案 B · 清锋蓝（深色） · 配色预览</title>
+<link rel="stylesheet" href="app.css">
+<style>
+/* 亮色 = 默认；深色 = html[data-theme="dark"] 覆盖。
+   两套变量同时写进来是刻意的：深色页里若有变量漏定义，会直接露出亮色的值当场翻车，
+   等于一个自动自检。落地时线上也是这个结构。 */
+:root {
+  --bg: #f5f7fa; --card: #ffffff; --paper-2: #f3f7fa; --paper-3: #edf3fa;
+  --ink: #16202e; --muted: #5c6a80; --line: #d5dfee; --card-border: #dbe3ee;
+  --brand: #2563eb; --brand-dark: #1d4ed8; --brand-strong: #1d4ed8; --brand-ink: #1a4bc4;
+  --brand-50: #eaf1fe; --brand-50-hover: #dbe7fd; --brand-200: #b6cdf8;
+  --danger-ink: #b42318; --danger-bg: #fdeceb; --danger-border: #f6cfcb;
+  --success-ink: #146b3a; --success-bg: #e7f5ec; --success-border: #bfe3cd;
+  --warning-ink: #8a5300; --warning-bg: #fdf4e0; --warning-border: #f0d9a6;
+  --sidebar-bg: #16233a; --sidebar-fg: #dbe4f2; --sidebar-fg-muted: #94a4bd;
+  --row-hover: #ecf2fb;
+  --brand-strong-hover: #1a4bc4; --field-bg: #ffffff;
+  --tag-room-bg: #f0e2e2; --tag-room-ink: #8f5a5a;
+  --radius-sm: 6px; --radius-md: 8px; --radius: 10px;
+  --shadow-md: 0 4px 16px -4px rgb(20 35 60 / .10), 0 1px 2px rgb(20 35 60 / .06);
+}
+html[data-theme="dark"] {
+  --bg: #0e141c; --card: #161e2a; --paper-2: #121a24; --paper-3: #1c2634;
+  --ink: #e6ecf5; --muted: #94a3b8; --line: #2b3746; --card-border: #2f3c4c;
+  --brand: #2b66d9; --brand-dark: #8ab4ff; --brand-strong: #2b66d9; --brand-strong-hover: #1e50b8;
+  --brand-ink: #7db3ff;
+  --brand-50: #1a2b45; --brand-50-hover: #223751; --brand-200: #4d86c9;
+  --danger-ink: #ff938a; --danger-bg: #3a1f21; --danger-border: #5c3033;
+  --success-ink: #6ed08f; --success-bg: #16321f; --success-border: #2a5136;
+  --warning-ink: #e8bd63; --warning-bg: #33280f; --warning-border: #5b4618;
+  --sidebar-bg: #090f16; --sidebar-fg: #ccd7e5; --sidebar-fg-muted: #7f8fa4;
+  --row-hover: #212f42;
+  --field-bg: #1a2431; --tag-room-bg: #3a2530; --tag-room-ink: #e3aabb;
+  --radius-sm: 6px; --radius-md: 8px; --radius: 10px;
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / .55), 0 1px 2px rgb(0 0 0 / .35);
+}
+/* ⚠️ 主题补丁：线上 app.css 里有 32 处硬编码色值，深色模式下会变成刺眼白块 / 错色徽章。
+   下面这些必须从硬编码改成变量，否则深色模式是残的。落地时一并替换进 app.css。 */
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+input, select, textarea { background: var(--field-bg); color: var(--ink); }
+.tabs a { background: var(--field-bg); }
+.checkgrid label.checkline { background: var(--field-bg); }
+details.ms { background: var(--field-bg); }
+.chip { background: var(--field-bg); }
+.task-card { background: var(--field-bg); }
+.sec-badge.high { border-color: var(--success-border); }
+.sec-badge.mid { border-color: var(--warning-border); }
+.badge.showroom { background: var(--tag-room-bg); color: var(--tag-room-ink); }
+/* 实心按钮 hover 必须走独立变量：深色下 --brand-ink 是亮蓝（链接要用），拿来当 hover 底色白字会失效 */
+button:hover, .btn:hover { background: var(--brand-strong-hover); }
+/* 预览页专用：让徽章/胶囊用真实语义色（线上靠 .badge.s-* 类，见 app.css 第 400+ 行） */
+h1 span.muted { font-size: .95rem; font-weight: 400; }
+</style>
+</head>
+<body class="has-sidebar">
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4a2 2 0 0 1 4 0v9.3a4.5 4.5 0 1 1-4 0z"/><circle cx="12" cy="17.5" r="1.7"/></svg><span>HVAccRM</span><button type="button" class="collapse-btn" aria-label="折叠侧边栏">⟨</button></div>
+    <nav>
+      <a href="#" class="active"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="8" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.5"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.5"/><rect x="3" y="14" width="7.5" height="7" rx="1.5"/></svg></span>看板</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.7-3.1 2.9-4.7 5.5-4.7s4.8 1.6 5.5 4.7"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.8c2.4.3 4 1.7 4.4 4.2"/></svg></span>客户</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/></svg></span>楼盘/房号</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19"/><path d="M9 12h6M9 15.5h6"/></svg></span>合同</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l3.5 4 3.5-4"/><path d="M12 12.5V17M9.8 14.5h4.4"/></svg></span>收款</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M9 7h6"/><path d="M9.5 12h.01M12 12h.01M14.5 12h.01M9.5 15.5h.01M12 15.5h.01M14.5 15.5h.01"/></svg></span>成本</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>施工</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h2M12 11h2M16 11h.01M8 15h2M12 15h2M16 15h.01M8 19h6"/></svg></span>核算</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg></span>案例</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><rect x="6" y="12" width="3.2" height="5" rx="0.6"/><rect x="10.4" y="8" width="3.2" height="9" rx="0.6"/><rect x="14.8" y="4" width="3.2" height="13" rx="0.6"/></svg></span>报表</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.8-3.4 3.3-5 6.5-5s5.7 1.6 6.5 5"/></svg></span>用户</a>
+      <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>系统</a>
+    </nav>
+    <div class="me">
+      <div class="who">13叔<div class="role">管理员</div></div>
+      <div class="me-links"><a href="#">账户</a><button type="button" class="linklike">退出</button></div>
+    </div>
+  </aside>
+  <main class="wrap">
+    <div class="page-head">
+      <h1 style="margin:0">客户管理 <span class="muted small">共 6 条 · 2026 年度</span></h1>
+      <div class="actions">
+        <a class="btn ghost" href="#">导出 Excel</a>
+        <a class="btn" href="#">+ 新增客户</a>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-num">12</span><span class="kpi-label">在施工地</span></div>
+      <div class="kpi"><span class="kpi-num">2,846,500</span><span class="kpi-label">年销售额</span></div>
+      <div class="kpi"><span class="kpi-num">2,193,000</span><span class="kpi-label">年收款</span></div>
+      <div class="kpi"><span class="kpi-num">1,524,800</span><span class="kpi-label">年成本</span></div>
+      <div class="kpi"><span class="kpi-num">1,321,700</span><span class="kpi-label">年利润</span></div>
+      <div class="kpi alert"><span class="kpi-num">653,500</span><span class="kpi-label">未收总额</span></div>
+    </div>
+
+    <div class="tabs">
+      <a href="#" class="active">全部 6</a><a href="#">施工中 3</a><a href="#">待开工 1</a><a href="#">已完工 2</a>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>客户与合同</h2>
+        <div class="actions">
+          <span class="head-sum">合计应收 <strong>767,700</strong></span>
+          <a class="btn ghost small" href="#">批量催款</a>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th class="nowrap">房号</th><th>客户</th><th class="nowrap">空调品牌</th>
+          <th class="nowrap">业务范围</th><th class="nowrap">合同额</th>
+          <th class="nowrap">已收</th><th class="nowrap">欠款</th><th class="nowrap">状态</th>
+        </tr></thead>
+        <tbody>
+      <tr><td class="nowrap"><a href="#">阳光美地 12-2-1801</a></td><td>周建国</td><td class="nowrap">大金</td><td class="nowrap small muted">中央空调+地暖</td><td class="nowrap"><strong>186,000</strong></td><td class="nowrap">186,000</td><td class="nowrap ">0</td><td class="nowrap"><span class="badge">已完工</span></td></tr>
+      <tr><td class="nowrap"><a href="#">橡树湾 3-1-0602</a></td><td>李美玲</td><td class="nowrap">日立</td><td class="nowrap small muted">中央空调</td><td class="nowrap"><strong>94,800</strong></td><td class="nowrap">60,000</td><td class="nowrap red">34,800</td><td class="nowrap"><span class="badge">施工中</span></td></tr>
+      <tr><td class="nowrap"><a href="#">中海城 8-2-1103</a></td><td>王海涛</td><td class="nowrap">格力</td><td class="nowrap small muted">风管机</td><td class="nowrap"><strong>62,400</strong></td><td class="nowrap">20,000</td><td class="nowrap red">42,400</td><td class="nowrap"><span class="badge">施工中</span></td></tr>
+      <tr><td class="nowrap"><a href="#">金地天府 5-1-2004</a></td><td>陈晓红</td><td class="nowrap">三菱</td><td class="nowrap small muted">中央空调+新风</td><td class="nowrap"><strong>258,000</strong></td><td class="nowrap">258,000</td><td class="nowrap ">0</td><td class="nowrap"><span class="badge">已完工</span></td></tr>
+      <tr class="row-alert"><td class="nowrap"><a href="#">锦绣山河 9-3-0801</a></td><td>赵志强</td><td class="nowrap">东芝</td><td class="nowrap small muted">地暖</td><td class="nowrap"><strong>118,500</strong></td><td class="nowrap">0</td><td class="nowrap red">118,500</td><td class="nowrap"><span class="badge">待开工</span></td></tr>
+      <tr><td class="nowrap"><a href="#">万科金域 2-1-1602</a></td><td>孙丽娟</td><td class="nowrap">美的</td><td class="nowrap small muted">风管机+净水</td><td class="nowrap"><strong>47,600</strong></td><td class="nowrap">30,000</td><td class="nowrap red">17,600</td><td class="nowrap"><span class="badge">施工中</span></td></tr>
+      <tr class="sum-row"><td class="sum-label">合计</td><td></td><td></td><td></td><td>767,300</td><td>554,000</td><td>213,300</td><td></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <h2>新增客户</h2>
+        <form class="stack">
+          <label>客户姓名<input value="周建国"></label>
+          <label>联系电话<input value="138 0000 1234"></label>
+          <label>空调品牌<select><option>大金</option><option>日立</option><option>三菱</option></select></label>
+          <label>意向等级<select><option>高意向 · 本月可签</option><option>中意向</option></select></label>
+          <div class="checkline"><input type="checkbox" checked> 已现场勘测</div>
+          <div style="display:flex;gap:.5rem;margin-top:.2rem">
+            <button type="button" class="btn">保存客户</button>
+            <button type="button" class="btn ghost">存为草稿</button>
+            <button type="button" class="danger">删除</button>
+          </div>
+        </form>
+      </section>
+      <section class="card">
+        <h2>本月待办</h2>
+        <div class="card note-card" style="margin-bottom:.7rem">
+          <strong>3 个工地欠款超 30 天</strong>
+          <div class="small muted">建议本周内完成电话回访并登记跟进记录。</div>
+        </div>
+        <table class="tight">
+          <thead><tr><th>房号</th><th>工序</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td><a href="#">阳光美地 12-2-1801</a></td><td>内机吊装</td><td><span class="badge s-doing">进行中</span></td></tr>
+            <tr><td><a href="#">中海城 8-2-1103</a></td><td>冷媒管焊接</td><td><span class="badge s-doing">进行中</span></td></tr>
+            <tr><td><a href="#">万科金域 2-1-1602</a></td><td>隐蔽验收</td><td><span class="badge warn">待开始</span></td></tr>
+            <tr><td><a href="#">金地天府 5-1-2004</a></td><td>调试交付</td><td><span class="badge s-done">已完成</span></td></tr>
+          </tbody>
+        </table>
+        <p style="margin:.6rem 0 0"><a href="#">查看全部施工任务 →</a></p>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <span class="sec-badge high"><i></i>安全等级：高</span><span class="foot-sep">·</span>v1.9.19 · HVAccRM — 暖通空调客户管理系统
+    </footer>
+  </main>
+</div>
+</body></html>
