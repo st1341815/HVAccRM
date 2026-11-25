@@ -8,6 +8,7 @@
     <span class="badge {{ 's-done' if locked else '' }}">{{ '已结算' if locked else '未结算' }}</span>
   </h1>
   <div class="actions">
+    <button class="btn" onclick="stampPrintTime(); window.print()" title="打印本页（自动隐去图片与录入表单）">打印</button>
     <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
     <a class="btn ghost" href="/contracts">合同列表</a>
     {% if can_settle %}
@@ -26,8 +27,21 @@
   </div>
 </div>
 
+{# 打印专用页眉：屏幕上不显示。浏览器自带的页眉会把 URL 打上去，很难看，
+   这里自己给一份「客户 / 合同号 / 签订日 / 打印时间」，打出来才知道是哪一单。 #}
+<div class="print-only print-head">
+  <div class="print-title">合同 {{ contract.no or ('#' ~ contract.id) }}</div>
+  <div class="print-sub">
+    <span>客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</span>
+    <span>签订日：{{ contract.sign_date }}</span>
+    <span>产品类型：{{ contract.product_type or '未填写' }}</span>
+    <span>状态：{{ summary.status }}</span>
+    <span>打印时间：<span id="print_ts">-</span></span>
+  </div>
+</div>
+
 {% if locked %}
-<div class="flash">
+<div class="flash no-print">
   该合同已于 {{ contract.settled_at or '-' }} 标记结算：收款、费用、施工、增项与合同金额已冻结。如需继续录入，请先点「取消结算」。
 </div>
 {% endif %}
@@ -55,7 +69,7 @@
 {% endif %}
 
 {% if can_pay and not locked %}
-<section class="card">
+<section class="card no-print">
   <h2>登记收款 / 退款</h2>
   <form method="post" action="/payments/record" class="filterbar" enctype="multipart/form-data">
     <input type="hidden" name="contract_id" value="{{ contract.id }}">
@@ -109,7 +123,7 @@
     <span class="muted small">毛利 {{ profit.gross_profit|money }} · 毛利率 {{ profit.gross_margin }}%</span>
   </h2>
   <table class="tight">
-    <thead><tr><th>日期</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th>附图</th><th>录入人</th><th></th></tr></thead>
+    <thead><tr><th>日期</th><th>费用项目</th><th>金额</th><th>供应商</th><th>安装师傅</th><th>备注</th><th class="no-print">附图</th><th>录入人</th><th class="no-print"></th></tr></thead>
     <tbody>
     {% for r in costs %}
       <tr>
@@ -119,7 +133,7 @@
         <td>{{ r.supplier.name if r.supplier else '-' }}</td>
         <td>{{ r.installer.display_name if r.installer else '-' }}</td>
         <td class="break">{{ r.remark or '-' }}</td>
-        <td class="photo-cell" data-photo-group>
+        <td class="photo-cell no-print" data-photo-group>
           {% set phs = cost_photos.get(r.id, []) %}
           {% for ph in phs[:3] %}
             <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="成本凭证"></a>
@@ -130,7 +144,7 @@
           {% if not phs %}<span class="muted small">—</span>{% endif %}
         </td>
         <td>{{ cost_users[r.created_by].display_name if r.created_by and cost_users.get(r.created_by) else '-' }}</td>
-        <td>
+        <td class="no-print">
           {% if can_cost and not locked %}
           <form method="post" action="/costs/{{ r.id }}/delete" class="inline" onsubmit="return confirm('删除这条成本记录？');">
             <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
@@ -145,7 +159,7 @@
   {% if not costs %}<p class="muted">还没有成本记录。材料成本需选供应商，施工费用需选安装师傅。</p>{% endif %}
 
   {% if can_cost and not locked %}
-  <form method="post" action="/costs/new" class="filterbar" enctype="multipart/form-data">
+  <form method="post" action="/costs/new" class="filterbar no-print" enctype="multipart/form-data">
     <input type="hidden" name="contract_id" value="{{ contract.id }}">
     <input type="hidden" name="back" value="/contracts/{{ contract.id }}#costs">
     <select name="category" id="cost_cat" onchange="syncCostFields()">
@@ -172,20 +186,20 @@
     </label>
     <button type="submit">＋ 登记成本</button>
   </form>
-  <p class="muted small">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）；供应商在 <a href="/costs/suppliers">成本 → 供应商</a> 维护。</p>
+  <p class="muted small no-print">材料成本必须关联供应商、施工费用必须关联安装师傅（服务端强校验）；供应商在 <a href="/costs/suppliers">成本 → 供应商</a> 维护。</p>
   {% endif %}
 </section>
 
 <section class="card">
   <h2>合同明细</h2>
   <table class="tight">
-    <thead><tr><th>产品</th><th>规格</th><th>数量</th><th>单位</th><th>单价</th><th>金额</th><th></th></tr></thead>
+    <thead><tr><th>产品</th><th>规格</th><th>数量</th><th>单位</th><th>单价</th><th>金额</th><th class="no-print"></th></tr></thead>
     <tbody>
     {% for it in items %}
       <tr>
         <td>{{ it.product_name }}</td><td>{{ it.spec or '-' }}</td><td>{{ it.qty }}</td>
         <td>{{ it.unit or '-' }}</td><td>{{ it.unit_price|money }}</td><td>{{ it.amount|money }}</td>
-        <td>
+        <td class="no-print">
           {% if can_edit and not locked %}
           <form method="post" action="/contracts/items/{{ it.id }}/delete" class="inline">
             <button class="ghost danger">删除</button>
@@ -209,7 +223,7 @@
   {% endif %}
 </section>
 
-<section class="card">
+<section class="card no-print">
   <h2>纸质合同图片（{{ contract_photos|length }}）</h2>
   {% if contract_photos %}
   <div class="gallery">
@@ -243,7 +257,7 @@
 <section class="card">
   <h2>收款流水</h2>
   <table class="tight">
-    <thead><tr><th>收款日期</th><th>金额</th><th>方式</th><th>凭证号</th><th>收款人</th><th>付款截图</th><th>备注</th></tr></thead>
+    <thead><tr><th>收款日期</th><th>金额</th><th>方式</th><th>凭证号</th><th>收款人</th><th class="no-print">付款截图</th><th>备注</th></tr></thead>
     <tbody>
     {% for p in payments %}
       <tr class="{{ 'row-alert' if p.amount < 0 else '' }}">
@@ -252,7 +266,7 @@
         <td>{{ p.method or '-' }}</td>
         <td>{{ p.voucher_no or '-' }}</td>
         <td>{{ users[p.received_by].display_name if p.received_by and users.get(p.received_by) else '-' }}</td>
-        <td class="photo-cell" data-photo-group>
+        <td class="photo-cell no-print" data-photo-group>
           {% set phs = payment_photos.get(p.id, []) %}
           {% for ph in phs[:3] %}
             <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank" title="{{ ph.orig_name or '' }}"><img class="mini" src="/photos/{{ ph.id }}/thumb" alt="付款截图"></a>
@@ -271,7 +285,7 @@
 </section>
 
 {% if can_edit and not locked %}
-<section class="card">
+<section class="card no-print">
   <h2>修改合同</h2>
   <form method="post" action="/contracts/{{ contract.id }}/edit" class="stack">
     <div class="grid3">
@@ -306,5 +320,18 @@
     ins.style.display = catVal === '施工费用' ? 'inline-block' : 'none';
   }
   syncCostFields();
+
+  // 打印页眉的「打印时间」：点按钮走 onclick 里的调用，Ctrl+P 走 beforeprint 兜底。
+  // 时间戳放在打印页眉里，纸面才知道这份是何时出的。
+  function stampPrintTime() {
+    const el = document.getElementById('print_ts');
+    if (!el) return;
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    el.textContent = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  window.addEventListener('beforeprint', stampPrintTime);
+  // 打开页面先填一次：老 Safari 不触发 beforeprint，直接 Ctrl+P 时别让页眉留个「-」。
+  stampPrintTime();
 </script>
 {% endblock %}

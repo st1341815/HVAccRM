@@ -901,6 +901,9 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 .preview-card strong { display: block; font-size: .86rem; line-height: 1.5; }
 .preview-box .foot-legal { background: var(--field-bg); border-top: 1px solid var(--card-border); padding: .8rem 0; }
 
+/* 仅打印才出现的内容（如合同详情的打印页眉）；屏幕上始终不占位 */
+.print-only { display: none; }
+
 /* ---------------------------------------------------------------- 打印 */
 /* 深色主题下直接打印会印出一片黑。打印一律锁回亮色、去掉侧栏，
    保证合同台账 / 对账单打出来是白纸黑字。
@@ -937,7 +940,46 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   .sidebar-toggle,
   .scrim { display: none !important; }
   .wrap { max-width: none; padding: 0; }
-  .card { box-shadow: none; break-inside: avoid; }
+  /* 卡片不锁断页：成本表 / 收款流水行数多，avoid 会把整块挤到下一页甚至溢出。
+     需要整块不拆的地方（KPI、单行）各自处理。 */
+  .card { box-shadow: none; break-inside: auto; }
   .kpi { break-inside: avoid; }
   body { background: #fff; }
+
+  /* ---- 合同详情「打印」按钮：打出来的纸面只要数据，不要图和录入控件 ----
+     `.no-print` 是通用约定：模板里逐处标记（图片块、附图列、操作列、录入区），
+     这里再做一层兜底（图片 / 表单 / 按钮 / 输入框），防止新加的元素漏标。 */
+  .no-print,
+  form,
+  button,
+  input,
+  select,
+  textarea,
+  .actions,
+  .flash,
+  img { display: none !important; }
+  .print-only { display: block !important; }
+
+  .print-head { border-bottom: 2px solid #000; padding-bottom: .35rem; margin-bottom: .7rem; }
+  .print-title { font-size: 15pt; font-weight: 700; }
+  .print-sub { display: flex; flex-wrap: wrap; gap: .15rem 1rem; font-size: 9.5pt; margin-top: .25rem; }
+
+  a { color: #000; text-decoration: none; }
+  h1 { font-size: 15pt; margin: 0 0 .3rem; }
+  h2 { font-size: 11.5pt; margin: 0 0 .35rem; }
+  .badge { border: 1px solid #999; font-size: 8.5pt; }
+  .meta { font-size: 9.5pt; padding: .3rem .5rem; }
+  .card { border: 1px solid #999; padding: .4rem .6rem; margin-bottom: .55rem; }
+
+  /* KPI 排成三列，9 个指标正好 3×3，比 flex 换行省纸 */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; margin-bottom: .7rem; }
+  .kpi { min-width: 0; padding: .3rem .45rem .35rem; }
+  .kpi-num { font-size: 12pt; }
+  .kpi-label { font-size: 8.5pt; }
+
+  /* 表格：细边框 + 跨页重复表头 + 行不拆开 */
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: left; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
 }

@@ -181,10 +181,15 @@ def test_lightbox_collect_handles_photo_group_before_global_fallback():
 
 
 def test_grouped_templates_mark_photo_cells():
-    """表格行内的凭证单元格都标了 photo-cell + data-photo-group。"""
+    """表格行内的凭证单元格都标了 photo-cell + data-photo-group。
+
+    用正则匹配 class 里**含** `photo-cell` 的 td：v1.13.3 起合同详情给凭证列
+    加了 `no-print`（打印时不出图），class 多一项不该判定为题。
+    """
+    tag = re.compile(r'<td class="[^"]*\bphoto-cell\b[^"]*"[^>]*\bdata-photo-group\b')
     for rel, expect in GROUPED_TEMPLATES.items():
         src = (TPL / rel).read_text()
-        n = src.count('<td class="photo-cell" data-photo-group>')
+        n = len(tag.findall(src))
         assert n == expect, f"{rel}: 期望 {expect} 个 photo-cell 单元格，实际 {n}"
 
 
