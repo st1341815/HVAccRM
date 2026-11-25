@@ -84,3 +84,56 @@ def test_print_layout_keeps_tables_readable():
     assert "border-collapse: collapse" in block
     assert "display: table-header-group" in block
     assert "break-inside: avoid" in block
+
+
+# ---------------------------------------------------------------- v1.13.4
+# 这一批是「打出来只有一个合同号 + 压进一张 A4」的回归钉子。
+
+
+def test_print_shows_contract_no_only_once():
+    """屏幕上标题行（h1）和 meta 行都带合同信息，打印时由 print-head 统一给出。
+
+    不隐藏就变成两行一样的「合同 ONExxxx」——纸面上重复且难看。
+    状态 / 结算两个徽标要搬进 print-head，别顺手把信息也删了。
+    """
+    html = _detail()
+    assert '<div class="page-head no-print">' in html, "标题行打印时要隐藏（否则合同号出现两次）"
+    assert '<div class="meta no-print">' in html, "meta 行信息已并入打印页眉，打印时隐藏"
+    head_start = html.index('class="print-only print-head"')
+    head_end = html.index("</div>", html.index("print-sub", head_start))
+    head = html[head_start:head_end]
+    assert "summary.status" in head, "打印页眉要保留状态徽标"
+    assert "已结算" in head and "未结算" in head, "打印页眉要保留结算徽标"
+
+
+def test_print_forces_table_layout_over_mobile_cards():
+    """A4 可用宽 ≈748px，会落进 `max-width:780px` 的移动端断点，
+    把宽表拆成「标签/值」竖排卡片（table.js-stack）——一竖排高度翻几倍，
+    一张纸根本装不下。打印必须强制回到表格布局。
+
+    注意 `table.js-stack td` 特异性高于 `.no-print`，所以重置时必须
+    `:not(.no-print)`，否则「附图 / 操作」列又被放出来。
+    """
+    block = _print_css()
+    assert "table.js-stack { display: table !important; }" in block
+    assert "table.js-stack thead { display: table-header-group !important; }" in block
+    assert "table.js-stack th:not(.no-print)" in block, (
+        "重置表格布局时要排除 .no-print，否则被隐藏的列会重新出现"
+    )
+    assert "table.js-stack td::before { content: none !important; }" in block, (
+        "移动端的 td::before 伪元素标签（「金额：」之类）必须清掉"
+    )
+
+
+def test_print_app_shell_does_not_claim_full_page():
+    """`.app` 是 `display:flex; min-height:100vh` 的应用外壳，打印里 100vh = 一整页，
+    外壳恒定占满 → 内容稍多就溢出空白第 2 页。打印必须退回块级且不设最小高度。"""
+    block = _print_css()
+    assert ".app { display: block; min-height: 0; }" in block
+
+
+def test_print_page_is_a4_with_tight_margins():
+    """纸张按 A4、收紧页边距；根字号降一档（全站用 rem，一改全跟着收）。"""
+    block = _print_css()
+    assert "@page { size: A4 portrait; margin: 7mm 6mm; }" in block
+    assert "html { font-size: 82%; }" in block

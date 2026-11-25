@@ -959,27 +959,62 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   .flash,
   img { display: none !important; }
   .print-only { display: block !important; }
+  /* 页脚（版权 / 版本号）与卡片里的空态提示（「还没有成本记录」）纸上没用：
+     空表本身已经说明没数据，再印一行提示只是白占高度。 */
+  .foot { display: none !important; }
+  .card > p.muted { display: none !important; }
 
-  .print-head { border-bottom: 2px solid #000; padding-bottom: .35rem; margin-bottom: .7rem; }
-  .print-title { font-size: 15pt; font-weight: 700; }
-  .print-sub { display: flex; flex-wrap: wrap; gap: .15rem 1rem; font-size: 9.5pt; margin-top: .25rem; }
+  /* ---- 版面：把一份合同压进一张 A4 ----
+     三层压缩：① @page 收页边距（默认 10mm 太奢侈）；② 根字号降到 82%，
+     全站尺寸几乎都用 rem，一改全跟着收；③ 局部压表格 / KPI / 卡片的内边距与行高。
+     实测依据见 CHANGELOG v1.13.4：合同 1（成本 4 行 + 收款 1 行）从 2 页变 1 页。 */
+  @page { size: A4 portrait; margin: 7mm 6mm; }
+  html { font-size: 82%; }
+  body { background: #fff; font-size: 8.5pt; line-height: 1.3; }
+  /* .app 是 `display:flex; min-height:100vh` 的应用外壳。打印时 100vh = 一整页高，
+     flex 还会把子项拉满，于是外壳恒定占满一页 → 内容稍多就溢出空白第 2 页。
+     打印不需要侧栏布局，直接退回普通块级 + 不设最小高度。 */
+  .app { display: block; min-height: 0; }
+
+  .print-head { border-bottom: 1.5px solid #000; padding-bottom: 1px; margin-bottom: 3px; }
+  .print-title { font-size: 12pt; font-weight: 700; }
+  .print-title .badge { margin-left: 4px; vertical-align: 1px; }
+  .print-sub { display: flex; flex-wrap: wrap; gap: 0 10px; font-size: 7.5pt; margin-top: 1px; }
 
   a { color: #000; text-decoration: none; }
-  h1 { font-size: 15pt; margin: 0 0 .3rem; }
-  h2 { font-size: 11.5pt; margin: 0 0 .35rem; }
-  .badge { border: 1px solid #999; font-size: 8.5pt; }
-  .meta { font-size: 9.5pt; padding: .3rem .5rem; }
-  .card { border: 1px solid #999; padding: .4rem .6rem; margin-bottom: .55rem; }
+  h1 { font-size: 12pt; margin: 0 0 2px; }
+  h2 { font-size: 9pt; margin: 0 0 1px; }
+  .badge { border: 1px solid #999; font-size: 7pt; padding: 0 3px; }
+  .meta { font-size: 8pt; padding: 1px 4px; }
+  .card { border: 1px solid #999; padding: 2px 5px; margin-bottom: 3px; }
+  /* 卡片标题里的说明（如成本标题后的「毛利 xx」）与 KPI 重复，纸上不再占一行 */
+  .card h2 .muted { display: none !important; }
 
-  /* KPI 排成三列，9 个指标正好 3×3，比 flex 换行省纸 */
-  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; margin-bottom: .7rem; }
-  .kpi { min-width: 0; padding: .3rem .45rem .35rem; }
-  .kpi-num { font-size: 12pt; }
-  .kpi-label { font-size: 8.5pt; }
+  /* KPI：9 项排一行，比 3×3 省两行高度；数字用 8.5pt 保证 6 位数金额不折行 */
+  .kpis { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; margin-bottom: 3px; }
+  .kpi { min-width: 0; padding: 1px 3px 2px; }
+  .kpi-num { font-size: 8.5pt; line-height: 1.2; white-space: nowrap; }
+  .kpi-label { font-size: 6.5pt; margin-top: 0; white-space: nowrap; }
 
   /* 表格：细边框 + 跨页重复表头 + 行不拆开 */
-  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-  th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: left; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  th, td { border: 1px solid #bbb; padding: 0 3px; text-align: left; line-height: 1.3; }
   thead { display: table-header-group; }
   tr { break-inside: avoid; }
+
+  /* ---- 打印宽度会掉进移动端断点，必须把「卡片化表格」打回原形 ----
+     A4 可用宽 ≈ 198mm ≈ 748px，正好小于 `max-width: 780px` 断点，于是
+     `table.js-stack` 被拆成「标签 / 值」两行一格的竖排卡片。屏幕上这很聪明，
+     纸上就是灾难：成本 4 行变成二十几行文字，收款 1 行占掉半页。
+     实测（v1.13.4）：修复前明细多 1 行就溢出到第 2 页，修复后 20 行仍是一页。 */
+  table.js-stack { display: table !important; }
+  table.js-stack thead { display: table-header-group !important; }
+  table.js-stack tbody { display: table-row-group !important; }
+  table.js-stack tr { display: table-row !important; }
+  /* 用 :not(.no-print)：`table.js-stack td` 的特异性高于 `.no-print`，
+     不排除的话会把「附图 / 付款截图 / 操作」这些列强行再显示出来。 */
+  table.js-stack th:not(.no-print),
+  table.js-stack td:not(.no-print) { display: table-cell !important; }
+  table.js-stack td::before { content: none !important; }
+  table.js-stack.has-sum thead tr { display: table-row !important; }
 }

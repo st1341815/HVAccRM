@@ -2,7 +2,7 @@
 {% block title %}合同 {{ contract.no or contract.id }}{% endblock %}
 {% block content %}
 {% set locked = contract.is_settled %}
-<div class="page-head">
+<div class="page-head no-print">
   <h1>合同 {{ contract.no or ('#' ~ contract.id) }}
     <span class="badge">{{ summary.status }}</span>
     <span class="badge {{ 's-done' if locked else '' }}">{{ '已结算' if locked else '未结算' }}</span>
@@ -28,14 +28,18 @@
 </div>
 
 {# 打印专用页眉：屏幕上不显示。浏览器自带的页眉会把 URL 打上去，很难看，
-   这里自己给一份「客户 / 合同号 / 签订日 / 打印时间」，打出来才知道是哪一单。 #}
+   这里自己给一份「合同号 / 客户 / 签订日 / 产品 / 打印时间」，打出来才知道是哪一单。
+   下面的 .page-head 与 .meta 打印时整体隐去（合同号会重复成两行），
+   状态/结算两个徽标搬到这里，信息不丢。 #}
 <div class="print-only print-head">
-  <div class="print-title">合同 {{ contract.no or ('#' ~ contract.id) }}</div>
+  <div class="print-title">合同 {{ contract.no or ('#' ~ contract.id) }}
+    <span class="badge">{{ summary.status }}</span>
+    <span class="badge">{{ '已结算' if locked else '未结算' }}</span>
+  </div>
   <div class="print-sub">
     <span>客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</span>
     <span>签订日：{{ contract.sign_date }}</span>
     <span>产品类型：{{ contract.product_type or '未填写' }}</span>
-    <span>状态：{{ summary.status }}</span>
     <span>打印时间：<span id="print_ts">-</span></span>
   </div>
 </div>
@@ -46,7 +50,7 @@
 </div>
 {% endif %}
 
-<div class="meta">
+<div class="meta no-print">
   <span>签订日：{{ contract.sign_date }}</span>
   <span>产品类型：<strong>{{ contract.product_type or '未填写' }}</strong></span>
   <span>状态：{{ contract.status }}</span>
