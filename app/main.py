@@ -73,6 +73,11 @@ def _apply_security_headers(response: Response, *, secure: bool, path: str) -> R
     hsts = int(get_settings().hsts_max_age or 0)
     if hsts > 0 and secure:
         response.headers.setdefault("Strict-Transport-Security", f"max-age={hsts}")
+    # 动态 HTML 一律不缓存。线上出过「电脑上有按钮、手机上却没有」的反馈，
+    # 排查下来服务端输出没问题、CSS 也没隐藏 —— 那就是浏览器/PWA 拿了旧页面。
+    # 后台每个页面都是实时数据 + 角色权限，缓存没有任何收益，只有幽灵 bug。
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault("Cache-Control", "no-store, must-revalidate")
     return response
 
 

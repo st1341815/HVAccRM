@@ -62,7 +62,16 @@
         </td>
         {% endif %}
         <td>{{ c.status }}</td>
-        <td><a href="/contracts/{{ c.id }}">详情 →</a>{% if can_delete_contract and not c.is_settled %}<form method="post" action="/contracts/{{ c.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ c.no or ('#' ~ c.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');"><button class="btn danger">删除</button></form>{% endif %}</td>
+        {# 正式文档入口放在列表里：手机上从「合同」列表进详情再找按钮，路径太长；
+           列表能直接点「电子合同」，进去就是可打印的一整页。 #}
+        <td class="row-actions">
+          <a href="/contracts/{{ c.id }}">详情 →</a>
+          <a class="btn tiny ghost" href="/contracts/{{ c.id }}/print/contract"
+             title="按后台模板生成正式合同，可直接打印或存 PDF">电子合同</a>
+          <a class="btn tiny ghost" href="/contracts/{{ c.id }}/print/settlement"
+             title="{{ '生成结算单（已结算，可打印）' if c.is_settled else '该合同还没标记结算，点进去会提示原因' }}">结算单</a>
+          {% if can_delete_contract and not c.is_settled %}<form method="post" action="/contracts/{{ c.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ c.no or ('#' ~ c.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');"><button class="btn danger">删除</button></form>{% endif %}
+        </td>
       </tr>
     {% endfor %}
     </tbody>
