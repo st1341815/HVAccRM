@@ -13,50 +13,123 @@
    以后凡是「设置 display 又被 hidden 控制的元素」都不用再单独写 .x[hidden]。 */
 [hidden] { display: none !important; }
 
+/* ════════════════════════════════════════════════════════════════════
+   配色主题：清锋蓝（restrained SaaS blue）
+   ────────────────────────────────────────────────────────────────────
+   换肤只改这一处：所有组件只引用变量，全文件不出现裸色值（打印块除外）。
+   深色同位体见下方 html[data-theme="dark"] —— 两套变量键名必须完全一致，
+   深色漏定义某个变量时会静默回落成亮色值，页面会当场花掉。
+   验收口径（WCAG AA 之上留余量）：正文 ≥13:1、次要字 ≥5:1、白字按钮 ≥6:1。
+   ════════════════════════════════════════════════════════════════════ */
 :root {
-  /* 莫兰迪色系：低饱和、暖灰基调（安静工具台方向）
-     命名分层：paper=暖纸灰阶 / brand=灰蓝品牌 / *-ink=语义文字深档 / sidebar=深色侧栏
-     所有组件只引用这里的变量，不再出现裸色值 */
-  /* 暖纸灰阶 */
-  --bg: #efebe3;
-  --card: #fbf9f5;
-  --paper-2: #f7f4ee;                /* 斑马纹 */
-  --paper-3: #f1efe9;                /* 图片底/代码底等更浅填充 */
-  --ink: #45423c;                    /* 主文字 */
-  --muted: #6f6b64;                  /* 弱化文字 AA 达标 */
-  --line: #e5dfd5;                   /* 发丝线 */
-  --card-border: #e2dbd0;            /* 卡片/面板边框略深，分层更清晰 */
-  /* 品牌灰蓝 */
-  --brand: #6c7f91;                  /* 装饰：图标/边框/进度条/选中底 */
-  --brand-dark: #596b7c;
-  --brand-strong: #5b6f83;           /* 实心按钮底（白字对比度达标） */
-  --brand-ink: #4f6376;              /* 链接/强调文字 */
-  --brand-50: #e9edf1;               /* 选中底/ghost 底 */
-  --brand-50-hover: #dde4ea;         /* ghost 悬停 */
-  --brand-200: #b9c7d4;              /* 焦点环/侧栏指示条 */
-  /* 语义色（浅底 + 深字 + 边框三档） */
-  --danger-ink: #8f4a4a;
-  --danger-bg: #f7eded;
-  --danger-border: #e6c9c9;
-  --success-ink: #4f7059;
-  --success-bg: #e6ece1;
-  --success-border: #c3d2c0;
-  --warning-ink: #7d6540;
-  --warning-bg: #f4eedf;
-  --warning-border: #dfd0a8;
-  /* 深色侧栏（纯色，不用渐变） */
-  --sidebar-bg: #3a3f47;
-  --sidebar-fg: #d6d2ca;             /* 侧栏导航文字 */
-  --sidebar-fg-muted: #a8adb4;       /* 侧栏次要文字 */
-  --sidebar-hover: rgba(255, 255, 255, .08);
-  --sidebar-active: rgba(255, 255, 255, .10);
+  /* 基础层 */
+  --bg: #f5f7fa;                     /* 页面底：冷白偏蓝灰 */
+  --card: #ffffff;                   /* 卡片 / 表格底 */
+  --paper-2: #f3f7fa;                /* 斑马纹 */
+  --paper-3: #edf3fa;                /* 表头 / 合计行 / 浅填充 */
+  --field-bg: #ffffff;               /* 输入框、胶囊 tab、任务卡等一切「白块」 */
+  --ink: #16202e;                    /* 主文字 16.4:1 */
+  --muted: #5c6a80;                  /* 标签 / 次要文字 5.5:1 */
+  --line: #d5dfee;                   /* 发丝线（装饰级 1.34:1） */
+  --card-border: #dbe3ee;            /* 卡片描边，比发丝线略深一档做分层 */
+
+  /* 主色层 */
+  --brand: #2563eb;                  /* 图标 / 指示条 / 选中胶囊底 */
+  --brand-dark: #1d4ed8;
+  --brand-strong: #1d4ed8;           /* 实心按钮底（白字 6.70:1） */
+  --brand-strong-hover: #1a4bc4;     /* ⚠️ 实心按钮 hover 专用，不能复用 --brand-ink */
+  --brand-ink: #1a4bc4;              /* 链接 / 文字按钮（对白 7.37:1） */
+  --brand-50: #eaf1fe;               /* 幽灵按钮底 / 选中底 */
+  --brand-50-hover: #dbe7fd;
+  --brand-200: #b6cdf8;              /* 焦点环 / 侧栏指示条 */
+
+  /* 语义层（浅底 + 深字 + 边框三档） */
+  --danger-ink: #b42318;
+  --danger-bg: #fdeceb;
+  --danger-border: #f6cfcb;
+  --success-ink: #146b3a;
+  --success-bg: #e7f5ec;
+  --success-border: #bfe3cd;
+  --warning-ink: #8a5300;
+  --warning-bg: #fdf4e0;
+  --warning-border: #f0d9a6;
+  /* 「样板间」标记：独立语义，别借用 danger —— 借了会让人以为这条出错了 */
+  --tag-room-bg: #f0e2e2;
+  --tag-room-ink: #8f5a5a;
+
+  /* 深色侧栏 */
+  --sidebar-bg: #16233a;
+  --sidebar-fg: #dbe4f2;
+  --sidebar-fg-muted: #94a4bd;
+  --sidebar-hover: rgba(255, 255, 255, .07);
+  --sidebar-active: rgba(255, 255, 255, .12);
+
+  /* 交互 */
+  --row-hover: #ecf2fb;              /* 表格行悬浮（对卡片 1.13） */
+
   /* 尺度 */
-  --row-hover: #f6f3ed;              /* 表格行悬浮 */
-  --radius-sm: 6px;                  /* 控件级：按钮/输入/小卡 */
+  --radius-sm: 6px;                  /* 控件级：按钮 / 输入 / 小卡 */
   --radius-md: 8px;                  /* 面板内小块 */
-  --radius: 10px;                    /* 卡片/面板级 */
-  --shadow-md: 0 4px 14px -2px rgb(74 71 66 / .12), 0 1px 3px rgb(74 71 66 / .07);  /* 仅弹层/浮起元素用 */
+  --radius: 10px;                    /* 卡片 / 面板级 */
+  --shadow-md: 0 4px 16px -4px rgb(20 35 60 / .10), 0 1px 2px rgb(20 35 60 / .06);
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   深色主题
+   ────────────────────────────────────────────────────────────────────
+   不是把亮色反相，而是重新定一套语义：
+   · 卡片（#161e2a）比页面底（#0e141c）**亮** —— 和亮色同一条分层逻辑，幅度收窄
+   · 正文不用纯白（#e6ecf5）—— 纯白配深底长时间盯屏，笔画边缘有眩光感
+   · --brand-dark / --brand-ink 在深色下**反向提亮**：它们承载幽灵按钮文字与链接
+   · 实心按钮 hover 必须走 --brand-strong-hover：深色下 --brand-ink 是亮蓝，
+     拿它当 hover 底色会让白字直接失效
+   · 阴影在深底上几乎不可见，分层交给 --card-border（1.49:1）
+   ════════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] {
+  --bg: #0e141c;
+  --card: #161e2a;
+  --paper-2: #121a24;
+  --paper-3: #1c2634;
+  --field-bg: #1a2431;
+  --ink: #e6ecf5;                    /* 14.1:1 */
+  --muted: #94a3b8;                  /* 6.5:1 */
+  --line: #2b3746;
+  --card-border: #2f3c4c;
+
+  --brand: #2b66d9;                  /* 白字 5.24:1（选中胶囊底靠它） */
+  --brand-dark: #8ab4ff;             /* ⚠️ 深色下变亮：幽灵按钮文字用它 */
+  --brand-strong: #2b66d9;
+  --brand-strong-hover: #1e50b8;
+  --brand-ink: #7db3ff;              /* 链接，对卡片 7.79:1 */
+  --brand-50: #1a2b45;
+  --brand-50-hover: #223751;
+  --brand-200: #4d86c9;
+
+  --danger-ink: #ff938a;
+  --danger-bg: #3a1f21;
+  --danger-border: #5c3033;
+  --success-ink: #6ed08f;
+  --success-bg: #16321f;
+  --success-border: #2a5136;
+  --warning-ink: #e8bd63;
+  --warning-bg: #33280f;
+  --warning-border: #5b4618;
+  --tag-room-bg: #3a2530;
+  --tag-room-ink: #e3aabb;
+
+  --sidebar-bg: #090f16;
+  --sidebar-fg: #ccd7e5;
+  --sidebar-fg-muted: #7f8fa4;
+  --sidebar-hover: rgba(255, 255, 255, .07);
+  --sidebar-active: rgba(255, 255, 255, .12);
+
+  --row-hover: #212f42;              /* 对卡片 1.24，深色下要比亮色更明显才找得到行 */
+
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / .55), 0 1px 2px rgb(0 0 0 / .35);
+}
+/* 原生控件（滚动条 / 日期选择器 / 下拉面板）跟随明暗 */
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
 /* 图片兜底：任何未单独约束的图片都不超过容器宽度（手机端溢出的根因防线） */
 img { max-width: 100%; height: auto; }
@@ -114,6 +187,22 @@ button.linklike {
 }
 button.linklike:hover { background: var(--sidebar-hover); color: #fff; }
 .sidebar .me-links form { margin: 0; display: contents; }
+/* 主题切换：侧栏底部独立一行，撑满宽度。
+   放 .me-links 里会跟「账户 / 退出」挤成两行（232px 侧栏扣掉内边距只剩 205px）。 */
+.theme-toggle {
+  width: 100%; margin-top: .5rem; padding: .38rem .6rem;
+  font-size: .82rem; color: var(--sidebar-fg-muted); text-align: left;
+  border: 1px solid rgba(255, 255, 255, .10);
+}
+.theme-toggle:hover { color: #fff; }
+/* 主题切换：侧栏底部独立一行，撑满宽度。
+   放 .me-links 里会跟「账户 / 退出」挤成两行（232px 侧栏扣掉内边距只剩 205px）。 */
+.theme-toggle {
+  width: 100%; margin-top: .5rem; padding: .38rem .6rem;
+  font-size: .82rem; color: var(--sidebar-fg-muted); text-align: left;
+  border: 1px solid rgba(255, 255, 255, .10);
+}
+.theme-toggle:hover { color: #fff; }
 .sidebar-toggle {
   display: none; position: fixed; top: .7rem; left: .7rem; z-index: 60;
   width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);
@@ -147,8 +236,8 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 .foot-sep { margin: 0 .35rem; color: var(--card-border); }
 .sec-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .05rem .5rem; border-radius: 999px; font-size: .74rem; border: 1px solid transparent; }
 .sec-badge i { width: .42rem; height: .42rem; border-radius: 50%; background: currentColor; display: inline-block; }
-.sec-badge.high { color: var(--success-ink); background: var(--success-bg); border-color: #cfdcc8; }
-.sec-badge.mid { color: var(--warning-ink); background: var(--warning-bg); border-color: #e3d6b8; }
+.sec-badge.high { color: var(--success-ink); background: var(--success-bg); border-color: var(--success-border); }
+.sec-badge.mid { color: var(--warning-ink); background: var(--warning-bg); border-color: var(--warning-border); }
 .sec-badge.low { color: var(--danger-ink); background: var(--danger-bg); border-color: var(--danger-border); }
 /* 对外分享页的版权/ICP 声明（两行居中，与内部版本页脚区分） */
 .foot-legal { padding: 1.1rem 0 1.6rem; font-size: .74rem; line-height: 1.9; }
@@ -277,13 +366,15 @@ td.photo-cell { white-space: nowrap; }
    拒绝打开相册；改成让 input 铺满整个 label（opacity:0），用户点击直接命中 input 本身即可。 */
 .file-label input[type=file] { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 0; }
 .checkgrid { row-gap: .3rem; }
-.checkgrid label.checkline { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
+.checkgrid label.checkline { background: var(--field-bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
 .checkgrid label.checkline:has(input:checked) { border-color: var(--brand); background: var(--brand-50); color: var(--brand-dark); font-weight: 600; }
 
 input, select, textarea {
   width: 100%; padding: .4rem .5rem; border: 1px solid var(--line);
-  border-radius: var(--radius-sm); font: inherit; line-height: 1.6; background: #fff;
+  border-radius: var(--radius-sm); font: inherit; line-height: 1.6;
+  background: var(--field-bg); color: var(--ink);
 }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand-200); outline-offset: 0; }
 input[type=file] { padding: .3rem; }
 input[type=checkbox] { width: auto; }
@@ -291,14 +382,14 @@ button {
   padding: .42rem .9rem; border: 0; border-radius: var(--radius-sm); background: var(--brand-strong);
   color: #fff; font: inherit; cursor: pointer; white-space: nowrap;
 }
-button:hover { background: var(--brand-ink); }
+button:hover { background: var(--brand-strong-hover); }
 button.ghost { background: var(--brand-50); color: var(--brand-dark); }
 button.ghost:hover { background: var(--brand-50-hover); }
 button.danger, .btn.danger { background: var(--danger-bg); color: var(--danger-ink); border: 1px solid var(--danger-border); }
 button.danger:hover, .btn.danger:hover { background: var(--danger-border); color: var(--danger-ink); }
 button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .btn { display: inline-block; padding: .42rem .9rem; border-radius: var(--radius-sm); background: var(--brand-strong); color: #fff; white-space: nowrap; }
-.btn:hover { background: var(--brand-ink); text-decoration: none; }
+.btn:hover { background: var(--brand-strong-hover); text-decoration: none; }
 .btn.ghost { background: var(--brand-50); color: var(--brand-dark); }
 /* 合同台账「结算」列：badge 与开关按钮同一行，窄屏不折行 */
 .settle-cell { white-space: nowrap; }
@@ -345,13 +436,13 @@ button.tiny { padding: .15rem .4rem; font-size: .75rem; }
 form.sms-test { margin-top: 1rem; }
 
 /* 下拉式多选（<details> 实现，无 JS 也能展开选择） */
-details.ms { border: 1px solid var(--line); border-radius: var(--radius-md); padding: .45rem .6rem; background: #fff; }
+details.ms { border: 1px solid var(--line); border-radius: var(--radius-md); padding: .45rem .6rem; background: var(--field-bg); }
 details.ms > summary { cursor: pointer; font-size: .85rem; display: flex; align-items: center; gap: .4rem; }
 details.ms > summary::-webkit-details-marker { color: var(--muted); }
 details.ms[open] > summary { margin-bottom: .4rem; }
 details.ms .ms-picked { font-weight: 400; }
 details.ms .ms-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem .6rem; padding-top: .2rem; border-top: 1px dashed var(--line); }
-details.ms .ms-panel label.checkline { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
+details.ms .ms-panel label.checkline { background: var(--field-bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .3rem .5rem; cursor: pointer; }
 details.ms .ms-panel label.checkline:has(input:checked) { border-color: var(--brand); background: var(--brand-50); color: var(--brand-dark); font-weight: 600; }
 /* 图片灯箱：点缩略图放大查看，左右切换 */
 .lightbox {
@@ -383,13 +474,13 @@ body.lb-open { overflow: hidden; }
 .quick-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .7rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 .chips.views { margin-left: auto; }
-.chip { display: inline-block; padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: .85rem; color: var(--ink); white-space: nowrap; }
+.chip { display: inline-block; padding: .3rem .7rem; border-radius: 999px; background: var(--field-bg); border: 1px solid var(--line); font-size: .85rem; color: var(--ink); white-space: nowrap; }
 .chip:hover { border-color: var(--brand); text-decoration: none; }
 .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 
 /* 按客户分组：一个工地一张卡，节点为步骤 */
 .task-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(345px, 1fr)); gap: .9rem; }
-.task-card { border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .8rem; background: #fff; }
+.task-card { border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem .8rem; background: var(--field-bg); }
 .task-card.is-alert { border-color: var(--danger-border); }
 .tc-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
 .tc-head strong { font-size: 1rem; }
@@ -430,18 +521,18 @@ details.filter-collapse .filterbar { padding-top: .1rem; }
 
 .badge { display: inline-block; padding: .05rem .45rem; border-radius: 999px; background: var(--brand-50); color: var(--brand-dark); font-size: .75rem; }
 .badge.warn { background: var(--warning-bg); color: var(--warning-ink); }
-.badge.showroom { background: #f0e2e2; color: #8f5a5a; }
+.badge.showroom { background: var(--tag-room-bg); color: var(--tag-room-ink); }
 .badge.s-done { background: var(--success-bg); color: var(--success-ink); }
 .badge.s-doing { background: var(--brand-50); color: var(--brand-dark); }
 .badge.s-overdue, .badge.s-skipped { background: var(--danger-bg); color: var(--danger-ink); }
 .badge.lock { background: var(--danger-bg); color: var(--danger-ink); border: 1px solid var(--danger-border); }
 
 .tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .8rem; }
-.tabs a { padding: .3rem .8rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
+.tabs a { padding: .3rem .8rem; border-radius: 999px; background: var(--field-bg); border: 1px solid var(--line); }
 .tabs a.active { background: var(--brand); border-color: var(--brand); color: #fff; }
 .inline-tabs { margin-left: auto; }
 
-.login-card { max-width: 380px; margin: 8vh auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem; box-shadow: var(--shadow-md); }
+.login-card { max-width: 380px; margin: 8vh auto; background: var(--field-bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem; box-shadow: var(--shadow-md); }
 .stack label { display: flex; flex-direction: column; gap: .25rem; }
 /* 例外：带 .checkline 的复选行在 .stack 里必须保持横向（复选框 + 说明文字同一行）。
    .stack label 的 column 会把它们拆成两行——此前复选框和文字是上下错开的。 */
@@ -458,7 +549,7 @@ details.filter-collapse .filterbar { padding-top: .1rem; }
 @media (max-width: 780px) { .photo-view img { max-height: 66vh; } }
 
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .7rem; }
-.gallery figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.gallery figure { margin: 0; background: var(--field-bg); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
 .gallery img { width: 100%; height: 120px; object-fit: cover; display: block; background: var(--paper-3); }
 .gallery figcaption { padding: .3rem .4rem; display: flex; flex-direction: column; gap: .1rem; }
 .gallery a span { font-size: .75rem; color: var(--muted); }
@@ -550,7 +641,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   table.js-stack tbody { display: block; }
   table.js-stack tr {
     display: block; border: 1px solid var(--line); border-radius: var(--radius);
-    padding: .45rem .55rem; margin-bottom: .5rem; background: var(--row-bg, #fff);
+    padding: .45rem .55rem; margin-bottom: .5rem; background: var(--row-bg, var(--card));
   }
   table.js-stack td {
     display: flex; justify-content: space-between; align-items: baseline; gap: .6rem;
@@ -680,7 +771,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* 案例外链分享页：居中卡片，仅展示可公开字段 */
 .share-wrap { display: flex; justify-content: center; padding: 6vh 1rem; }
-.share-card { max-width: 420px; width: 100%; background: #fff; border-radius: var(--radius); padding: 1.6rem 1.5rem; }
+.share-card { max-width: 420px; width: 100%; background: var(--field-bg); border-radius: var(--radius); padding: 1.6rem 1.5rem; }
 .share-brand { font-size: .85rem; color: var(--muted); letter-spacing: .04em; }
 .share-title { font-size: 1.5rem; margin: .3rem 0 1rem; }
 .share-kv { width: 100%; margin-bottom: 1rem; }
@@ -804,8 +895,49 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 .preview-browser { display: flex; align-items: center; gap: .4rem; padding: .45rem .7rem; background: var(--paper-3); border-bottom: 1px solid var(--card-border); }
 .preview-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--brand-200); flex: 0 0 auto; }
 .preview-url { margin-left: .4rem; font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.preview-body { padding: 1.2rem 1.2rem .6rem; background: #fff; }
+.preview-body { padding: 1.2rem 1.2rem .6rem; background: var(--field-bg); }
 .preview-body .share-title { font-size: 1.1rem; }
 .preview-card { margin-top: .9rem; padding: .6rem .7rem; border: 1px solid var(--card-border); border-left: 3px solid var(--brand); border-radius: var(--radius-sm); background: var(--paper-2); }
 .preview-card strong { display: block; font-size: .86rem; line-height: 1.5; }
-.preview-box .foot-legal { background: #fff; border-top: 1px solid var(--card-border); padding: .8rem 0; }
+.preview-box .foot-legal { background: var(--field-bg); border-top: 1px solid var(--card-border); padding: .8rem 0; }
+
+/* ---------------------------------------------------------------- 打印 */
+/* 深色主题下直接打印会印出一片黑。打印一律锁回亮色、去掉侧栏，
+   保证合同台账 / 对账单打出来是白纸黑字。
+   注意也要覆盖 :root（亮色态），否则变量沿用屏幕上的灰底。 */
+@media print {
+  :root,
+  html[data-theme="dark"] {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --paper-2: #ffffff;
+    --paper-3: #f2f2f2;
+    --field-bg: #ffffff;
+    --ink: #000000;
+    --muted: #333333;
+    --line: #bbbbbb;
+    --card-border: #999999;
+    --row-hover: #ffffff;
+    --brand: #1d4ed8;
+    --brand-dark: #1d4ed8;
+    --brand-strong: #1d4ed8;
+    --brand-strong-hover: #1d4ed8;
+    --brand-ink: #1d4ed8;
+    --brand-50: #f2f2f2;
+    --brand-50-hover: #f2f2f2;
+    --brand-200: #999999;
+    --sidebar-bg: #ffffff;
+    --sidebar-fg: #000000;
+    --sidebar-fg-muted: #333333;
+    --sidebar-hover: transparent;
+    --sidebar-active: transparent;
+    color-scheme: light;
+  }
+  .sidebar,
+  .sidebar-toggle,
+  .scrim { display: none !important; }
+  .wrap { max-width: none; padding: 0; }
+  .card { box-shadow: none; break-inside: avoid; }
+  .kpi { break-inside: avoid; }
+  body { background: #fff; }
+}
