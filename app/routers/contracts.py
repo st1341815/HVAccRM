@@ -239,11 +239,22 @@ def new_contract_form(
     allowed = visible_customer_ids(db, user)
     if allowed is not None:
         customers = [c for c in customers if c.id in allowed]
-    # 已锁定客户（任一合同「前期施工」已完工）从新建合同下拉中过滤，降低误选概率
-    customers = [c for c in customers if not c.locked]
+    # 已锁定客户（任一合同「前期施工」已完工）以前是从下拉里**整体过滤**掉的。
+    # 线上实测：11 个客户全锁 → 新建合同时输入姓名/手机号/房号**一个都搜不到**，
+    # 用户只能看到空列表，看起来像系统坏了（2026-11-25 反馈）。
+    # 锁定是「提醒已开工、别选错」而不是「禁止再签」——同一客户先地暖后暖气片、
+    # 分期签第二份合同是正常业务。所以：保留在下拉里，排到未锁定之后、带 locked 标记，
+    # 前端选中时二次确认。
+    customers.sort(key=lambda c: (1 if c.locked else 0, c.name or ""))
     # 客户选择改为可搜索下拉：把可见客户序列化供前端本地过滤（含姓名/房号/手机号）
     customer_options = [
-        {"id": c.id, "name": c.name, "room": c.room_label or "", "phone": c.phone or ""}
+        {
+            "id": c.id,
+            "name": c.name,
+            "room": c.room_label or "",
+            "phone": c.phone or "",
+            "locked": 1 if c.locked else 0,
+        }
         for c in customers
     ]
     return render(

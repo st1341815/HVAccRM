@@ -53,10 +53,16 @@
   }
   function nameOf(c) { return c.name + (c.room ? '（' + c.room + '）' : ''); }
   function render(items) {
-    if (!items.length) { list.hidden = true; list.innerHTML = ''; return; }
+    if (!items.length) {
+      list.innerHTML = '<li class="muted">没有匹配的客户。姓名、手机号、房号都能搜；' +
+        '确实没这个人就到「客户」里先新建。</li>';
+      list.hidden = false;
+      return;
+    }
     list.innerHTML = items.map(function (c) {
-      return '<li data-id="' + c.id + '" data-name="' + esc(nameOf(c)) + '">' +
-        '<div>' + esc(c.name) + (c.room ? ' <span class="muted">' + esc(c.room) + '</span>' : '') + '</div>' +
+      return '<li data-id="' + c.id + '" data-name="' + esc(nameOf(c)) + '" data-locked="' + (c.locked ? '1' : '0') + '">' +
+        '<div>' + esc(c.name) + (c.room ? ' <span class="muted">' + esc(c.room) + '</span>' : '') +
+        (c.locked ? ' <span class="badge lock">🔒 已开工</span>' : '') + '</div>' +
         (c.phone ? '<div class="muted">' + esc(c.phone) + '</div>' : '') +
         '</li>';
     }).join('');
@@ -77,8 +83,14 @@
   input.addEventListener('focus', search);
   list.addEventListener('mousedown', function (e) {
     var li = e.target.closest('li');
-    if (!li) return;
+    if (!li || !li.getAttribute('data-id')) return;
     e.preventDefault(); // 防止 input 先失焦导致点击不生效
+    // 锁定客户 = 前期施工已完工。不是禁止再签（同一客户分期加系统很常见），
+    // 但要防手滑选错人，所以二次确认。
+    if (li.getAttribute('data-locked') === '1' &&
+        !confirm('「' + li.getAttribute('data-name') + '」已完成前期施工（已锁定）。\n确认仍要为 TA 新建一份合同？')) {
+      return;
+    }
     hidden.value = li.getAttribute('data-id');
     input.value = li.getAttribute('data-name');
     list.hidden = true; list.innerHTML = '';
@@ -92,7 +104,7 @@
   if (pre) {
     var found = data.find(function (c) { return String(c.id) === String(pre); });
     if (found) input.value = nameOf(found);
-    else { hidden.value = ''; input.value = ''; } // 已锁定客户不在可选列表内，清空避免静默提交
+    else { hidden.value = ''; input.value = ''; } // 客户不可见（被数据权限过滤）时清空，避免静默提交
   }
   // 必填校验：隐藏字段不触发浏览器 required
   if (form) {
