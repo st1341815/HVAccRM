@@ -1022,6 +1022,9 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 }
 .doc-parties > div,
 .doc-meta > div { min-width: 0; }
+/* v1.15.9：抬头里需要独占整行的字段。工程地址最长（市+区+楼盘+楼栋+单元+房号），
+   塞进半栏必然折行，还会把整块顶高一行——跨两列让它自己占满。 */
+.doc-parties > div.wide { grid-column: 1 / -1; }
 .doc-parties .lbl,
 .doc-meta .lbl { color: #666; }
 

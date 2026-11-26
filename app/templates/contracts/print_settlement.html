@@ -34,20 +34,24 @@
     </div>
   </div>
 
+  {# v1.15.9：抬头按用户指定的版式重排——工程地址独占一行（地址最长，塞进半栏
+     必然折成两行，还会把整块顶高），其余六项两两成对：
+       结算日期 | 签订日期
+       销售经理 | 产品类型
+       甲方名称 | 联系电话
+     「结算状态」不再单独占一格：能打出这张单子就一定是已结算的（路由层 409 拦掉了
+     未结算合同），结算日期本身就是状态，再印一行「已结算」是重复。这样抬头正好
+     4 行排满，不留孤零零的半个空格。 #}
   <div class="doc-parties">
-    <div><span class="lbl">甲方（客户）：</span>{{ contract.customer.name if contract.customer else '-' }}</div>
-    <div><span class="lbl">联系电话：</span>{{ contract.customer.phone if contract.customer and contract.customer.phone else '-' }}</div>
     {# v1.15.0：原来取 customer.address，但地址是选填、房号才必填（线上客户地址全空），
        改成和电子合同同一个口径：市+区+楼盘+楼栋+单元+房号。 #}
-    <div><span class="lbl">工程地址：</span>{{ site_address or '-' }}</div>
-    <div><span class="lbl">签订日期：</span>{{ contract.sign_date or '-' }}</div>
+    <div class="wide"><span class="lbl">工程地址：</span>{{ site_address or '-' }}</div>
     <div><span class="lbl">结算日期：</span>{{ contract.settled_at or '未标记' }}</div>
+    <div><span class="lbl">签订日期：</span>{{ contract.sign_date or '-' }}</div>
+    <div><span class="lbl">销售经理：</span>{{ sales_name or '-' }}</div>
     <div><span class="lbl">产品类型：</span>{{ contract.product_type or '-' }}</div>
-    <div><span class="lbl">结算状态：</span>{{ '已结算' if contract.is_settled else '未结算' }}</div>
-    {# v1.15.4：业务员从文末挪回抬头，紧跟在「结算状态」后面 —— 两列刚好填满第 4 行，
-       和第 3 行右列的「产品类型」上下对齐。原来单独放在文末，纸下方孤零零一行，
-       看着像漏排的脚注。 #}
-    <div><span class="lbl">业务员：</span>{{ sales_name or '-' }}</div>
+    <div><span class="lbl">甲方名称：</span>{{ contract.customer.name if contract.customer else '-' }}</div>
+    <div><span class="lbl">联系电话：</span>{{ contract.customer.phone if contract.customer and contract.customer.phone else '-' }}</div>
   </div>
 
   <h2>一、结算金额</h2>
@@ -86,7 +90,8 @@
 
   {# v1.15.0：去掉文末甲乙方签字 / 盖章栏（用户要求，结算单不再走线下签字流程）。
      打印时间、打印人与次数已上移到抬头下方，作为唯一的留痕信息。
-     v1.15.4：业务员改放抬头「结算状态」之后，不再单独落在文末。 #}
+     v1.15.4：业务员挪回抬头，不再单独落在文末。
+     v1.15.9：抬头重排，业务员改称「销售经理」，与产品类型同一行。 #}
 </div>
 
 {# v1.15.6：去掉「加载即自动打印」，和电子合同保持一致——打开页面只是预览，

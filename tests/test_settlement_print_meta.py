@@ -153,29 +153,76 @@ def test_no_contractor_line_in_header(db, admin):
     assert "乙方" not in html, "结算单全文不该再出现「乙方」"
 
 
-def test_sales_name_in_header_after_settle_status(db, admin):
-    """业务员在抬头信息区、紧跟「结算状态」之后，= 录入人（合同 created_by）。
+HEADER_ORDER = ["工程地址：", "结算日期：", "签订日期：", "销售经理：",
+                "产品类型：", "甲方名称：", "联系电话："]
 
-    v1.15.3 先放在文末（顶替签字栏位置），v1.15.4 用户要求挪回抬头：
-    两列 grid 刚好填满第 4 行，和第 3 行右列的「产品类型」上下对齐。
+
+def _parties_block(html: str) -> str:
+    m = re.search(r'<div class="doc-parties">(.*?)</div>\s*<h2', html, re.S)
+    assert m, "找不到抬头信息区（doc-parties）"
+    return m.group(1)
+
+
+def test_sales_name_in_header(db, admin):
+    """销售经理在抬头信息区，= 录入人（合同 created_by）。
+
+    v1.15.3 先放在文末（顶替签字栏位置），v1.15.4 挪回抬头，
+    v1.15.9 按用户给的版式重排并改称「销售经理」。
     """
     ctr = _settled_contract(db, admin, no="HT-PRINT-5")
     html = _print(db, admin, ctr.id).body.decode()
 
-    parties = re.search(r'<div class="doc-parties">(.*?)</div>\s*<h2', html, re.S)
-    assert parties, "找不到抬头信息区（doc-parties）"
-    block = parties.group(1)
-    assert "结算状态：" in block and "业务员：" in block, "业务员应放在抬头信息区里"
-    assert block.index("结算状态：") < block.index("业务员："), (
-        "业务员要排在「结算状态」之后，两列才能对齐成第 4 行"
-    )
+    block = _parties_block(html)
+    assert "销售经理：" in block, "销售经理应放在抬头信息区里"
     assert 'class="doc-foot-info"' not in html, "文末不该再留独立的落款块"
 
-    m = re.search(r'<span class="lbl">业务员：</span>([^<]*)', html)
-    assert m, "抬头里没有「业务员」这一行"
+    m = re.search(r'<span class="lbl">销售经理：</span>([^<]*)', html)
+    assert m, "抬头里没有「销售经理」这一行"
     assert m.group(1).strip() == admin.display_name, (
-        f"业务员应取录入人 {admin.display_name}，实际 {m.group(1).strip()!r}"
+        f"销售经理应取录入人 {admin.display_name}，实际 {m.group(1).strip()!r}"
     )
+
+
+def test_header_layout_follows_user_spec(db, admin):
+    """v1.15.9 用户指定的抬头版式：工程地址独占一行，其余两两成对。
+
+        工程地址：***
+        结算日期：***   签订日期：***
+        销售经理：***   产品类型：***
+        甲方名称：***   联系电话：***
+
+    工程地址必须带 `.wide`（CSS 里 `grid-column: 1 / -1`）——地址是「市+区+楼盘+
+    楼栋+单元+房号」，塞进半栏会折成两行，把整块顶高。
+    「结算状态」不再是独立一格：它和结算日期是同一件事，未结算时在日期后括号标出，
+    抬头因此正好 4 行排满，不留孤零零的半个空格。
+    """
+    ctr = _settled_contract(db, admin, no="HT-PRINT-7")
+    html = _print(db, admin, ctr.id).body.decode()
+    block = _parties_block(html)
+
+    positions = [block.index(k) for k in HEADER_ORDER]
+    assert positions == sorted(positions), (
+        "抬头字段顺序不对，期望：" + " → ".join(k.rstrip("：") for k in HEADER_ORDER)
+    )
+
+    wide = re.search(r'<div class="wide"><span class="lbl">([^<]*)</span>', block)
+    assert wide and wide.group(1) == "工程地址：", (
+        "只有工程地址该独占整行（class=\"wide\"），其余两两成对"
+    )
+    assert block.count('class="wide"') == 1, "独占整行的字段只应有一个"
+
+    assert "结算状态：" not in block, "结算状态已并入结算日期，不该再单独占一格"
+
+
+def test_settled_contract_has_no_unsettled_suffix(db, admin):
+    """已结算的单子，结算日期后面不该挂「（未结算）」。"""
+    ctr = _settled_contract(db, admin, no="HT-PRINT-8")
+    html = _print(db, admin, ctr.id).body.decode()
+    m = re.search(r'<span class="lbl">结算日期：</span>([^<]*)', html)
+    assert m, "抬头里没有「结算日期」这一行"
+    assert "未结算" not in m.group(1), f"已结算的单子不该标未结算：{m.group(1)!r}"
+
+
 
 
 def test_sales_name_falls_back_to_customer_owner(db, admin, sales):
@@ -189,5 +236,5 @@ def test_sales_name_falls_back_to_customer_owner(db, admin, sales):
     db.get(Customer, ctr.customer_id).owner_id = sales.id
     db.flush()
     html = _print(db, admin, ctr.id).body.decode()
-    m = re.search(r'<span class="lbl">业务员：</span>([^<]*)', html)
+    m = re.search(r'<span class="lbl">销售经理：</span>([^<]*)', html)
     assert m and m.group(1).strip() == sales.display_name, "没填录入人时应回落客户负责人"
