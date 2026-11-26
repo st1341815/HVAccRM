@@ -84,13 +84,15 @@ def test_mobile_preview_still_single_column():
     )
 
 
-# ---------------------------------------------------------------- v1.15.2
-def test_page_margin_is_document_standard():
-    """纸张边距：上下 2.2cm、左右 1.8cm（用户 2026-11-26 指定）。
+# ---------------------------------------------------------------- v1.15.2 / v1.15.5
+def test_page_margin_stays_compact():
+    """纸张边距：7mm / 6mm（v1.15.5 回退值）。
 
-    这条特别容易被「把合同压进一页」的优化悄悄改小（v1.13.4 就压成过 7mm/6mm），
-    所以钉死。注意可用宽 = 210 − 2×18 = 174mm ≈ 658px，仍小于 760px 断点 ——
-    上面那三条列数覆盖依赖这个前提，改边距前先想清楚。
+    这段历史值得记住：v1.15.2 按用户要求改成上下 2.2cm / 左右 1.8cm，理由是
+    「正式文书要留装订和签批的空白」；结果可用宽 198mm → 174mm，合同正文
+    3 页涨到 4 页、断行位置全变，用户当天就反馈「有影响」要求改回。
+    **边距是全局开关**（牵动合同、结算单、台账所有打印页），调之前先算页数。
+    另外：198mm ≈ 748px 仍小于 760px 断点，上面那三条列数覆盖依赖这个前提。
     """
     block = _block("@media print")
     m = re.search(r"@page\s*\{([^}]*)\}", block)
@@ -100,4 +102,4 @@ def test_page_margin_is_document_standard():
     margin = re.search(r"margin:\s*([^;]+);", decl)
     assert margin, "@page 缺 margin"
     value = margin.group(1).strip()
-    assert value == "2.2cm 1.8cm", f"页边距应为上下 2.2cm / 左右 1.8cm，实际 {value!r}"
+    assert value == "7mm 6mm", f"页边距应为 7mm / 6mm，实际 {value!r}"
