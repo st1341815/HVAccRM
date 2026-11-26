@@ -1,11 +1,16 @@
-"""合同详情页「打印」按钮：打印当前页，但去掉图片部分。
+"""合同详情页的打印约定（v1.14.4 起不再有「打印本页」按钮）。
 
 **背景**（v1.13.3 需求）：合同详情是给客户看 / 存档的主力页面，销售要的是
 「打印这一单」——但页面上有纸质合同扫描件、成本凭证缩略图、收款截图，
 还有一堆录入表单和删除按钮，直接 Ctrl+P 会印出一堆没用的东西。
 
+**v1.14.4 变化**：用户反馈「有结算单就不需要打印控件了，两个功能重复」。
+确实——「打印本页」把屏幕上的台账整页印出来，纸面观感差，而真正要交给对方的
+是「电子合同」（签字用）和「结算单」（财务凭证）两份正式文档。于是删掉按钮，
+但**打印能力本身不删**：Ctrl+P 仍然可用。
+
 这里钉住四条约定：
-1. 页头有「打印」按钮，调 `window.print()`（不新开窗口、不生成 PDF 接口）；
+1. 页头**不再有**「打印本页」按钮，但「电子合同 / 结算单」两个正式入口都在；
 2. 打印时图片（图片块、附图列、付款截图列）一律不出；
 3. 打印时录入表单 / 按钮也不出（`@media print` 兜底 + `.no-print` 逐处标记）；
 4. 打印页眉给出合同号 / 客户 / 签订日 / 打印时间。屏幕上不显示。
@@ -32,10 +37,17 @@ def _print_css() -> str:
     return css[start:]
 
 
-def test_has_print_button():
+def test_print_page_button_removed():
+    """v1.14.4：删掉「打印本页」，正式件只留电子合同 + 结算单两个入口。
+
+    用户原话：「有结算单，就可以不需要显示打印控件了，两个功能重复」。
+    删按钮可以，但那两个正式文档的链接不能跟着一起没了（那是删错东西）。
+    """
     html = _detail()
-    assert "window.print()" in html, "合同详情页必须有一个调 window.print() 的打印按钮"
-    assert ">打印</button>" in html, "按钮文案应为「打印」"
+    assert ">打印</button>" not in html, "「打印本页」按钮已按 v1.14.4 去掉，别再加回来"
+    assert "stampPrintTime(); window.print()" not in html, "打印按钮的 onclick 应一并清除"
+    assert "/print/contract" in html, "电子合同入口不能跟着一起删"
+    assert "/print/settlement" in html, "结算单入口不能跟着一起删"
 
 
 def test_paper_contract_photo_section_is_not_printed():

@@ -8,9 +8,10 @@
     <span class="badge {{ 's-done' if locked else '' }}">{{ '已结算' if locked else '未结算' }}</span>
   </h1>
   <div class="actions">
-    <button class="btn" onclick="stampPrintTime(); window.print()" title="打印本页（自动隐去图片与录入表单）">打印</button>
-    {# 正式文档：套模板生成的电子合同 / 结算单，和「打印本页」不是一个东西。
-       本页是给内部看的台账，纸面上带图带表单；这两个是给对方签字盖章的正式件。 #}
+    {# v1.14.4：去掉「打印本页」按钮。它把屏幕上的台账整页印出来，跟「结算单」
+       功能重叠，纸面观感也差（徽标按钮隐去后剩一堆表格、页眉还得自己补）。
+       给对方的正式件就走下面两个：电子合同（签字用）、结算单（财务凭证）。
+       偶尔内部真要一张纸，Ctrl+P 依旧能打——打印页眉与 @media print 规则都保留着。 #}
     <a class="btn ghost" href="/contracts/{{ contract.id }}/print/contract"
        title="按后台模板生成正式合同，可直接打印或存 PDF">电子合同</a>
     <a class="btn ghost" href="/contracts/{{ contract.id }}/print/settlement"
@@ -331,8 +332,8 @@
   }
   syncCostFields();
 
-  // 打印页眉的「打印时间」：点按钮走 onclick 里的调用，Ctrl+P 走 beforeprint 兜底。
-  // 时间戳放在打印页眉里，纸面才知道这份是何时出的。
+  // 打印页眉的「打印时间」：v1.14.4 去掉了「打印本页」按钮，现在只剩 Ctrl+P 这条路径，
+  // 由 beforeprint 触发。时间戳放在打印页眉里，纸面才知道这份是何时出的。
   function stampPrintTime() {
     const el = document.getElementById('print_ts');
     if (!el) return;
