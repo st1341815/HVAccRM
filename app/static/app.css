@@ -1147,11 +1147,14 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   .foot { display: none !important; }
   .card > p.muted { display: none !important; }
 
-  /* ---- 版面：把一份合同压进一张 A4 ----
-     三层压缩：① @page 收页边距（默认 10mm 太奢侈）；② 根字号降到 82%，
-     全站尺寸几乎都用 rem，一改全跟着收；③ 局部压表格 / KPI / 卡片的内边距与行高。
-     实测依据见 CHANGELOG v1.13.4：合同 1（成本 4 行 + 收款 1 行）从 2 页变 1 页。 */
-  @page { size: A4 portrait; margin: 7mm 6mm; }
+  /* ---- 版面：页边距 ----
+     2026-11-26 用户要求「上下 2.2cm、左右 1.8cm」——正式合同 / 结算单要给装订
+     和签批留白。此前是 7mm/6mm，那是 v1.13.4 为了「把合同详情页压进一张 A4」
+     硬压出来的；而那个「打印本页」按钮 v1.14.4 已经删掉，压缩的初衷不复存在。
+     现在打出去的都是正式文书（电子合同 / 结算单），边距按文书标准给。
+     副作用可控：可用宽从 198mm 降到 174mm ≈ 658px，仍小于 760px 断点，
+     所以下面那段「打印时把甲乙双方打回两列」的覆盖依然必要，也依然有效。 */
+  @page { size: A4 portrait; margin: 2.2cm 1.8cm; }
   html { font-size: 82%; }
   body { background: #fff; font-size: 8.5pt; line-height: 1.3; }
   /* .app 是 `display:flex; min-height:100vh` 的应用外壳。打印时 100vh = 一整页高，

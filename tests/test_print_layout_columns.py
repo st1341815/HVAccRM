@@ -82,3 +82,22 @@ def test_mobile_preview_still_single_column():
     assert any("1fr" in _columns(r) for r in rules), (
         "手机断点里 .doc-sign 应保持单列：手机屏宽装不下两列签字区"
     )
+
+
+# ---------------------------------------------------------------- v1.15.2
+def test_page_margin_is_document_standard():
+    """纸张边距：上下 2.2cm、左右 1.8cm（用户 2026-11-26 指定）。
+
+    这条特别容易被「把合同压进一页」的优化悄悄改小（v1.13.4 就压成过 7mm/6mm），
+    所以钉死。注意可用宽 = 210 − 2×18 = 174mm ≈ 658px，仍小于 760px 断点 ——
+    上面那三条列数覆盖依赖这个前提，改边距前先想清楚。
+    """
+    block = _block("@media print")
+    m = re.search(r"@page\s*\{([^}]*)\}", block)
+    assert m, "@media print 里没有 @page 规则，纸张边距会退回浏览器默认"
+    decl = m.group(1)
+    assert "size: A4" in decl, "@page 应显式声明 A4，否则纸张跟着打印机默认走"
+    margin = re.search(r"margin:\s*([^;]+);", decl)
+    assert margin, "@page 缺 margin"
+    value = margin.group(1).strip()
+    assert value == "2.2cm 1.8cm", f"页边距应为上下 2.2cm / 左右 1.8cm，实际 {value!r}"

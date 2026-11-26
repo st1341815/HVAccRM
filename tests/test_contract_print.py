@@ -144,8 +144,16 @@ def test_print_app_shell_does_not_claim_full_page():
     assert ".app { display: block; min-height: 0; }" in block
 
 
-def test_print_page_is_a4_with_tight_margins():
-    """纸张按 A4、收紧页边距；根字号降一档（全站用 rem，一改全跟着收）。"""
+def test_print_page_is_a4_with_document_margins():
+    """纸张按 A4；边距按正式文书标准（v1.15.2 用户指定：上下 2.2cm / 左右 1.8cm）。
+
+    历史上这里钉过 `margin: 7mm 6mm`（v1.13.4 为「把合同详情页压进一张 A4」压的），
+    但那个「打印本页」按钮 v1.14.4 已经删掉，压缩的初衷没了；现在打出去的是
+    要给客户签字的正式文书，边上得留装订与签批的空白。
+    根字号降一档这条保留——它管的是台账表格，和文档正文的字号是两回事。
+    """
     block = _print_css()
-    assert "@page { size: A4 portrait; margin: 7mm 6mm; }" in block
+    assert "@page { size: A4 portrait; margin: 2.2cm 1.8cm; }" in block, (
+        "页边距应为上下 2.2cm / 左右 1.8cm（v1.15.2 用户指定）"
+    )
     assert "html { font-size: 82%; }" in block
