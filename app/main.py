@@ -26,6 +26,7 @@ from .routers import (
     contracts,
     costs,
     customers,
+    dashboard,
     payments,
     photos,
     projects,
@@ -232,6 +233,7 @@ async def auth_middleware(request: Request, call_next):
 
 app.include_router(auth_router)
 app.include_router(ui.router)
+app.include_router(dashboard.router)
 app.include_router(projects.router)
 app.include_router(customers.router)
 app.include_router(contracts.router)

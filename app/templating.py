@@ -44,6 +44,15 @@ def number(v: Any, nd: int = 1) -> str:
         return "0.0"
 
 
+def wan(v: Any) -> str:
+    """元 → 万元（1 位小数）。看板 KPI 与图表 tooltip 共用同一口径，避免
+    页面显示 83.0 万、图表显示 830000 这种「看起来数据不一致」。"""
+    try:
+        return f"{float(v or 0) / 10000:,.1f}"
+    except (TypeError, ValueError):
+        return "0.0"
+
+
 def short_dt(v: Any) -> str:
     return str(v)[:16] if v else ""
 
@@ -68,6 +77,7 @@ def duration(v: Any) -> str:
 
 templates.env.filters["money"] = money
 templates.env.filters["number"] = number
+templates.env.filters["wan"] = wan
 templates.env.filters["short_dt"] = short_dt
 templates.env.filters["duration"] = duration
 templates.env.globals["role_labels"] = permissions.ROLE_LABELS

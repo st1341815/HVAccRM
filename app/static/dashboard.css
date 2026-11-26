@@ -1,0 +1,203 @@
+/* ============================================================================
+   首页看板 2.0（v1.16.0）
+   只放看板专属样式；配色一律引用 app.css 里的变量，不新增裸色值，
+   这样深色主题（html[data-theme="dark"]）自动跟随，不用再维护第二套。
+   ========================================================================== */
+
+/* ---------- 页头：方案切换 ---------- */
+.dash-head { display: flex; align-items: center; gap: .8rem; margin: 0 0 12px; flex-wrap: wrap; }
+.dash-switch { display: flex; align-items: center; gap: .5rem; }
+.vs-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.vs-select {
+  appearance: none; -webkit-appearance: none;
+  background: var(--card) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c6a80' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
+  border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+  padding: 6px 30px 6px 10px; font-size: 13px; font-weight: 600; color: var(--ink);
+  font-family: inherit; cursor: pointer; max-width: 220px;
+}
+.vs-select:focus-visible { outline: 2px solid var(--brand-200); outline-offset: 1px; }
+
+/* ---------- 编辑工具条 ---------- */
+.dash-editbar {
+  display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  background: var(--brand-50); border: 1px solid var(--brand-200);
+  border-radius: var(--radius); padding: 8px 12px; margin-bottom: 12px;
+}
+.eb-hint { font-size: 12.5px; color: var(--brand-ink); }
+.eb-actions { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
+
+/* ---------- 栅格 ---------- */
+.dash-grid {
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px; align-items: start;
+}
+.dash-card { min-width: 0; position: relative; display: flex; flex-direction: column; }
+.dash-card .card-head { margin-bottom: 8px; }
+.dash-card .card-title { font-size: 13px; font-weight: 700; }
+.dash-card .card-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* 拖拽手柄：非编辑态不可见也不占位 */
+.drag-handle { display: none; width: 18px; height: 18px; flex: 0 0 18px; cursor: grab; color: #a9b6c8; touch-action: none; }
+.drag-handle svg { width: 16px; height: 16px; display: block; }
+.drag-handle:active { cursor: grabbing; }
+
+/* 卡片工具（齿轮 / 删除）：只在编辑态出现 */
+.card-tools { display: none; margin-left: auto; gap: .25rem; }
+.card-tools .t {
+  width: 24px; height: 24px; border: 1px solid transparent; border-radius: 5px;
+  background: transparent; color: var(--muted); cursor: pointer; padding: 0;
+  display: grid; place-items: center;
+}
+.card-tools .t svg { width: 14px; height: 14px; }
+.card-tools .t:hover { background: var(--brand-50); color: var(--brand-ink); border-color: var(--brand-200); }
+
+body.dash-editing .drag-handle,
+body.dash-editing .card-tools { display: flex; }
+body.dash-editing .dash-card {
+  outline: 1.5px dashed var(--brand-200); outline-offset: -1px;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+body.dash-editing .dash-card.is-drag {
+  opacity: .55; box-shadow: var(--shadow-md); z-index: 5;
+}
+body.dash-editing .dash-card.is-target { outline: 2px dashed var(--brand); background: var(--brand-50); }
+
+/* 拖拽落位占位符 */
+.dash-ph {
+  border: 2px dashed var(--brand-200); background: var(--brand-50);
+  border-radius: var(--radius); min-height: 88px;
+}
+
+/* ---------- KPI 卡 ---------- */
+.kpi-body { display: flex; flex-direction: column; gap: 1px; }
+.kpi-body .kpi-num { font-size: 22px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; }
+.kpi-body .kpi-label { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.kpi-body .kpi-note { font-size: 11px; color: var(--muted); opacity: .85; white-space: nowrap; }
+.kpi-delta { font-size: 11px; font-weight: 700; }
+.kpi-delta.up { color: var(--success-ink); }
+.kpi-delta.down { color: var(--danger-ink); }
+
+/* ---------- 列表卡 ---------- */
+.dash-list { font-size: 12.5px; }
+.dash-list td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.dash-list tr:last-child td { border-bottom: 0; }
+.dash-list td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.dash-link { color: var(--brand-ink); text-decoration: none; font-weight: 600; }
+.dash-link:hover { text-decoration: underline; }
+.dash-list .bar { display: inline-block; width: 46px; height: 5px; margin-left: 6px; vertical-align: middle; }
+.dash-list .bar > i { background: var(--brand); }
+
+/* 工序状态徽标（模板里拼的是 b-<status>，status 是英文） */
+.badge.b-pending { background: var(--paper-3); color: var(--muted); }
+.badge.b-ready { background: var(--warning-bg); color: var(--warning-ink); }
+.badge.b-doing { background: var(--brand-50); color: var(--brand-ink); }
+.badge.b-done { background: var(--success-bg); color: var(--success-ink); }
+.badge.b-skipped { background: var(--paper-3); color: var(--muted); }
+
+/* ---------- 图表容器 ---------- */
+.chart-box { position: relative; width: 100%; min-width: 0; }
+.chart-box canvas { display: block; width: 100% !important; height: 100% !important; }
+.chart-empty, .dash-empty { font-size: 12.5px; color: var(--muted); margin: 6px 0; }
+.dash-empty-state { text-align: center; padding: 28px 16px; }
+.dash-empty-state h2 { font-size: 15px; margin: 0 0 6px; }
+
+/* 自研热力图 */
+.heat-wrap { display: flex; gap: 3px; overflow: hidden; }
+.heat-col { display: flex; flex-direction: column; gap: 3px; }
+.heat-cell { width: 12px; height: 12px; border-radius: 2px; background: var(--paper-3); }
+.heat-legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); margin-top: 8px; }
+.heat-legend .heat-cell { width: 10px; height: 10px; }
+
+/* 自研堆叠条 */
+.stack-wrap { display: flex; flex-direction: column; gap: 8px; }
+.stack-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.stack-label { width: 62px; flex: 0 0 62px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stack-bar { flex: 1; display: flex; height: 20px; border-radius: 4px; overflow: hidden; gap: 2px; min-width: 0; }
+.stack-seg { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; overflow: hidden; }
+.stack-total { width: 26px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* 堆叠条图例 */
+.stack-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.stack-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.stack-legend .li { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* ---------- 轻提示 ---------- */
+.dash-toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(8px);
+  background: rgb(22 32 46 / .95); color: #fff; font-size: 12.5px;
+  padding: 8px 14px; border-radius: 8px; z-index: 90;
+  opacity: 0; transition: opacity .18s ease, transform .18s ease; pointer-events: none;
+  box-shadow: 0 8px 24px -10px rgb(0 0 0 / .5);
+}
+.dash-toast { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dash-toast.out { opacity: 0; transform: translateX(-50%) translateY(6px); }
+.dash-toast.bad { background: var(--danger-ink); }
+
+/* ---------- 模块库抽屉 ---------- */
+.dash-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 300px; z-index: 60;
+  background: var(--card); border-left: 1px solid var(--card-border);
+  box-shadow: -10px 0 28px -18px rgb(20 35 60 / .35);
+  display: flex; flex-direction: column; padding: 14px 14px 18px;
+}
+.dd-head { display: flex; align-items: center; gap: .5rem; }
+.dd-head h3 { margin: 0; font-size: 14px; }
+.dd-head .t { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 15px; padding: 2px 6px; border-radius: 5px; }
+.dd-head .t:hover { background: var(--paper-3); }
+.dd-tip { font-size: 11.5px; color: var(--muted); margin: 6px 0 10px; }
+.dd-body { overflow-y: auto; flex: 1; padding-right: 2px; }
+.dd-sec { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin: 12px 0 6px; }
+.dd-item {
+  display: flex; align-items: center; gap: .5rem; width: 100%;
+  border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+  background: var(--card); padding: 7px 9px; margin-bottom: 6px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; color: var(--ink); text-align: left;
+}
+.dd-item:hover { background: var(--brand-50); border-color: var(--brand-200); }
+.dd-item .dd-kinds { margin-left: auto; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.dd-item .dd-plus { color: var(--brand-ink); font-weight: 700; font-size: 14px; }
+
+/* ---------- 卡片设置浮层 ---------- */
+.dash-pop {
+  position: fixed; z-index: 70; width: 260px; background: var(--card);
+  border: 1px solid var(--card-border); border-radius: var(--radius);
+  box-shadow: var(--shadow-md); padding: 12px;
+}
+.dp-head { display: flex; align-items: center; margin-bottom: 10px; }
+.dp-head b { font-size: 12.5px; }
+.dp-head .t { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; }
+.dp-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 9px; font-size: 12px; }
+.dp-row > label { color: var(--muted); white-space: nowrap; }
+.dp-select { flex: 1; min-width: 0; font-family: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--card-border); border-radius: 5px; background: var(--field-bg); color: var(--ink); }
+.dp-seg { display: flex; border: 1px solid var(--card-border); border-radius: 5px; overflow: hidden; }
+.dp-seg button {
+  border: 0; border-right: 1px solid var(--card-border); background: var(--card);
+  color: var(--muted); font-family: inherit; font-size: 11.5px; padding: 3px 8px; cursor: pointer; white-space: nowrap;
+}
+.dp-seg button:last-child { border-right: 0; }
+.dp-seg button.on { background: var(--brand-50); color: var(--brand-ink); font-weight: 700; }
+.dp-seg button:disabled { opacity: .35; cursor: not-allowed; }
+.dp-foot { margin-top: 4px; display: flex; }
+.dp-foot .btn { font-size: 12px; padding: 5px 10px; }
+
+/* 遮罩：只在抽屉/浮层打开时出现，点击关闭 */
+.dash-scrim { position: fixed; inset: 0; background: rgb(16 24 40 / .28); z-index: 55; }
+
+/* ---------- 移动端：只读 ---------- */
+@media (max-width: 780px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .dash-card { grid-column: 1 / -1 !important; }
+  .drag-handle, .card-tools, #btnEdit, .dash-editbar { display: none !important; }
+  .dash-switch { width: 100%; }
+  .vs-select { flex: 1; max-width: none; }
+  .chart-box { height: auto !important; min-height: 200px; }
+  .chart-box canvas { height: 200px !important; }
+  .dash-drawer { width: 100%; }
+  .dash-list .bar { width: 34px; }
+}
+
+/* 打印：卡片不跨页断开 */
+@media print {
+  .dash-switch, .dash-editbar, .dash-drawer, .dash-pop, .dash-scrim { display: none !important; }
+  .dash-card { break-inside: avoid; outline: 0 !important; }
+}

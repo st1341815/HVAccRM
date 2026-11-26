@@ -64,6 +64,16 @@
   --sidebar-hover: rgba(255, 255, 255, .07);
   --sidebar-active: rgba(255, 255, 255, .12);
 
+  /* 图表色板（首页看板用）：6 色，彼此在灰度上也拉得开，
+     深色同位体在 html[data-theme="dark"] 里提亮 —— JS 只读变量名，不认色值 */
+  --ch-1: #2563eb;                   /* 蓝：主口径 */
+  --ch-2: #14a3a3;                   /* 青 */
+  --ch-3: #e08a1e;                   /* 琥珀 */
+  --ch-4: #7c5cf0;                   /* 紫 */
+  --ch-5: #d9605a;                   /* 红 */
+  --ch-6: #5b8c3e;                   /* 绿 */
+  --ch-grid: #eef2f8;                /* 图表网格线（装饰级，比 --line 更淡） */
+
   /* 交互 */
   --row-hover: #ecf2fb;              /* 表格行悬浮（对卡片 1.13） */
 
@@ -122,6 +132,14 @@ html[data-theme="dark"] {
   --sidebar-fg-muted: #7f8fa4;
   --sidebar-hover: rgba(255, 255, 255, .07);
   --sidebar-active: rgba(255, 255, 255, .12);
+
+  --ch-1: #5b8cf5;
+  --ch-2: #38bfb8;
+  --ch-3: #e8a83f;
+  --ch-4: #9b82f7;
+  --ch-5: #e87a74;
+  --ch-6: #7fb35c;
+  --ch-grid: #26303d;
 
   --row-hover: #212f42;              /* 对卡片 1.24，深色下要比亮色更明显才找得到行 */
 

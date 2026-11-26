@@ -667,6 +667,41 @@ class ContractTemplate(Base):
     updated_at = Column(String, default=now_iso, onupdate=now_iso)
 
 
+# ------------------------------------------------------------ 看板方案（v1.16.0）
+class DashboardView(Base):
+    """首页看板的布局方案。**一律个人私有**（user_id 非空，无共享方案）。
+
+    为什么单独建表而不塞 app_settings：方案要能列出来、改名、删、每人多个，
+    key-value 表存不了这种结构；而且布局是高频读写的小 JSON，和设置的生命周期不同。
+
+    layout_json 结构（v=2，12 栅格）：
+        {"v":2,"cols":12,"items":[{"id","metric","kind","span","h","opts"}]}
+    带版本号是为了将来改栅格（12→24）时按版本迁移，而不是猜着兼容。
+    """
+
+    __tablename__ = "dashboard_views"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_dashboard_view_name"),
+        # 每人至多一个默认方案：部分唯一索引（SQLite 支持 WHERE 子句）
+        Index(
+            "uq_dashboard_view_default",
+            "user_id",
+            unique=True,
+            sqlite_where=text("is_default = 1"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    layout_json = Column(Text, nullable=False)
+    is_default = Column(Integer, default=0)
+    created_at = Column(String, nullable=False, default=now_iso)
+    updated_at = Column(String, nullable=False, default=now_iso, onupdate=now_iso)
+
+    user = relationship("User")
+
+
 # 标准 9 个施工工序（文档 6.5）
 DEFAULT_STAGES = [
     ("上门勘测", 1, 1, 1, "勘测记录 + 现场照"),
