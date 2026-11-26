@@ -1058,13 +1058,6 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 .doc-note { color: #444; font-size: 9.5pt; }
 .doc-upper { margin: 0 0 .7rem; }
 
-/* 文末「业务员」落款（v1.15.3）：原来签字栏的位置，一行小字，右侧留白不抢正文 */
-.doc-foot-info {
-  margin-top: 1.1rem;
-  font-size: 9.5pt;
-  color: #333;
-}
-
 /* 签字区：两块并排，留出真实手写的高度 */
 .doc-sign {
   display: grid;

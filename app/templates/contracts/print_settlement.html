@@ -44,6 +44,10 @@
     <div><span class="lbl">结算日期：</span>{{ contract.settled_at or '未标记' }}</div>
     <div><span class="lbl">产品类型：</span>{{ contract.product_type or '-' }}</div>
     <div><span class="lbl">结算状态：</span>{{ '已结算' if contract.is_settled else '未结算' }}</div>
+    {# v1.15.4：业务员从文末挪回抬头，紧跟在「结算状态」后面 —— 两列刚好填满第 4 行，
+       和第 3 行右列的「产品类型」上下对齐。原来单独放在文末，纸下方孤零零一行，
+       看着像漏排的脚注。 #}
+    <div><span class="lbl">业务员：</span>{{ sales_name or '-' }}</div>
   </div>
 
   <h2>一、结算金额</h2>
@@ -82,11 +86,7 @@
 
   {# v1.15.0：去掉文末甲乙方签字 / 盖章栏（用户要求，结算单不再走线下签字流程）。
      打印时间、打印人与次数已上移到抬头下方，作为唯一的留痕信息。
-     v1.15.3：抬头里「乙方（承包方）」去掉；业务员（= 录入人）落到文末，
-     正好顶替原来签字栏的位置——这单是谁经办的，纸面上一眼能看到。 #}
-  <div class="doc-foot-info">
-    <span class="lbl">业务员：</span>{{ sales_name or '-' }}
-  </div>
+     v1.15.4：业务员改放抬头「结算状态」之后，不再单独落在文末。 #}
 </div>
 
 <script>

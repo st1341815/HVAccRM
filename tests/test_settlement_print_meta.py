@@ -153,12 +153,26 @@ def test_no_contractor_line_in_header(db, admin):
     assert "乙方" not in html, "结算单全文不该再出现「乙方」"
 
 
-def test_sales_name_printed_at_footer(db, admin):
-    """文末落款「业务员」= 录入人（合同 created_by）。"""
+def test_sales_name_in_header_after_settle_status(db, admin):
+    """业务员在抬头信息区、紧跟「结算状态」之后，= 录入人（合同 created_by）。
+
+    v1.15.3 先放在文末（顶替签字栏位置），v1.15.4 用户要求挪回抬头：
+    两列 grid 刚好填满第 4 行，和第 3 行右列的「产品类型」上下对齐。
+    """
     ctr = _settled_contract(db, admin, no="HT-PRINT-5")
     html = _print(db, admin, ctr.id).body.decode()
+
+    parties = re.search(r'<div class="doc-parties">(.*?)</div>\s*<h2', html, re.S)
+    assert parties, "找不到抬头信息区（doc-parties）"
+    block = parties.group(1)
+    assert "结算状态：" in block and "业务员：" in block, "业务员应放在抬头信息区里"
+    assert block.index("结算状态：") < block.index("业务员："), (
+        "业务员要排在「结算状态」之后，两列才能对齐成第 4 行"
+    )
+    assert 'class="doc-foot-info"' not in html, "文末不该再留独立的落款块"
+
     m = re.search(r'<span class="lbl">业务员：</span>([^<]*)', html)
-    assert m, "文末没有「业务员」这一行"
+    assert m, "抬头里没有「业务员」这一行"
     assert m.group(1).strip() == admin.display_name, (
         f"业务员应取录入人 {admin.display_name}，实际 {m.group(1).strip()!r}"
     )
