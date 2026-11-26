@@ -120,3 +120,32 @@ def test_manifest_colors_match_theme():
     manifest = (ROOT / "app" / "static" / "manifest.webmanifest").read_text()
     assert "#efebe3" not in manifest, "manifest 里还留着旧配色 #efebe3（PWA 启动屏会是旧暖灰）"
     assert "#353a41" not in manifest, "manifest 里还留着旧侧栏色 #353a41"
+
+
+def test_theme_toggle_sits_under_settings_in_nav():
+    """v1.15.8：明暗切换从侧栏底部搬进导航区，紧排在「系统」下方。
+
+    位置本身就是需求（用户要求「调整到侧栏系统下方」），所以直接对 DOM 顺序断言，
+    不做像素级检查。三个要点：
+    1. 按钮在 `<nav>` 里面，不再是 `.me` 底部那块；
+    2. 排在有权限渲染出的「系统」之后 —— 若哪天菜单顺序变了，这里会先报；
+    3. 三个图标 + 三份文字常驻 DOM（靠脚本只显示一个），别退回 `textContent = ...`
+       的写法：那会把图标一起冲掉，折叠态就只剩一个空壳。
+    """
+    html = LAYOUT.read_text()
+    nav = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+    assert 'id="themeToggle"' in nav, "明暗切换按钮应在侧栏导航区（<nav>）内"
+    assert nav.index('id="themeToggle"') > nav.index(">系统</a>"), (
+        "明暗切换按钮应排在「系统」之后"
+    )
+
+    me = html.split('class="me"', 1)[1].split("</aside>", 1)[0]
+    assert "themeToggle" not in me, "旧的侧栏底部按钮还在？两处 id 重复会让脚本只认第一个"
+
+    btn = nav.split('id="themeToggle"', 1)[1].split("</button>", 1)[0]
+    for mode in ("auto", "light", "dark"):
+        assert f'data-theme-icon="{mode}"' in btn, f"缺少 {mode} 模式的图标"
+        assert f'data-theme-label="{mode}"' in btn, f"缺少 {mode} 模式的文字"
+    assert "textContent = LABEL" not in html, (
+        "别再用 textContent 覆盖按钮内容 —— 图标会一起没掉"
+    )

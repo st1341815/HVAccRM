@@ -187,22 +187,20 @@ button.linklike {
 }
 button.linklike:hover { background: var(--sidebar-hover); color: #fff; }
 .sidebar .me-links form { margin: 0; display: contents; }
-/* 主题切换：侧栏底部独立一行，撑满宽度。
-   放 .me-links 里会跟「账户 / 退出」挤成两行（232px 侧栏扣掉内边距只剩 205px）。 */
-.theme-toggle {
-  width: 100%; margin-top: .5rem; padding: .38rem .6rem;
-  font-size: .82rem; color: var(--sidebar-fg-muted); text-align: left;
-  border: 1px solid rgba(255, 255, 255, .10);
+/* 明暗切换（v1.15.8 起）：从侧栏底部搬进导航区，排在「系统」下方，
+   长得跟其它菜单项一致——同宽同高、同样的图标列宽和 hover 反馈。
+   用 button 而不是 a，因为它不跳转；font: inherit 抹掉浏览器按钮默认字体。 */
+.sidebar nav button.nav-theme {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .55rem .7rem; border: 0; border-radius: var(--radius-sm);
+  background: none; font: inherit; font-size: .95rem; text-align: left;
+  color: var(--sidebar-fg); cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
 }
-.theme-toggle:hover { color: #fff; }
-/* 主题切换：侧栏底部独立一行，撑满宽度。
-   放 .me-links 里会跟「账户 / 退出」挤成两行（232px 侧栏扣掉内边距只剩 205px）。 */
-.theme-toggle {
-  width: 100%; margin-top: .5rem; padding: .38rem .6rem;
-  font-size: .82rem; color: var(--sidebar-fg-muted); text-align: left;
-  border: 1px solid rgba(255, 255, 255, .10);
-}
-.theme-toggle:hover { color: #fff; }
+.sidebar nav button.nav-theme:hover { background: var(--sidebar-hover); color: #fff; }
+.sidebar nav button.nav-theme .ico { width: 1.3rem; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.sidebar nav button.nav-theme .ico svg { width: 1.1rem; height: 1.1rem; display: block; }
+.sidebar nav button.nav-theme span:not(.ico) { white-space: nowrap; }
 .sidebar-toggle {
   display: none; position: fixed; top: .7rem; left: .7rem; z-index: 60;
   width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);
@@ -228,6 +226,8 @@ body.sidebar-collapsed .sidebar .brand { justify-content: center; }
 body.sidebar-collapsed .sidebar .brand span { display: none; }
 body.sidebar-collapsed .sidebar .collapse-btn { margin-left: 0; transform: scaleX(-1); }
 body.sidebar-collapsed .sidebar nav a { justify-content: center; gap: 0; padding: .58rem 0; font-size: 0; }
+/* 明暗切换也是导航项，折叠时同样只留图标（font-size:0 会连 span 里的文字一起收掉） */
+body.sidebar-collapsed .sidebar nav button.nav-theme { justify-content: center; gap: 0; padding: .58rem 0; font-size: 0; }
 body.sidebar-collapsed .sidebar .me { display: none; }
 
 .wrap { flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto; padding: 1.2rem 1.5rem; }
@@ -606,6 +606,7 @@ legend { font-size: .82rem; color: var(--muted); padding: 0 .3rem; }
   body.sidebar-collapsed .sidebar .brand { justify-content: flex-start; }
   body.sidebar-collapsed .sidebar .brand span { display: inline; }
   body.sidebar-collapsed .sidebar nav a { justify-content: flex-start; gap: .6rem; padding: .58rem .7rem; font-size: .95rem; }
+  body.sidebar-collapsed .sidebar nav button.nav-theme { justify-content: flex-start; gap: .6rem; padding: .58rem .7rem; font-size: .95rem; }
   body.sidebar-collapsed .sidebar .me { display: block; }
   .wrap { padding-top: 3.4rem; }
 

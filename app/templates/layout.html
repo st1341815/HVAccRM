@@ -14,10 +14,23 @@
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
       var KEY = 'hvaccrm-theme';
       var ORDER = ['auto', 'light', 'dark'];
-      var LABEL = { auto: '◐ 跟随系统', light: '☀ 亮色', dark: '☾ 深色' };
       var pref = 'auto';
       try { pref = localStorage.getItem(KEY) || 'auto'; } catch (e) {}
       if (ORDER.indexOf(pref) < 0) pref = 'auto';
+
+      // 按钮在侧栏导航里（v1.15.8 起）：文字与图标都是三份常驻 DOM，
+      // 按当前模式只亮一个。head 里执行时导航还没解析出来，找不到就跳过，
+      // DOMContentLoaded 时再补一次。
+      function paint(p) {
+        var btn = document.getElementById('themeToggle');
+        if (!btn) return;
+        var lbl = btn.querySelector('[data-theme-label="' + p + '"]');
+        var all = btn.querySelectorAll('[data-theme-icon], [data-theme-label]');
+        for (var i = 0; i < all.length; i++) all[i].style.display = 'none';
+        if (lbl) lbl.style.display = '';
+        var icon = btn.querySelector('[data-theme-icon="' + p + '"]');
+        if (icon) icon.style.display = 'block';
+      }
 
       function isDark(p) { return p === 'dark' || (p === 'auto' && mq.matches); }
       function apply(p, persist) {
@@ -26,8 +39,7 @@
         // 手机状态栏 / PWA 标题栏跟着走，不然深色页面顶着一条亮色标题栏
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', isDark(p) ? '#0e141c' : '#f5f7fa');
-        var btn = document.getElementById('themeToggle');
-        if (btn) btn.textContent = LABEL[p];
+        paint(p);
         if (persist) { try { localStorage.setItem(KEY, p); } catch (e) {} }
       }
 
@@ -36,7 +48,7 @@
       document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('themeToggle');
         if (btn) {
-          btn.textContent = LABEL[pref];
+          paint(pref);
           btn.addEventListener('click', function () {
             pref = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
             apply(pref, true);
@@ -102,6 +114,20 @@
       {% if can('report:view') %}<a href="/reports" class="{{ 'active' if current_path.startswith('/reports') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><rect x="6" y="12" width="3.2" height="5" rx="0.6"/><rect x="10.4" y="8" width="3.2" height="9" rx="0.6"/><rect x="14.8" y="4" width="3.2" height="13" rx="0.6"/></svg></span>报表</a>{% endif %}
       {% if can('admin:user') %}<a href="/admin/users" class="{{ 'active' if current_path.startswith('/admin/users') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.8-3.4 3.3-5 6.5-5s5.7 1.6 6.5 5"/></svg></span>用户</a>{% endif %}
       {% if can('admin:setting') %}<a href="/admin" class="{{ 'active' if current_path == '/admin' or current_path.startswith('/admin/') and not current_path.startswith('/admin/users') else '' }}"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span>系统</a>{% endif %}
+      {# v1.15.8 明暗切换从侧栏底部移到这里，紧排在「系统」下方；
+         无 admin:setting 权限时「系统」不渲染，它就落到最后一项菜单下方。
+         三个图标常驻 DOM，由首屏脚本按当前模式只显示一个（不用 hidden，
+         因为 .ico svg 的 display:block 会盖掉 [hidden]）。 #}
+      <button type="button" class="nav-theme" id="themeToggle" title="切换显示主题：跟随系统 / 亮色 / 深色">
+        <span class="ico">
+          <svg data-theme-icon="auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 3.6a8.4 8.4 0 0 1 0 16.8z" fill="currentColor" stroke="none"/></svg>
+          <svg data-theme-icon="light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+          <svg data-theme-icon="dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M20.4 14.6A8.6 8.6 0 0 1 9.4 3.6a8.6 8.6 0 1 0 11 11z"/></svg>
+        </span>
+        <span data-theme-label="auto">跟随系统</span>
+        <span data-theme-label="light" style="display:none">亮色</span>
+        <span data-theme-label="dark" style="display:none">深色</span>
+      </button>
     </nav>
     <div class="me">
       <div class="who">{{ user.display_name }}<div class="role">{{ role_label }}</div></div>
@@ -109,7 +135,6 @@
         <a href="/account">账户</a>
         <form method="post" action="/logout" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="linklike">退出</button></form>
       </div>
-      <button type="button" class="linklike theme-toggle" id="themeToggle" title="切换显示主题：跟随系统 / 亮色 / 深色">◐ 跟随系统</button>
     </div>
   </aside>
   <button type="button" class="sidebar-toggle" aria-label="菜单" onclick="document.body.classList.toggle('nav-open')">☰</button>
