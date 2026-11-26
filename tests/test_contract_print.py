@@ -157,3 +157,24 @@ def test_print_page_is_a4_with_tight_margins():
         "页边距应为 7mm / 6mm（v1.15.5 回退值；改它会牵动全部打印版式）"
     )
     assert "html { font-size: 82%; }" in block
+
+
+# ---------------------------------------------------------------- v1.15.6
+def test_doc_pages_do_not_auto_print():
+    """电子合同 / 结算单打开后**不许**自动弹系统打印面板，必须手动点按钮。
+
+    用户反馈：点「电子合同」「结算单」一进去就自动调打印，只是想核对数据的时候
+    还得先按 Esc 关掉，很烦。所以两个页面统一改成手动——工具条上那个
+    「打印 / 存 PDF」按钮在就行。
+    """
+    for name in ("print_contract.html", "print_settlement.html"):
+        html = (ROOT / "app" / "templates" / "contracts" / name).read_text()
+        assert "setTimeout(function () { window.print(); }" not in html, (
+            f"{name} 又在页面加载后自动打印了"
+        )
+        assert "window.addEventListener('load'" not in html, (
+            f"{name} 不该再有 load 事件里触发打印的逻辑"
+        )
+        assert 'onclick="window.print()"' in html, (
+            f"{name} 的工具条「打印 / 存 PDF」按钮不能跟着一起删掉"
+        )

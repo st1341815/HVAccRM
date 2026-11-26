@@ -38,12 +38,8 @@
   {{ body|safe }}
 </div>
 
-<script>
-  // 从「打印 → 电子合同」点进来就是要打，等字体/布局稳定后直接弹系统打印面板。
-  // 打完按 Esc 即可回到文档，工具条上还有「打印 / 存 PDF」可以再来一次。
-  window.addEventListener('load', function () {
-    if (!location.search) setTimeout(function () { window.print(); }, 400);
-  });
-</script>
+{# v1.15.6：去掉「加载即自动打印」。以前页面一打开就弹系统打印面板（等 400ms 让字体
+   稳定），用户反馈很烦——尤其只是点进来核对模板 / 数据的时候，得先按 Esc 关掉。
+   现在统一手动：点工具条上的「打印 / 存 PDF」再打。 #}
 </body>
 </html>
