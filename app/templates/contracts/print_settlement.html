@@ -40,7 +40,6 @@
     {# v1.15.0：原来取 customer.address，但地址是选填、房号才必填（线上客户地址全空），
        改成和电子合同同一个口径：市+区+楼盘+楼栋+单元+房号。 #}
     <div><span class="lbl">工程地址：</span>{{ site_address or '-' }}</div>
-    <div><span class="lbl">乙方（承包方）：</span>{{ company_name or '-' }}</div>
     <div><span class="lbl">签订日期：</span>{{ contract.sign_date or '-' }}</div>
     <div><span class="lbl">结算日期：</span>{{ contract.settled_at or '未标记' }}</div>
     <div><span class="lbl">产品类型：</span>{{ contract.product_type or '-' }}</div>
@@ -82,7 +81,12 @@
   <p>4. 如有异议，请于收到本结算单之日起七日内提出，逾期视为认可。</p>
 
   {# v1.15.0：去掉文末甲乙方签字 / 盖章栏（用户要求，结算单不再走线下签字流程）。
-     打印时间、打印人与次数已上移到抬头下方，作为唯一的留痕信息。 #}
+     打印时间、打印人与次数已上移到抬头下方，作为唯一的留痕信息。
+     v1.15.3：抬头里「乙方（承包方）」去掉；业务员（= 录入人）落到文末，
+     正好顶替原来签字栏的位置——这单是谁经办的，纸面上一眼能看到。 #}
+  <div class="doc-foot-info">
+    <span class="lbl">业务员：</span>{{ sales_name or '-' }}
+  </div>
 </div>
 
 <script>

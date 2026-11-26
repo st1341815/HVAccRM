@@ -819,6 +819,13 @@ def print_settlement_doc(
     # 和电子合同一样，优先拼「市+区+楼盘+楼栋+单元+房号」，拼不出来才退回手填地址。
     site = doc_svc.site_address(contract.customer) if contract.customer else ""
 
+    # 业务员（v1.15.3）：取「录入人」= 合同的 created_by；没填则退到客户负责人。
+    # 与电子合同里 {{业务员}} 完全同口径（contract_docs.build_context），
+    # 免得同一单在合同和结算单上写出两个人。
+    sales_name = users.get(contract.created_by or 0, "") or users.get(
+        getattr(contract.customer, "owner_id", 0) or 0, ""
+    )
+
     # 打印留痕（v1.15.0）：每生成一次结算单就记一条 audit_log —— 谁、什么时候、
     # 第几次、是客户版还是内部版。序号印在纸面上，纸和系统能对上。
     # 不另建表：查询、导出、清理都跟审计走同一条路。
@@ -851,6 +858,7 @@ def print_settlement_doc(
         hide_cost=bool(hide_cost),
         can_cost=can_cost,
         site_address=site,
+        sales_name=sales_name,
         print_seq=seq,
         print_time=printed_at,
         print_user=user.display_name or user.username,

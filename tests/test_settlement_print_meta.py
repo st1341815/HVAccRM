@@ -11,6 +11,8 @@
 """
 from __future__ import annotations
 
+import re
+
 from starlette.requests import Request
 
 from app.models import (
@@ -139,3 +141,39 @@ def test_print_seq_is_per_contract(db, admin):
     _print(db, admin, a.id)
     html_b = _print(db, admin, b.id).body.decode()
     assert "第 1 次打印" in html_b, "另一份合同的次数应从头算"
+
+
+# ---------------------------------------------------------------- v1.15.3
+def test_no_contractor_line_in_header(db, admin):
+    """抬头里不再有「乙方（承包方）」——结算单是给客户看的财务凭证，
+    承包主体是谁对这张单子没有意义，占一行还挤掉了别的信息。"""
+    ctr = _settled_contract(db, admin, no="HT-PRINT-4")
+    html = _print(db, admin, ctr.id).body.decode()
+    assert "乙方（承包方）" not in html, "抬头里的乙方那行应已删除"
+    assert "乙方" not in html, "结算单全文不该再出现「乙方」"
+
+
+def test_sales_name_printed_at_footer(db, admin):
+    """文末落款「业务员」= 录入人（合同 created_by）。"""
+    ctr = _settled_contract(db, admin, no="HT-PRINT-5")
+    html = _print(db, admin, ctr.id).body.decode()
+    m = re.search(r'<span class="lbl">业务员：</span>([^<]*)', html)
+    assert m, "文末没有「业务员」这一行"
+    assert m.group(1).strip() == admin.display_name, (
+        f"业务员应取录入人 {admin.display_name}，实际 {m.group(1).strip()!r}"
+    )
+
+
+def test_sales_name_falls_back_to_customer_owner(db, admin, sales):
+    """合同没记 created_by 的老数据，退回客户负责人——别印成一根横杠。
+
+    口径必须和电子合同的 {{业务员}} 一致（contract_docs.build_context），
+    否则同一单在合同和结算单上会写出两个人。
+    """
+    ctr = _settled_contract(db, admin, no="HT-PRINT-6")
+    ctr.created_by = None
+    db.get(Customer, ctr.customer_id).owner_id = sales.id
+    db.flush()
+    html = _print(db, admin, ctr.id).body.decode()
+    m = re.search(r'<span class="lbl">业务员：</span>([^<]*)', html)
+    assert m and m.group(1).strip() == sales.display_name, "没填录入人时应回落客户负责人"
