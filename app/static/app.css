@@ -1215,6 +1215,16 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   }
   .doc-page h1 { font-size: 15pt; }
   .doc-page h2 { font-size: 10.5pt; margin: .8rem 0 .3rem; }
+
+  /* ⚠️ 打印时页面宽度 ≈ 748px（A4 去掉 @page 边距），比 `max-width: 760px`
+     那个断点还窄，于是会命中「手机上单列」的规则：屏幕上左右并排的
+     「甲方 / 乙方」，纸上变成上下两块堆叠（v1.15.1 用户实测 PDF：甲方一块
+     乙方一块，看着像两家不相干的人）。纸面宽度是固定的，这里显式把桌面
+     列数写回来，让打印结果和预览一致。 */
+  .doc-parties { grid-template-columns: 1fr 1fr; }
+  .doc-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .doc-sign { grid-template-columns: 1fr 1fr; }
+
   .doc-parties,
   .doc-meta { font-size: 9pt; }
   .doc-table { font-size: 8.5pt; margin: .2rem 0 .5rem; }
