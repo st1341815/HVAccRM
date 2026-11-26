@@ -187,6 +187,60 @@ def list_contracts(
     )
 
 
+@router.get("/{contract_id}/settle")
+def settle_confirm(
+    request: Request,
+    contract_id: int,
+    back: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(require("settlement:edit")),
+):
+    """结算前的确认页（v1.15.10）。
+
+    原来是 `onsubmit="return confirm(...)"` —— 浏览器原生弹窗，长得跟系统没关系，
+    也没有合同上下文。改成系统内页面，和「未结算点结算单」看到的拦截页同一套观感。
+
+    这页只负责把话说清楚，真正的校验仍在 POST 里（这里也跑一遍，好在页面上
+    直接告诉用户「还有 3 道工序没完成」而不是点完才报错）。
+    """
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    if settlement_svc.is_settled(contract):
+        return _settle_redirect(back, "该合同已是结算状态", "err")
+    ok, why = settlement_svc.can_settle(db, contract)
+    return render(
+        request,
+        "contracts/settle_confirm.html",
+        contract=contract,
+        settled=False,
+        ok=ok,
+        reason=why.rstrip("。"),
+        back=_back_target(back, f"/contracts/{contract.id}"),
+    )
+
+
+@router.get("/{contract_id}/unsettle")
+def unsettle_confirm(
+    request: Request,
+    contract_id: int,
+    back: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(require("settlement:edit")),
+):
+    """取消结算的确认页，与 settle_confirm 共用模板。"""
+    contract = get_or_404(db, Contract, contract_id, "合同")
+    if not settlement_svc.is_settled(contract):
+        return _settle_redirect(back, "该合同不是结算状态", "err")
+    return render(
+        request,
+        "contracts/settle_confirm.html",
+        contract=contract,
+        settled=True,
+        ok=True,
+        reason="",
+        back=_back_target(back, f"/contracts/{contract.id}"),
+    )
+
+
 @router.post("/{contract_id}/settle")
 def settle_contract(
     request: Request,

@@ -393,7 +393,9 @@ button.tiny, .btn.tiny { padding: .15rem .4rem; font-size: .75rem; }
 .btn.ghost { background: var(--brand-50); color: var(--brand-dark); }
 /* 合同台账「结算」列：badge 与开关按钮同一行，窄屏不折行 */
 .settle-cell { white-space: nowrap; }
-.settle-cell form.inline { margin-left: .35rem; }
+/* v1.15.10：结算入口从 POST 表单改成「进确认页」的链接，间距规则跟着覆盖到 a.btn */
+.settle-cell form.inline,
+.settle-cell a.btn { margin-left: .35rem; }
 /* 合同台账操作列：详情 / 电子合同 / 结算单 一行排开，窄屏也不把「电子合同」挤断 */
 .row-actions { white-space: nowrap; }
 .row-actions > * + * { margin-left: .3rem; }

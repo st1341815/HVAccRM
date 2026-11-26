@@ -19,12 +19,10 @@
     <a class="btn ghost" href="/customers/{{ contract.customer_id }}?tab=finance">客户：{{ contract.customer.name if contract.customer else contract.customer_id }}</a>
     <a class="btn ghost" href="/contracts">合同列表</a>
     {% if can_settle %}
-    <form method="post" action="/contracts/{{ contract.id }}/{{ 'unsettle' if locked else 'settle' }}" class="inline"
-          {% if locked %}onsubmit="return confirm('确认取消该合同的结算？取消后可继续录入收款、费用与施工。');"{% else %}onsubmit="return confirm('确认把该合同标记为结算？标记后其收款、费用、施工新增将被冻结。');"{% endif %}>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="back" value="/contracts/{{ contract.id }}">
-      <button class="btn{{ ' ghost' if locked else '' }}">{{ '取消结算' if locked else '标记结算' }}</button>
-    </form>
+    {# v1.15.10：结算 / 取消结算改走系统内确认页，不再用浏览器 confirm()。
+       链接带上 back，确认完回到合同页。 #}
+    <a class="btn{{ ' ghost' if locked else '' }}"
+       href="/contracts/{{ contract.id }}/{{ 'unsettle' if locked else 'settle' }}?back={{ ('/contracts/' ~ contract.id)|urlencode }}">{{ '取消结算' if locked else '标记结算' }}</a>
     {% endif %}
     {% if can_delete_contract and not locked %}
     <form method="post" action="/contracts/{{ contract.id }}/delete" class="inline" onsubmit="return confirm('确定删除合同 {{ contract.no or ('#' ~ contract.id) }}？\n将同时删除其全部收款、成本、施工工序、案例与照片，且不可恢复。');">

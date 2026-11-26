@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% block title %}{{ '取消结算' if settled else '标记结算' }} · 合同 {{ contract.no or contract.id }}{% endblock %}
+{% block content %}
+{# v1.15.10：结算 / 取消结算原来用浏览器原生 confirm()，弹窗长得跟系统没关系
+   （纯系统字体、没有合同上下文、手机上还容易被当成页面卡住）。改成系统内的确认页，
+   和「未结算点结算单」看到的 print_blocked 页是同一套观感。
+   确认后仍走原来的 POST，POST 里的校验一条没少——这页只是把话说清楚。 #}
+<div class="page-head">
+  <h1>{{ '取消结算' if settled else '标记结算' }}</h1>
+</div>
+
+<section class="card">
+  <p>
+    合同 <strong>{{ contract.no or ('#' ~ contract.id) }}</strong>
+    {% if contract.customer %}（{{ contract.customer.name }}）{% endif %}
+    当前状态是
+    <span class="badge{{ ' s-done' if settled else '' }}">{{ '已结算' if settled else '未结算' }}</span>
+  </p>
+
+  {% if settled %}
+  <p>取消结算后，该合同的收款、费用、施工工序与增项<strong>恢复可录入</strong>，结算日期一并清空。</p>
+  <p class="muted small">已经打印出去的结算单不会因此失效——纸面上有打印次数与时间，重打会拿到新的序号。</p>
+  {% else %}
+  <p>标记结算后，该合同的收款、费用、施工工序与增项新增将<strong>冻结</strong>，只能查看与打印结算单。</p>
+  <p class="muted small">结算单是财务关账凭证，只有标记结算之后才能打印。金额若还会变（增项、退款、追加收款），先别标记。</p>
+  {% endif %}
+
+  {% if not ok %}
+  <p class="red">{{ reason }}</p>
+  {% endif %}
+
+  <div class="actions" style="margin-top:1rem">
+    {% if ok %}
+    <form method="post" action="/contracts/{{ contract.id }}/{{ 'unsettle' if settled else 'settle' }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <button class="btn{{ ' danger' if settled else '' }}">{{ '确认取消结算' if settled else '确认标记结算' }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ back }}">← {{ '返回' if not ok else '取消' }}</a>
+  </div>
+</section>
+{% endblock %}

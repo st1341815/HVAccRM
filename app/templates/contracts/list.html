@@ -53,12 +53,10 @@
         {% if show_settle %}
         <td data-label="结算" class="settle-cell">
           <span class="badge {{ 's-done' if c.is_settled else '' }}">{{ '已结算' if c.is_settled else '未结算' }}</span>
-          <form method="post" action="/contracts/{{ c.id }}/{{ 'unsettle' if c.is_settled else 'settle' }}" class="inline"
-                {% if c.is_settled %}onsubmit="return confirm('确认取消该合同的结算？取消后可继续录入收款、费用与施工。');"{% else %}onsubmit="return confirm('确认把该合同标记为结算？标记后其收款、费用、施工新增将被冻结。');"{% endif %}>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="back" value="{{ ('/contracts?' ~ keep_qs) if keep_qs else '/contracts' }}">
-            <button class="btn tiny{{ ' ghost' if c.is_settled else '' }}">{{ '取消结算' if c.is_settled else '标记结算' }}</button>
-          </form>
+          {# v1.15.10：改走系统内确认页（原来是浏览器 confirm）。back 带上当前筛选，
+             确认完回列表还是原来的排序与页码。 #}
+          <a class="btn tiny{{ ' ghost' if c.is_settled else '' }}"
+             href="/contracts/{{ c.id }}/{{ 'unsettle' if c.is_settled else 'settle' }}?back={{ (('/contracts?' ~ keep_qs) if keep_qs else '/contracts')|urlencode }}">{{ '取消结算' if c.is_settled else '标记结算' }}</a>
         </td>
         {% endif %}
         <td>{{ c.status }}</td>
