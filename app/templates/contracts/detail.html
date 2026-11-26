@@ -241,8 +241,9 @@
     {% for ph in contract_photos %}
       <figure>
         <a class="photo-link" href="/photos/{{ ph.id }}" target="_blank"><img src="/photos/{{ ph.id }}/thumb" alt="纸质合同"></a>
+        {# v1.15.7 按用户要求不再显示图片原始文件名，只留上传时间与删除入口 #}
         <figcaption class="small muted">
-          {{ ph.orig_name or '' }}<br>{{ ph.created_at[:16] }}
+          {{ ph.created_at[:16] }}
           {% if can_delete_photo %}
           <form method="post" action="/photos/{{ ph.id }}/delete" class="inline" onsubmit="return confirm('删除这张图片？');">
             <input type="hidden" name="back" value="/contracts/{{ contract.id }}">
