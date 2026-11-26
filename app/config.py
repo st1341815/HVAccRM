@@ -67,7 +67,10 @@ class Settings(BaseSettings):
     login_lock_seconds: int = 300
     # 可信代理（逗号分隔，支持 CIDR）：只有这些来源的 X-Forwarded-For 才被采信。
     # 默认含 Lucky 所在地址；Lucky 搬家 / 换反代时改这里。
-    trusted_proxies: str = "127.0.0.1,::1,172.16.0.0/12,192.168.1.6"
+    # 默认信任全部私网段（RFC1918 + CGNAT/Tailscale）作为反代来源。
+    # 不再硬编码单台 Lucky 的 IP —— 反代搬家（1.6 → 11.21 → 11.4 …）时无需改配置。
+    # 安全前提：8090 只在内网暴露，公网无法直连伪造 XFF。
+    trusted_proxies: str = "127.0.0.1,::1,10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16"
     write_retry_attempts: int = 3
 
     # 进程内标记：本次启动是否自动生成了 APP_SECRET_KEY（后台页面据此提示）
