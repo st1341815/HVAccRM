@@ -132,8 +132,10 @@ def test_dashboard_year_aggregation_filters_by_sign_year(db, admin, monkeypatch,
     assert ys["cost"] == 20000.0
     # 当年收款按「收款日」归集 → 当年的收款计入
     assert ys["received"] == 10000.0
-    # 利润 = 0 - 20000（负数，是预期）
-    assert ys["profit"] == -20000.0
+    # 利润口径（v1.15.12）：只算「当年签约 **且** 已结算」的合同。
+    # 该合同签在去年、也没标记结算 → 销售额与成本都不进利润 → 0
+    assert ys["settled_count"] == 0
+    assert ys["profit"] == 0.0
 
 
 def test_by_month_aggregates_signing_date(db, admin, monkeypatch, today):

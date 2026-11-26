@@ -92,8 +92,23 @@ def dashboard(
             ),
             2,
         )
+        # 年利润口径：**只认已标记结算的合同**（settled=1 且当年签约），未结算的不计入。
+        # 销售额 / 收款 / 成本三个 KPI 仍是全口径，所以年利润会小于「年销售额 − 年成本」
+        # —— 这是刻意的：钱没关账之前不确认利润，避免看板虚高。
+        settled_ids = {
+            c.id for c in contracts if c.settled and (c.sign_date or "").startswith(year)
+        }
+        settled_sales = round(
+            sum(
+                (c.total_amount or 0) - (c.discount or 0) + change_by_contract.get(c.id, 0)
+                for c in contracts
+                if c.id in settled_ids
+            ),
+            2,
+        )
         year_received = 0.0
         year_cost = 0.0
+        settled_cost = 0.0
         if cids:
             for p in db.scalars(select(Payment).where(Payment.contract_id.in_(cids))).all():
                 if (p.paid_at or "").startswith(year):
@@ -103,11 +118,16 @@ def dashboard(
             ).all():
                 if (cost.spent_at or "").startswith(year):
                     year_cost += cost.amount or 0
+                    if cost.contract_id in settled_ids:
+                        settled_cost += cost.amount or 0
         year_stats = {
             "sales": year_sales,
             "received": round(year_received, 2),
             "cost": round(year_cost, 2),
-            "profit": round(year_sales - year_cost, 2),
+            "settled_count": len(settled_ids),
+            "settled_sales": settled_sales,
+            "settled_cost": round(settled_cost, 2),
+            "profit": round(settled_sales - settled_cost, 2),
         }
 
     # 施工概况：有未完工工序的客户数

@@ -280,6 +280,8 @@ body.sidebar-collapsed .sidebar .me { display: none; }
 .kpi { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: .65rem 1rem .7rem; min-width: 8.5rem; }
 .kpi-num { display: block; font-size: 1.45rem; font-weight: 700; line-height: 1.25; }
 .kpi-label { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+/* 口径补充说明（如「仅已结算 N 份」）：比 label 更小一号，不参与主读数层级 */
+.kpi-note { display: block; font-size: .68rem; color: var(--muted); opacity: .85; margin-top: .05rem; white-space: nowrap; }
 .kpi.alert .kpi-num { color: var(--danger-ink); }
 .kpis.compact .kpi { padding: .35rem .7rem .4rem; min-width: 5.5rem; }
 .kpis.compact .kpi-num { font-size: 1.1rem; }

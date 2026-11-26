@@ -26,6 +26,7 @@
   <div class="kpi {{ 'alert' if year_stats.profit < 0 else '' }}">
     <span class="kpi-num">{{ year_stats.profit|money }}</span>
     <span class="kpi-label">{{ year }} 年利润</span>
+    <span class="kpi-note" title="只统计已标记结算的合同，未结算不计入">仅已结算 {{ year_stats.settled_count }} 份</span>
   </div>
   {% endif %}
   {% if finance %}
