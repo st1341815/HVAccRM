@@ -4,7 +4,7 @@ from __future__ import annotations
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..audit import log_action
@@ -13,6 +13,7 @@ from ..db import commit_retry, get_db
 from ..models import (
     COST_CATEGORIES,
     PRODUCT_OPTIONS,
+    AuditLog,
     Case,
     ChangeOrder,
     Contract,
@@ -813,6 +814,33 @@ def print_settlement_doc(
     costs = list(contract.costs) if with_cost else []
     users = {u.id: u.display_name for u in db.scalars(select(User)).all()}
 
+    # 工程地址（v1.15.0）：模板原来取 `customer.address`，可客户表单里「地址」是选填、
+    # 房号才是必填——线上 11 个客户地址全空，结算单上「工程地址」永远是「-」。
+    # 和电子合同一样，优先拼「市+区+楼盘+楼栋+单元+房号」，拼不出来才退回手填地址。
+    site = doc_svc.site_address(contract.customer) if contract.customer else ""
+
+    # 打印留痕（v1.15.0）：每生成一次结算单就记一条 audit_log —— 谁、什么时候、
+    # 第几次、是客户版还是内部版。序号印在纸面上，纸和系统能对上。
+    # 不另建表：查询、导出、清理都跟审计走同一条路。
+    seq = (db.scalar(
+        select(func.count(AuditLog.id)).where(
+            AuditLog.action == "settlement_print",
+            AuditLog.table_name == "contracts",
+            AuditLog.record_id == contract.id,
+        )
+    ) or 0) + 1
+    printed_at = now_iso()
+    log_action(
+        db,
+        user,
+        "settlement_print",
+        "contracts",
+        contract.id,
+        new={"seq": seq, "with_cost": with_cost, "hide_cost": bool(hide_cost), "at": printed_at},
+        ip=client_ip(request),
+        commit=True,
+    )
+
     return render(
         request,
         "contracts/print_settlement.html",
@@ -822,6 +850,10 @@ def print_settlement_doc(
         with_cost=with_cost,
         hide_cost=bool(hide_cost),
         can_cost=can_cost,
+        site_address=site,
+        print_seq=seq,
+        print_time=printed_at,
+        print_user=user.display_name or user.username,
         company_name=doc_svc.company_info(db).get("doc.company_name", ""),
         total_upper=doc_svc.rmb_upper(summary.total),
         payments_html=doc_svc.payments_table(payments, users),

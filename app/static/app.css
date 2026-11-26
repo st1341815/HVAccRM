@@ -992,6 +992,15 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
 .doc-head { text-align: center; margin-bottom: 1rem; }
 .doc-no { font-size: 9.5pt; color: #555; letter-spacing: .04em; }
 
+/* 打印留痕（v1.15.0）：第几次 / 什么时候 / 谁打的。小字、灰、居中，
+   不抢正文，但纸面上一定有——重打的单子能一眼看出不是原件。 */
+.doc-print-meta {
+  margin-top: .2rem;
+  font-size: 9pt;
+  color: #666;
+  letter-spacing: .02em;
+}
+
 /* 甲乙方 / 工程概况：字段对齐成格子比「一行一段」省一半纸 */
 .doc-parties {
   display: grid;

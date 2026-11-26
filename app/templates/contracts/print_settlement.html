@@ -27,12 +27,19 @@
   <div class="doc-head">
     <h1>工程结算单</h1>
     <div class="doc-no">合同编号：{{ contract.no or ('#' ~ contract.id) }}</div>
+    {# v1.15.0：打印留痕印在纸面上——第几次、什么时候、谁打的。
+       每次生成都会往 audit_log 写一条，纸和系统能对上，重打也留底。 #}
+    <div class="doc-print-meta">
+      第 {{ print_seq }} 次打印　·　{{ print_time }}　·　打印人：{{ print_user }}
+    </div>
   </div>
 
   <div class="doc-parties">
     <div><span class="lbl">甲方（客户）：</span>{{ contract.customer.name if contract.customer else '-' }}</div>
     <div><span class="lbl">联系电话：</span>{{ contract.customer.phone if contract.customer and contract.customer.phone else '-' }}</div>
-    <div><span class="lbl">工程地址：</span>{{ contract.customer.address if contract.customer and contract.customer.address else '-' }}</div>
+    {# v1.15.0：原来取 customer.address，但地址是选填、房号才必填（线上客户地址全空），
+       改成和电子合同同一个口径：市+区+楼盘+楼栋+单元+房号。 #}
+    <div><span class="lbl">工程地址：</span>{{ site_address or '-' }}</div>
     <div><span class="lbl">乙方（承包方）：</span>{{ company_name or '-' }}</div>
     <div><span class="lbl">签订日期：</span>{{ contract.sign_date or '-' }}</div>
     <div><span class="lbl">结算日期：</span>{{ contract.settled_at or '未标记' }}</div>
@@ -71,21 +78,11 @@
   <h2>{{ '五' if with_cost else '四' }}、结算说明</h2>
   <p>1. 本结算单依据合同 {{ contract.no or ('#' ~ contract.id) }} 及其增项（变更单）、收款流水编制。</p>
   <p>2. 应收总额 = 合同额（合同金额 − 优惠）+ 增项合计；未收金额 = 应收总额 − 已收金额。</p>
-  <p>3. 本结算单经双方确认签字后，作为该工程财务结算的最终依据。</p>
+  <p>3. 本结算单经双方确认后，作为该工程财务结算的最终依据。</p>
   <p>4. 如有异议，请于收到本结算单之日起七日内提出，逾期视为认可。</p>
 
-  <div class="doc-sign">
-    <div class="sign-box">
-      <div class="sign-title">甲方（签字 / 盖章）</div>
-      <div class="sign-line">签字：</div>
-      <div class="sign-line">日期：　　　年　　月　　日</div>
-    </div>
-    <div class="sign-box">
-      <div class="sign-title">乙方（签字 / 盖章）</div>
-      <div class="sign-line">签字：</div>
-      <div class="sign-line">日期：　　　年　　月　　日</div>
-    </div>
-  </div>
+  {# v1.15.0：去掉文末甲乙方签字 / 盖章栏（用户要求，结算单不再走线下签字流程）。
+     打印时间、打印人与次数已上移到抬头下方，作为唯一的留痕信息。 #}
 </div>
 
 <script>
