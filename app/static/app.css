@@ -1263,3 +1263,57 @@ td.num.done { color: var(--success-ink); font-weight: 600; }
   .doc-sign { margin-top: 1.2rem; }
   .sign-title { margin-bottom: 1.1rem; }
 }
+
+/* ---------- 权限矩阵（/admin/permissions） ---------- */
+.perm-card { padding: 14px 16px 12px; }
+.perm-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.perm-head-text { flex: 1 1 320px; min-width: 0; }
+.perm-head h2 { margin: 0 0 4px; font-size: 15px; white-space: nowrap; }
+.perm-head p { margin: 0; line-height: 1.45; }
+.perm-badges { white-space: nowrap; }
+
+.perm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.perm-matrix { min-width: 720px; }
+.perm-matrix th,
+.perm-matrix td { vertical-align: top; }
+.perm-col-name { min-width: 300px; }
+.perm-col-role { min-width: 92px; text-align: center; white-space: nowrap; }
+.perm-col-role .pr-label { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.perm-col-role .pr-key { font-size: 10.5px; font-weight: 400; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.perm-col-role .pr-lock { font-size: 10.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.perm-col-role .pr-all {
+  margin-top: 3px; padding: 1px 7px; font-size: 10.5px; line-height: 1.5;
+  border: 1px solid var(--card-border); border-radius: 5px; background: var(--paper-3);
+  color: var(--muted); cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.perm-col-role .pr-all:hover { border-color: var(--brand-200); background: var(--brand-50); color: var(--brand-ink); }
+
+.perm-name { font-size: 13px; white-space: nowrap; }
+.perm-code {
+  margin-left: 6px; padding: 1px 4px; border-radius: 3px;
+  font-size: 10.5px; color: var(--muted); background: var(--paper-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap;
+}
+.perm-desc { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+.perm-group-tag {
+  display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  color: var(--brand-ink); background: var(--brand-50); border: 1px solid var(--brand-200);
+}
+.perm-gstart td { border-top: 2px solid var(--card-border); }
+.perm-matrix .perm-box {
+  width: 16px; height: 16px; margin: 0; cursor: pointer;
+  accent-color: var(--brand-ink);
+}
+.perm-matrix .perm-box:disabled { cursor: not-allowed; opacity: .45; }
+.perm-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border);
+}
+.perm-actions .muted { white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .perm-col-name { min-width: 220px; }
+  .perm-col-role { min-width: 78px; }
+  .perm-desc { font-size: 11px; }
+}

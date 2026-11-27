@@ -1,6 +1,7 @@
 """后台管理：用户/角色/权限、审计日志、工序模板、备份、系统信息。"""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
@@ -33,10 +34,16 @@ from ..models import (
 )
 from ..permissions import (
     DEFAULT_SCOPE,
+    EDITABLE_ROLES,
+    PERM_GROUPS,
     ROLE_LABELS,
     ROLE_PERMS,
     ALL_PERMISSIONS,
+    effective_role_perms,
+    is_custom,
+    reset_matrix,
     require,
+    save_matrix,
 )
 from ..scheduler import reload_backup_jobs
 from ..security import generate_totp_secret, hash_password, password_problem
@@ -780,15 +787,75 @@ def save_wx_settings(
 
 
 @router.get("/permissions")
-def permissions_page(request: Request, user: User = Depends(require("admin:user"))):
+def permissions_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:user")),
+):
+    matrix = effective_role_perms()
     return render(
         request,
         "admin/permissions.html",
         roles=ROLE_LABELS,
-        role_perms={k: sorted(v) for k, v in ROLE_PERMS.items()},
-        all_perms=ALL_PERMISSIONS,
+        matrix={k: sorted(v) for k, v in matrix.items()},
+        perm_groups=PERM_GROUPS,
+        editable_roles=EDITABLE_ROLES,
+        custom_roles=[r for r in EDITABLE_ROLES if is_custom(r)],
+        perm_total=len(ALL_PERMISSIONS),
         scopes=SCOPES,
     )
+
+
+@router.post("/permissions")
+def permissions_save(
+    request: Request,
+    matrix_json: str = Form("{}"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:user")),
+    _csrf: None = Depends(csrf_protect),
+):
+    """保存权限矩阵。只接受 EDITABLE_ROLES 里的角色；admin 列前端禁用、后端也忽略。"""
+    try:
+        payload = json.loads(matrix_json or "{}")
+    except ValueError:
+        return redirect("/admin/permissions", "提交的数据格式不对，没有保存", "err")
+    if not isinstance(payload, dict):
+        return redirect("/admin/permissions", "提交的数据格式不对，没有保存", "err")
+
+    before = {r: sorted(p) for r, p in effective_role_perms().items() if r in EDITABLE_ROLES}
+    after = save_matrix(db, payload)
+    log_action(
+        db,
+        user,
+        "perm.update",
+        "app_settings",
+        None,
+        old=before,
+        new={r: sorted(p) for r, p in after.items()},
+        ip=client_ip(request),
+    )
+    commit_retry(db)
+    if not after:
+        return redirect("/admin/permissions", "已保存：所有角色都回到默认权限", "ok")
+    return redirect(
+        "/admin/permissions",
+        f"已保存：{len(after)} 个角色使用自定义权限，对在线用户立即生效",
+        "ok",
+    )
+
+
+@router.post("/permissions/reset")
+def permissions_reset(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin:user")),
+    _csrf: None = Depends(csrf_protect),
+):
+    before = {r: sorted(p) for r, p in effective_role_perms().items() if r in EDITABLE_ROLES}
+    reset_matrix(db)
+    log_action(db, user, "perm.reset", "app_settings", None, old=before, new=None, ip=client_ip(request))
+    commit_retry(db)
+    return redirect("/admin/permissions", "已恢复默认权限预设", "ok")
 
 
 # ---------------------------------------------------------- 电子合同模板

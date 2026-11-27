@@ -14,22 +14,90 @@
   </nav>
 </div>
 
-<section class="card">
-  <table class="tight">
-    <thead>
-      <tr><th>权限点</th>{% for key, label in roles.items() %}<th>{{ label }}<div class="muted small">{{ key }}</div></th>{% endfor %}</tr>
-    </thead>
-    <tbody>
-    {% for perm in all_perms %}
-      <tr>
-        <td><code>{{ perm }}</code></td>
-        {% for key in roles.keys() %}
-          <td class="center">{{ '✅' if perm in role_perms[key] else '—' }}</td>
+<section class="card perm-card">
+  <div class="perm-head">
+    <div class="perm-head-text">
+      <h2>谁能做什么</h2>
+      <p class="muted small">
+        勾上 = 该角色拥有这个权限。改完点「保存权限」，<strong>对在线用户立即生效</strong>，不用让人重新登录。
+        管理员的列锁死为全权——万一把它改没了，就没人能进后台改回来。
+      </p>
+    </div>
+    <div class="perm-badges">
+      {% if custom_roles %}
+        <span class="badge warn">{{ custom_roles|length }} 个角色使用自定义权限</span>
+      {% else %}
+        <span class="badge">{{ perm_total }} 个权限点 · 全部为默认预设</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" action="/admin/permissions" id="permForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="matrix_json" id="matrixJson" value="">
+
+    <div class="perm-scroll">
+      <table class="tight perm-matrix">
+        <thead>
+          <tr>
+            <th class="perm-col-name">权限点</th>
+            {% for key, label in roles.items() %}
+            <th class="perm-col-role">
+              <div class="pr-label">{{ label }}</div>
+              <div class="pr-key">
+                {{ key }}
+                {% if key in custom_roles %}<span class="badge warn">自定义</span>{% endif %}
+              </div>
+              {% if key in editable_roles %}
+              <button type="button" class="pr-all js-col-all" data-role="{{ key }}">全选</button>
+              {% else %}
+              <div class="pr-lock">固定全权</div>
+              {% endif %}
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+        {% set ns = namespace(prev='') %}
+        {% for group, perms in perm_groups.items() %}
+          {% for p in perms %}
+          <tr class="{{ 'perm-gstart' if group != ns.prev else '' }}">
+            <td>
+              <div class="perm-name">
+                {% if group != ns.prev %}<span class="perm-group-tag">{{ group }}</span>{% endif %}
+                {{ p.label }}<code class="perm-code">{{ p.key }}</code>
+              </div>
+              <div class="perm-desc">{{ p.desc }}</div>
+            </td>
+            {% for key in roles.keys() %}
+            <td class="center">
+              {% if key in editable_roles %}
+              <input type="checkbox" class="perm-box" data-role="{{ key }}" data-perm="{{ p.key }}"
+                     aria-label="{{ roles[key] }} · {{ p.label }}"
+                     {{ 'checked' if p.key in matrix[key] }}>
+              {% else %}
+              <input type="checkbox" checked disabled aria-label="管理员固定全权">
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          {% set ns.prev = group %}
         {% endfor %}
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="perm-actions">
+      <button type="submit" class="btn primary">保存权限</button>
+      <button type="button" class="btn ghost" id="btnResetPerm">恢复默认预设</button>
+      <span class="muted small" id="permDirty"></span>
+    </div>
+  </form>
+
+  <form method="post" action="/admin/permissions/reset" id="permResetForm" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  </form>
 </section>
 
 <section class="card">
@@ -40,6 +108,67 @@
     {% for key, label in scopes.items() %}<tr><td><code>{{ key }}</code></td><td>{{ label }}</td></tr>{% endfor %}
     </tbody>
   </table>
-  <p class="muted small">金额隔离：设计师与安装工即使能看客户，也看不到合同金额（模板层与视图层双重屏蔽）。安装工采用显式白名单——只能看到自己被指派任务的客户。</p>
+  <p class="muted small">
+    数据范围是第二道闸：权限点决定「能不能进这个功能」，数据范围决定「进去以后能看到谁的记录」。
+    两者都要通过才放行。
+  </p>
+  <p class="muted small">
+    金额隔离：设计师与安装工即使有「查看合同」权限，也看不到合同金额（模板层与视图层双重屏蔽）。
+    安装工采用显式白名单——只能看到自己被指派了工序的客户。
+  </p>
 </section>
+
+<script>
+(function () {
+  var form = document.getElementById('permForm');
+  if (!form) return;
+  var out = document.getElementById('matrixJson');
+  var dirty = document.getElementById('permDirty');
+
+  function boxes(role) {
+    return Array.prototype.slice.call(document.querySelectorAll('.perm-box[data-role="' + role + '"]'));
+  }
+
+  function collect() {
+    var m = {};
+    Array.prototype.forEach.call(document.querySelectorAll('.perm-box'), function (b) {
+      var r = b.dataset.role;
+      if (!m[r]) m[r] = [];
+      if (b.checked) m[r].push(b.dataset.perm);
+    });
+    return m;
+  }
+
+  form.addEventListener('submit', function () {
+    out.value = JSON.stringify(collect());
+  });
+
+  function markDirty() {
+    if (dirty) dirty.textContent = '有未保存的改动';
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.perm-box'), function (b) {
+    b.addEventListener('change', markDirty);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.js-col-all'), function (btn) {
+    btn.addEventListener('click', function () {
+      var list = boxes(btn.dataset.role);
+      var allOn = list.every(function (b) { return b.checked; });
+      list.forEach(function (b) { b.checked = !allOn; });
+      btn.textContent = allOn ? '全选' : '清空';
+      markDirty();
+    });
+  });
+
+  var reset = document.getElementById('btnResetPerm');
+  if (reset) {
+    reset.addEventListener('click', function () {
+      if (window.confirm('恢复默认会把所有角色（含已自定义的）重置为出厂预设，确定？')) {
+        document.getElementById('permResetForm').submit();
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}

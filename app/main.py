@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import __version__, errors
+from . import __version__, errors, permissions
 from .auth import NotAuthenticated, load_user, router as auth_router
 from .bootstrap import configure_logging, ensure_fts, run_migrations, seed_admin, seed_stages
 from .config import get_settings, set_timezone
@@ -94,6 +94,11 @@ async def lifespan(app: FastAPI):
     seed_stages()
     seed_admin()
     log.info("数据库初始化完成（迁移方式：%s）", backend)
+    # 权限矩阵的自定义覆盖读进进程缓存（uvicorn --workers 1，单进程安全）
+    with session_scope() as _db:
+        custom = permissions.load_overrides(_db)
+    if custom:
+        log.info("权限矩阵：%s 使用自定义权限", "、".join(sorted(custom)))
     start_scheduler()
     try:
         yield
