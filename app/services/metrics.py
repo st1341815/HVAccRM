@@ -100,6 +100,18 @@ def _cache(db: Session, key: str, loader):
     return store[key]
 
 
+def _sig(cids: list[int]) -> str:
+    """cids 的参数指纹。
+
+    ⚠️ 缓存 key **必须**带上它。踩过的坑（v1.16.0 上线当天）：key 写死成
+    "costs"，于是「按全部合同算年成本」和「按已结算合同算年利润」共用同一份
+    缓存 —— 谁先跑谁的结果被另一方复用。页面上年利润因此拿到了全公司成本
+    59,164 而不是那 1 份已结算合同的 6,211，从 +2,289 变成 −50,664。
+    这类 bug 单看任何一个函数都发现不了，因为每个函数单独算都是对的。
+    """
+    return str(hash(frozenset(cids)))
+
+
 def visible_customer_ids(db: Session, user: User) -> set[int] | None:
     """None = 不限（管理员/全局范围）。"""
     def load():
@@ -142,7 +154,7 @@ def changes_by_contract(db: Session, cids: list[int]) -> dict[int, float]:
         for co in db.scalars(select(ChangeOrder).where(ChangeOrder.contract_id.in_(cids))).all():
             out[co.contract_id] = out.get(co.contract_id, 0.0) + (co.amount or 0.0)
         return out
-    return _cache(db, "changes", load)
+    return _cache(db, "changes:" + _sig(cids), load)
 
 
 def contract_sales(c: Contract, changes: dict[int, float]) -> float:
@@ -158,7 +170,7 @@ def payments_by_contract(db: Session, cids: list[int]) -> dict[int, list[Payment
         for p in db.scalars(select(Payment).where(Payment.contract_id.in_(cids))).all():
             out.setdefault(p.contract_id, []).append(p)
         return out
-    return _cache(db, "payments", load)
+    return _cache(db, "payments:" + _sig(cids), load)
 
 
 def costs_by_contract(db: Session, cids: list[int]) -> dict[int, list[ContractCost]]:
@@ -169,7 +181,7 @@ def costs_by_contract(db: Session, cids: list[int]) -> dict[int, list[ContractCo
         for r in db.scalars(select(ContractCost).where(ContractCost.contract_id.in_(cids))).all():
             out.setdefault(r.contract_id, []).append(r)
         return out
-    return _cache(db, "costs", load)
+    return _cache(db, "costs:" + _sig(cids), load)
 
 
 def month_labels(months: int) -> list[str]:
@@ -245,8 +257,7 @@ def _kpi_profit(db: Session, user: User) -> dict:
         (r.amount or 0.0) for rs in costs_by_contract(db, cids).values()
         for r in rs if (r.spent_at or "").startswith(year)
     )
-    return {"value": round(sales - cost, 2), "label": f"{year} 年利润",
-            "note": f"仅已结算 {len(cs)} 份"}
+    return {"value": round(sales - cost, 2), "label": f"{year} 年利润"}
 
 
 @metric("kpi.outstanding", "未收总额", "财务", ("kpi",), ("payment:view",), money=True)
