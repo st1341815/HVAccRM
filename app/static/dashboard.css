@@ -146,7 +146,11 @@ body.dash-editing .dash-card.is-target { outline: 2px dashed var(--brand); backg
 .dd-head .t:hover { background: var(--paper-3); }
 .dd-tip { font-size: 11.5px; color: var(--muted); margin: 6px 0 10px; }
 .dd-body { overflow-y: auto; flex: 1; padding-right: 2px; }
-.dd-sec { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin: 12px 0 6px; }
+.dd-sec {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin: 12px 0 6px;
+}
+.dd-sec .dd-count { margin-left: auto; font-weight: 600; opacity: .7; letter-spacing: 0; }
 .dd-item {
   display: flex; align-items: center; gap: .5rem; width: 100%;
   border: 1px solid var(--card-border); border-radius: var(--radius-sm);
@@ -156,6 +160,16 @@ body.dash-editing .dash-card.is-target { outline: 2px dashed var(--brand); backg
 .dd-item:hover { background: var(--brand-50); border-color: var(--brand-200); }
 .dd-item .dd-kinds { margin-left: auto; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .dd-item .dd-plus { color: var(--brand-ink); font-weight: 700; font-size: 14px; }
+
+/* 已在看板上的指标：置灰 + 点它跳到那张卡 */
+.dd-item.is-added { opacity: .55; }
+.dd-item.is-added:hover { opacity: .9; background: var(--paper-3); border-color: var(--card-border); }
+.dd-item.is-added .dd-plus { font-size: 11px; font-weight: 600; color: var(--muted); }
+.dash-card.dash-flash { animation: dashFlash 1.2s ease; }
+@keyframes dashFlash {
+  0%, 100% { box-shadow: var(--shadow-sm, 0 1px 2px rgb(20 35 60 / .06)); }
+  25%, 75% { box-shadow: 0 0 0 3px var(--brand-200); }
+}
 
 /* ---------- 卡片设置浮层 ---------- */
 .dash-pop {

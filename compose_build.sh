@@ -11,6 +11,11 @@
 # ⚠️ 每次部署前：把下面这行的 tag 更新为「当前线上版本号」，
 #    以便新版本出问题时能 docker image tag <tag> hvaccrm:local 一键回滚。
 #
+# ⚠️⚠️ 上传文件必须带 `--overwrite replace`：
+#    trim-cli file upload 默认 overwrite=rename，目标同名时会**静默改名成 xxx_1.py**，
+#    原文件不动 → build 用的还是旧代码 → 版本号不变、白跑一次（v1.16.3 踩过）。
+#    正确写法：trim-cli ... file upload <remoteDir> <localFile> --overwrite replace --yes
+#
 # 📌 健康检查「文件名即数据」通道：沙箱有时连不上 NAS 的 Docker 映射端口，
 #    读不到 build_result.log 正文，所以把 /health 结果编码进文件名，
 #    外部用 `trim-cli file ls /vol1/1000/Docker/Hvaccrm/` 即可读回版本号与状态。
@@ -19,7 +24,7 @@ DIR=/vol1/1000/Docker/Hvaccrm
 exec > $DIR/build_result.log 2>&1
 
 echo "===== START BUILD $(date -Iseconds) ====="
-docker image tag hvaccrm:local hvaccrm:pre-1.16.2
+docker image tag hvaccrm:local hvaccrm:pre-1.16.3
 
 echo "===== docker compose build ====="
 docker compose -f docker-compose.yml -p hvaccrm build 2>&1

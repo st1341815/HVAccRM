@@ -742,21 +742,47 @@
     var catalog = safeJSON(($('#dashCatalog') || {}).textContent);
     // 后端 /catalog 直出数组；这里兼容一下「包了一层 metrics」的形态
     var metrics = Array.isArray(catalog) ? catalog : (catalog.metrics || []);
+    // 已经在看板上的指标：metric -> 卡片 id（同指标多张卡时取第一张，点它跳过去）
+    var onBoard = {};
+    Array.prototype.forEach.call(grid.querySelectorAll('.dash-card'), function (c) {
+      var k = c.dataset.metric;
+      if (k && !onBoard[k]) onBoard[k] = c.dataset.id;
+    });
     var groups = {};
     metrics.forEach(function (m) { (groups[m.group] = groups[m.group] || []).push(m); });
     var html = '';
     Object.keys(groups).forEach(function (g) {
-      html += '<div class="dd-sec">' + g + '</div>';
-      groups[g].forEach(function (m) {
-        html += '<button type="button" class="dd-item" data-key="' + m.key + '">' +
+      var list = groups[g];
+      var used = list.filter(function (m) { return onBoard[m.key]; }).length;
+      html += '<div class="dd-sec">' + g +
+        '<span class="dd-count">已用 ' + used + '/' + list.length + '</span></div>';
+      list.forEach(function (m) {
+        var added = !!onBoard[m.key];
+        html += '<button type="button" class="dd-item' + (added ? ' is-added' : '') +
+          '" data-key="' + m.key + '"' + (added ? ' data-added="1"' : '') + '>' +
           '<span>' + m.title + '</span>' +
           '<span class="dd-kinds">' + m.kinds.map(function (k) { return KIND_LABEL[k] || k; }).join(' / ') + '</span>' +
-          '<span class="dd-plus">+</span></button>';
+          '<span class="dd-plus">' + (added ? '✓ 已添加' : '+') + '</span></button>';
       });
     });
     body.innerHTML = html || '<p class="muted small">当前账号没有可用指标</p>';
     $('#libDrawer').hidden = false;
     $('#dashScrim').hidden = false;
+  }
+
+  // 点「已添加」的指标：关掉抽屉，滚到那张卡并闪一下
+  function focusCard(metric) {
+    var card = null;
+    Array.prototype.forEach.call(grid.querySelectorAll('.dash-card'), function (c) {
+      if (!card && c.dataset.metric === metric) card = c;
+    });
+    closeLib();
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('dash-flash');
+    void card.offsetWidth;   // 强制重排，让动画能重放
+    card.classList.add('dash-flash');
+    setTimeout(function () { card.classList.remove('dash-flash'); }, 1400);
   }
 
   function closeLib() {
@@ -868,7 +894,9 @@
 
     $('#libBody').addEventListener('click', function (e) {
       var item = e.target.closest('.dd-item');
-      if (item) addMetric(item.dataset.key);
+      if (!item) return;
+      if (item.dataset.added) { focusCard(item.dataset.key); return; }
+      addMetric(item.dataset.key);
     });
 
     $('.js-close-lib').addEventListener('click', closeLib);
