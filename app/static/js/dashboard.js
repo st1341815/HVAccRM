@@ -20,6 +20,7 @@
   var charts = {};            // id -> Chart 实例（必须 destroy，否则切方案会泄漏）
   var editing = false;
   var undoStack = [];         // [{html, index}] 仅记录删除，够用且不会误导
+  var dirty = false;          // 编辑态是否已有未保存改动
 
   // ------------------------------------------------------------------ 工具
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -332,7 +333,181 @@
     document.body.classList.toggle('dash-editing', on);
     $('#editBar').hidden = !on;
     $('#btnEdit').textContent = on ? '退出编辑' : '编辑布局';
-    if (!on) closePop(), closeLib();
+    if (!on) { closePop(); closeLib(); clearDirty(); }
+  }
+
+  // ------------------------------------------------------------------ 草稿模式
+  // 编辑态的一切操作（增删、拖动、换指标/图形/尺寸）只改 DOM 与 ITEMS，**不落库**；
+  // 只有点「保存并完成」才 PATCH 一次。
+  // 为什么这么改：v1.16.1 之前每次加模块都「存库 + location.reload()」，reload 顺手
+  // 把编辑态也关了 —— 用户想连加两个模块，得重新进一次编辑态；想反悔也没有退路。
+  function markDirty() {
+    if (dirty) return;
+    dirty = true;
+    var b = $('#btnDone');
+    if (b) b.textContent = '保存并完成';
+  }
+
+  function clearDirty() {
+    dirty = false;
+    var b = $('#btnDone');
+    if (b) b.textContent = '完成';
+  }
+
+  // 退出编辑态的统一入口：有未保存改动就先确认，确认放弃就整页重载回原样
+  function exitEditing() {
+    if (dirty) {
+      if (!window.confirm('有未保存的布局改动，确定放弃？')) return;
+      location.reload();
+      return;
+    }
+    setEditing(false);
+  }
+
+  function catalogList() {
+    var cat = safeJSON(($('#dashCatalog') || {}).textContent);
+    return Array.isArray(cat) ? cat : (cat.metrics || []);
+  }
+
+  function metricTitle(key) {
+    var m = catalogList().filter(function (x) { return x.key === key; })[0];
+    return m ? m.title : key;
+  }
+
+  // 与服务端 |wan 过滤器同口径：元 → 万元，1 位小数，千分位
+  function wanJS(v) {
+    return (Number(v || 0) / 10000).toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // 卡片外壳（与服务端模板 dashboard.html 的结构保持一致，只是不含内联数据块）
+  var HEAD_HTML =
+    '<header class="card-head">' +
+      '<span class="drag-handle" aria-hidden="true" title="拖动调整位置">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>' +
+      '</span>' +
+      '<span class="card-title"></span>' +
+      '<div class="card-tools">' +
+        '<button type="button" class="t js-gear" title="设置这个模块" aria-label="设置">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>' +
+        '</button>' +
+        '<button type="button" class="t js-remove" title="移除这个模块" aria-label="移除">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        '</button>' +
+      '</div>' +
+    '</header>';
+
+  function buildCard(item) {
+    var sec = document.createElement('section');
+    sec.className = 'card dash-card';
+    sec.dataset.id = item.id;
+    sec.dataset.metric = item.metric;
+    sec.dataset.kind = item.kind;
+    sec.dataset.span = item.span;
+    sec.dataset.h = item.h || 0;
+    sec.dataset.opts = JSON.stringify(item.opts || {});
+    sec.style.gridColumn = 'span ' + item.span;
+    sec.innerHTML = HEAD_HTML;
+    $('.card-title', sec).textContent = metricTitle(item.metric);
+    return sec;
+  }
+
+  // 按 kind 重建卡片内容（KPI / 列表 / 图表）。图表复用 renderCard()。
+  function renderBody(card, item, data) {
+    destroyChart(item.id);
+    Array.prototype.slice.call(card.children).forEach(function (n) {
+      if (!n.classList.contains('card-head')) n.remove();
+    });
+    var oldSub = $('.card-sub', card);
+    if (oldSub) oldSub.remove();
+    $('.card-title', card).textContent = metricTitle(item.metric);
+    DATA[item.id] = data || null;
+
+    if (!data) { card.appendChild(el('p', 'dash-empty', '暂无数据')); return; }
+
+    if (item.kind === 'kpi') {
+      var box = el('div', 'kpi-body');
+      var num = el('span', 'kpi-num');
+      num.textContent = data.unit === 'wan'
+        ? '¥ ' + wanJS(data.value) + ' 万'
+        : String(data.value) + (item.metric === 'kpi.recovery' ? '%' : '');
+      box.appendChild(num);
+      box.appendChild(el('span', 'kpi-label', data.label || ''));
+      if (data.delta) {
+        box.appendChild(el('span', 'kpi-delta ' + (data.delta > 0 ? 'up' : 'down'),
+          (data.delta > 0 ? '+' : '') + Number(data.delta).toFixed(1) + '%'));
+      }
+      if (data.note) box.appendChild(el('span', 'kpi-note', data.note));
+      card.appendChild(box);
+      return;
+    }
+
+    if (item.kind === 'list') {
+      var rows = data.rows || [];
+      if (!rows.length) { card.appendChild(el('p', 'dash-empty', '暂无数据')); return; }
+      var cols = data.columns || ['名称', '数值'];
+      var sub = el('span', 'card-sub', '共 ' + (data.total != null ? data.total : rows.length) + ' 条');
+      var head = $('.card-head', card);
+      head.insertBefore(sub, $('.card-tools', card));
+
+      var t = el('table', 'tight dash-list');
+      var thead = el('thead'), tr = el('tr');
+      tr.appendChild(el('th', null, cols[0] || '名称'));
+      var th2 = el('th', null, cols[1] || '数值');
+      th2.style.textAlign = 'right';
+      tr.appendChild(th2);
+      if (rows[0].meta !== undefined) tr.appendChild(el('th', null, '状态'));
+      thead.appendChild(tr);
+      t.appendChild(thead);
+
+      var tb = el('tbody');
+      rows.forEach(function (r) {
+        var row = el('tr');
+        var c1 = el('td');
+        var a = el('a', 'dash-link', r.label);
+        a.href = r.href || '#';
+        c1.appendChild(a);
+        row.appendChild(c1);
+        var c2 = el('td', 'num');
+        c2.textContent = data.unit === 'wan' ? '¥ ' + wanJS(r.value) : String(r.value);
+        row.appendChild(c2);
+        if (r.meta !== undefined) {
+          var c3 = el('td');
+          c3.appendChild(el('span', 'badge b-' + r.meta, r.meta));
+          row.appendChild(c3);
+        }
+        tb.appendChild(row);
+      });
+      t.appendChild(tb);
+      card.appendChild(t);
+      return;
+    }
+
+    var cb = el('div', 'chart-box');
+    cb.style.height = (item.h || 240) + 'px';
+    card.appendChild(cb);
+    renderCard(card);
+  }
+
+  // 取一个模块的数据并重绘（换指标 / 换图形后必须重取：同一指标的不同图形，
+  // 返回结构可能不同 —— kpi 给 value，line 给 labels+series）
+  function refreshCard(card, item) {
+    var url = '/api/dashboard/widget?metric=' + encodeURIComponent(item.metric);
+    Object.keys(item.opts || {}).forEach(function (k) {
+      url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(item.opts[k]);
+    });
+    return api(url).then(function (r) {
+      renderBody(card, item, r.data);
+    }).catch(function (e) {
+      renderBody(card, item, null);
+      toast(e.message || '模块数据加载失败', true);
+    });
   }
 
   function collectItems() {
@@ -349,14 +524,12 @@
     });
   }
 
-  function saveLayout(silent) {
+  function saveLayout() {
     return api('/api/dashboard/views/' + grid.dataset.viewId, {
       method: 'PATCH',
       body: { items: collectItems() }
     }).then(function () {
-      if (!silent) toast('布局已保存');
-    }).catch(function (e) {
-      toast(e.message || '保存失败', true);
+      toast('布局已保存');
     });
   }
 
@@ -420,7 +593,7 @@
     drag = null;
     // 重排后图表尺寸变了，Chart.js 需要 resize
     Object.keys(charts).forEach(function (id) { charts[id].resize(); });
-    saveLayout(true);
+    markDirty();
   }
 
   // 删除
@@ -431,7 +604,7 @@
     card.remove();
     delete DATA[id];
     delete ITEMS[id];
-    saveLayout(true);
+    markDirty();
     toast('已移除，可点「撤销」恢复');
   }
 
@@ -521,19 +694,27 @@
 
   function applyToCard(card, patch) {
     var id = card.dataset.id;
-    Object.assign(ITEMS[id] = ITEMS[id] || {}, patch);
-    Object.keys(patch).forEach(function (k) {
-      if (k === 'span') card.style.gridColumn = 'span ' + patch[k];
-      if (k === 'metric' || k === 'kind' || k === 'span' || k === 'h') card.dataset[k] = patch[k];
-    });
+    ITEMS[id] = ITEMS[id] || {};
+    Object.keys(patch).forEach(function (k) { ITEMS[id][k] = patch[k]; });
+    if (patch.metric != null) card.dataset.metric = patch.metric;
+    if (patch.kind != null) card.dataset.kind = patch.kind;
+    if (patch.span != null) { card.dataset.span = patch.span; card.style.gridColumn = 'span ' + patch.span; }
+    if (patch.h != null) card.dataset.h = patch.h;
   }
 
   function changeKind(kind) {
     if (!popCard) return;
-    var id = popCard.dataset.id;
-    applyToCard(popCard, { kind: kind });
-    // 图表类需要 chart-box，数字/列表类需要重建外壳 —— 统一走「整页重载」最稳
-    saveLayout(true).then(function () { location.reload(); });
+    var card = popCard;
+    var it = ITEMS[card.dataset.id];
+    applyToCard(card, { kind: kind });
+    // 数字/列表不需要高度；图表类若没设过高度给个默认值
+    if (kind === 'kpi' || kind === 'list') it.h = 0;
+    else if (!it.h) it.h = 240;
+    card.dataset.h = it.h || 0;
+    renderKindSeg(it);
+    renderHSeg(it);
+    refreshCard(card, it);
+    markDirty();
   }
 
   function changeSpan(span) {
@@ -541,7 +722,7 @@
     applyToCard(popCard, { span: span });
     renderSpanSeg(ITEMS[popCard.dataset.id]);
     Object.keys(charts).forEach(function (id) { charts[id].resize(); });
-    saveLayout(true);
+    markDirty();
   }
 
   function changeH(h) {
@@ -552,7 +733,7 @@
     renderHSeg(ITEMS[popCard.dataset.id]);
     var ch = charts[popCard.dataset.id];
     if (ch) ch.resize();
-    saveLayout(true);
+    markDirty();
   }
 
   // ------------------------------------------------------------------ 模块库
@@ -585,6 +766,7 @@
 
   function addMetric(key) {
     var kinds = metricKinds(key);
+    if (!kinds.length) { toast('这个指标没有可用的图形', true); return; }
     var kind = kinds[0];
     var item = {
       id: 'w' + Date.now().toString(36),
@@ -594,17 +776,24 @@
       h: ['kpi', 'list'].indexOf(kind) >= 0 ? 0 : 240,
       opts: {}
     };
-    var items = collectItems().concat([item]);
-    api('/api/dashboard/views/' + grid.dataset.viewId, {
-      method: 'PATCH',
-      body: { items: items }
-    }).then(function () { location.reload(); })
-      .catch(function (e) { toast(e.message || '添加失败', true); });
+    ITEMS[item.id] = item;
+    var card = buildCard(item);
+    grid.appendChild(card);
+    closeLib();
+    markDirty();
+    refreshCard(card, item);
+    // 新卡在页面底部，滚动过去让用户看见
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    toast('已添加「' + metricTitle(key) + '」，记得点「保存并完成」');
   }
 
   // ------------------------------------------------------------------ 方案切换
   function switchView(id) {
     if (!id) return;
+    if (dirty && !window.confirm('有未保存的布局改动，切换方案会丢弃，继续？')) {
+      $('#viewSelect').value = grid.dataset.viewId;
+      return;
+    }
     location.href = '/?view=' + encodeURIComponent(id);
   }
 
@@ -637,11 +826,20 @@
     });
 
     $('#btnEdit').addEventListener('click', function () {
-      setEditing(!editing);
+      if (editing) { exitEditing(); return; }
+      setEditing(true);
     });
 
     $('#btnDone').addEventListener('click', function () {
-      saveLayout(false).then(function () { setEditing(false); });
+      var btn = this;
+      btn.disabled = true;
+      saveLayout().then(function () {
+        setEditing(false);
+        btn.disabled = false;
+      }).catch(function (e) {
+        btn.disabled = false;
+        toast(e.message || '保存失败', true);
+      });
     });
 
     $('#btnUndo').addEventListener('click', function () {
@@ -661,8 +859,8 @@
         opts: safeJSON(node.dataset.opts)
       };
       renderCard(node);
-      saveLayout(true);
-      toast('已恢复');
+      markDirty();
+      toast('已恢复，记得点「保存并完成」');
     });
 
     $('#btnLibrary').addEventListener('click', openLib);
@@ -686,8 +884,19 @@
     });
     $('#popMetric').addEventListener('change', function (e) {
       if (!popCard) return;
-      applyToCard(popCard, { metric: e.target.value, kind: metricKinds(e.target.value)[0] || 'bar' });
-      saveLayout(true).then(function () { location.reload(); });
+      var card = popCard;
+      var kind = metricKinds(e.target.value)[0] || 'bar';
+      applyToCard(card, { metric: e.target.value, kind: kind });
+      var it = ITEMS[card.dataset.id];
+      if (kind === 'kpi' || kind === 'list') it.h = 0;
+      else if (!it.h) it.h = 240;
+      card.dataset.h = it.h || 0;
+      $('#popTitle').textContent = e.target.value + ' · 设置';
+      renderKindSeg(it);
+      renderSpanSeg(it);
+      renderHSeg(it);
+      refreshCard(card, it);
+      markDirty();
     });
 
     // 点空白关闭浮层
@@ -699,7 +908,10 @@
 
     // 快捷键：编辑态 Esc 退出
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && editing) setEditing(false);
+      if (e.key !== 'Escape' || !editing) return;
+      if (!$('#cardPop').hidden) { closePop(); return; }
+      if (!$('#libDrawer').hidden) { closeLib(); return; }
+      exitEditing();
     });
   }
 
